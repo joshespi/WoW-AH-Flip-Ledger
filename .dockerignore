@@ -1,0 +1,4 @@
+# The only thing the image build copies is docker/. Everything else (src/, db_data/,
+# legacy/, uploader/) would just bloat the build context.
+*
+!docker/
