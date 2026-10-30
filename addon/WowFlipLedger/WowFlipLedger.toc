@@ -1,0 +1,12 @@
+## Interface: 120007, 120100, 120105
+## Title: WoW Flip Ledger
+## Notes: Your WoW Flip Ledger positions, watchlist targets and alerts in game. Data comes from the uploader.
+## Version: 0.1.0
+## SavedVariables: WowFlipLedgerDB
+## Category: Auction & Economy
+
+Data.lua
+Core.lua
+Tooltip.lua
+Panel.lua
+Alerts.lua
