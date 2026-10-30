@@ -1,0 +1,151 @@
+<?php
+
+namespace App\Services;
+
+use App\Support\Bounds;
+use App\Support\ItemName;
+use App\Support\Num;
+
+/**
+ * Weighted-average cost ledger. Port of the legacy build_ledger, same integer math.
+ *
+ * Buys come from the user's own trades. Sales come from TSM csvSales and only count from an
+ * item's first tracked buy onward. A sale larger than the tracked held quantity is "own
+ * stock" (gathered or pre-existing) and is reported apart from flip P/L.
+ *
+ * Buys sort before sells at the same timestamp. All operands are non-negative, so intdiv
+ * matches Python's floor division.
+ *
+ * @phpstan-type Position array{bq: int, bc: int, sq: int, sr: int, pnl: int, oq: int, orev: int, inv: int, cost: int}
+ */
+class LedgerService
+{
+    /**
+     * From TSM csvSales rows, as parsed (string fields). Malformed rows are skipped.
+     *
+     * @param  list<array{ts: int, item: string, qty: int, cost: int}>  $trades  cost is the lot total in copper
+     * @param  list<array<string, string>>  $sales  csvSales rows; price is per unit after the AH cut
+     * @return array<string, array{bq: int, bc: int, sq: int, sr: int, pnl: int, oq: int, orev: int, inv: int, cost: int}>
+     *                                                                                                                     keyed by base item id. bq/bc bought qty/cost, sq/sr sold qty/net revenue, pnl realized,
+     *                                                                                                                     oq/orev own-stock qty/revenue, inv/cost still held qty/cost basis.
+     */
+    public function build(array $trades, array $sales): array
+    {
+        $normalized = [];
+
+        foreach ($sales as $r) {
+            // Same limits as ingest, so qty x price stays an int.
+            if (($r['source'] ?? null) !== TsmData::SOURCE_AUCTION || Bounds::count($r['quantity'] ?? null, Bounds::MAX_QTY) === null
+                || Bounds::count($r['price'] ?? null, Bounds::MAX_PRICE) === null || Bounds::count($r['time'] ?? null) === null) {
+                continue;
+            }
+
+            $normalized[] = [
+                'item' => ItemName::baseId($r['itemString'] ?? ''),
+                'ts' => (int) $r['time'],
+                'qty' => (int) $r['quantity'],
+                'unit_price' => (int) $r['price'],
+            ];
+        }
+
+        return $this->buildFromSales($trades, $normalized);
+    }
+
+    /**
+     * From already-validated auction sales, as stored in tsm_sales.
+     *
+     * Item ids are only used as array keys, so any int or string id works (the app passes ints).
+     *
+     * A trade with `adjust` set removes qty units at the average cost with no revenue and no P/L
+     * (a correction for stock the log counted but the user never held). It counts only from the
+     * item's first buy onward, like a sale, and sorts after buys and sales at the same time.
+     *
+     * @param  list<array{ts: int, item: int|string, qty: int, cost: int, adjust?: bool}>  $trades
+     * @param  iterable<array{item: int|string, ts: int, qty: int, unit_price: int}>  $sales  unit_price after the AH cut; may be a generator
+     * @return array<int|string, array{bq: int, bc: int, sq: int, sr: int, pnl: int, oq: int, orev: int, inv: int, cost: int}>
+     */
+    public function buildFromSales(array $trades, iterable $sales): array
+    {
+        $events = [];
+        $adjusts = [];
+
+        foreach ($trades as $t) {
+            if ($t['adjust'] ?? false) {
+                $adjusts[] = $t;
+
+                continue;
+            }
+
+            $events[$t['item']][] = [$t['ts'], 0, $t['qty'], $t['cost']];
+        }
+
+        $first = array_map(static fn (array $e): int => min(array_column($e, 0)), $events);
+
+        foreach ($adjusts as $t) {
+            if (isset($first[$t['item']]) && $t['ts'] >= $first[$t['item']]) {
+                $events[$t['item']][] = [$t['ts'], 2, $t['qty'], 0];
+            }
+        }
+
+        foreach ($sales as $s) {
+            $k = $s['item'];
+
+            if ($s['qty'] <= 0 || ! isset($first[$k]) || $s['ts'] < $first[$k]) {
+                continue;
+            }
+
+            $events[$k][] = [$s['ts'], 1, $s['qty'], $s['qty'] * $s['unit_price']];
+        }
+
+        $out = [];
+
+        foreach ($events as $k => $list) {
+            usort($list, static fn (array $a, array $b): int => $a <=> $b);
+            $out[$k] = $this->replay($list);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  list<array{int, int, int, int}>  $events  [ts, side (0 buy, 1 sell, 2 adjust), qty, total copper]
+     * @return array{bq: int, bc: int, sq: int, sr: int, pnl: int, oq: int, orev: int, inv: int, cost: int}
+     */
+    private function replay(array $events): array
+    {
+        $a = ['bq' => 0, 'bc' => 0, 'sq' => 0, 'sr' => 0, 'pnl' => 0, 'oq' => 0, 'orev' => 0, 'inv' => 0, 'cost' => 0];
+
+        foreach ($events as [, $side, $q, $c]) {
+            if ($side === 0) {
+                $a['inv'] += $q;
+                $a['cost'] += $c;
+                $a['bq'] += $q;
+                $a['bc'] += $c;
+
+                continue;
+            }
+
+            if ($side === 2) {
+                $m = min($q, $a['inv']);
+                $a['cost'] -= $a['inv'] > 0 ? Num::mulDiv($a['cost'], $m, $a['inv']) : 0;
+                $a['inv'] -= $m;
+
+                continue;
+            }
+
+            $m = min($q, $a['inv']);
+            $cogs = $a['inv'] > 0 ? Num::mulDiv($a['cost'], $m, $a['inv']) : 0;
+            $rev = Num::mulDiv($c, $m, $q);
+
+            $a['pnl'] += $rev - $cogs;
+            $a['sq'] += $m;
+            $a['sr'] += $rev;
+            $a['oq'] += $q - $m;
+            $a['orev'] += $c - $rev;
+            $a['inv'] -= $m;
+            $a['cost'] -= $cogs;
+        }
+
+        return $a;
+    }
+}
