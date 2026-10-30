@@ -51,7 +51,7 @@ services:
       REAL_IP_FROM: ${TRUSTED_PROXIES:-127.0.0.1}
     ports:
       # Production with the proxy on this host: APP_BIND=127.0.0.1, so only the proxy can reach it.
-      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8087}:80"
+      - ${APP_PORT:-8087}:80"
     volumes:
       # public/ only: that is all nginx serves, and `npm run build` shows up without a rebuild.
       - ./src/public:/var/www/html/public:ro
