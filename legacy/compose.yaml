@@ -1,0 +1,19 @@
+# docker compose run --rm tsm ledger
+# docker compose run --rm tsm market
+# docker compose run --rm tsm scan --max-ratio 0.75
+#
+# /reload in game first; TSM only writes its file on reload/logout.
+
+services:
+  tsm:
+    build: .
+    image: tsm-ledger
+    pull_policy: build
+    environment:
+      TZ: ${TZ:-America/Denver}
+    volumes:
+      - type: bind
+        source: ${WOW_DIR:?set WOW_DIR in .env}
+        target: /wow
+        read_only: true
+      - ./data:/data
