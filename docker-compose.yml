@@ -1,0 +1,97 @@
+# One compose file for local + prod; only .env differs (APP_ENV, APP_URL, etc).
+name: wow-flip-ledger
+
+# php-fpm and the scheduler share one image and env so they can't drift apart.
+x-php: &php
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+  image: wow-flip-ledger-php
+  env_file: .env
+  restart: unless-stopped
+  environment:
+    # Where the backup service records its last good dump; health:check warns when it gets old.
+    LEDGER_BACKUP_STATUS_FILE: /backups/LAST_OK
+  volumes:
+    - ./src:/var/www/html
+    # Read-only so `artisan test`'s clearEnv() can read var names by path.
+    - ./.env:/var/www/html/.env:ro
+    # Read-only: the app only reads the status file, never the dumps' contents.
+    - ./backups:/backups:ro
+  depends_on:
+    db:
+      condition: service_healthy
+
+services:
+  app:
+    <<: *php
+
+  # In-stack scheduler, not host cron. Every entry in bootstrap/app.php carries
+  # onOneServer() + withoutOverlapping(), so a stray second scheduler can't double-fire.
+  scheduler:
+    <<: *php
+    user: www-data
+    # Overrides the image entrypoint; waits for the app entrypoint (composer, migrate) to finish.
+    entrypoint:
+      - sh
+      - -c
+      - |
+        until [ -f storage/framework/cache/.ready ]; do
+          echo "scheduler: waiting for app entrypoint..."
+          sleep 3
+        done
+        exec php artisan schedule:work
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    environment:
+      # The reverse proxy's address as nginx sees it (same value as TRUSTED_PROXIES). Only a
+      # request from there has its X-Forwarded-For believed, for the upload rate limit.
+      REAL_IP_FROM: ${TRUSTED_PROXIES:-127.0.0.1}
+    ports:
+      # Production with the proxy on this host: APP_BIND=127.0.0.1, so only the proxy can reach it.
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8087}:80"
+    volumes:
+      # public/ only: that is all nginx serves, and `npm run build` shows up without a rebuild.
+      - ./src/public:/var/www/html/public:ro
+      # A template: the image runs envsubst over it at start (REAL_IP_FROM below).
+      - ./docker/nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    depends_on:
+      - app
+
+  # Daily gzip dump of the database into ./backups (14 days kept; BACKUP_KEEP_DAYS, BACKUP_HOUR_UTC).
+  # Restore with scripts/db-restore.sh. Copy ./backups off this machine too (see README).
+  backup:
+    image: mariadb:11.8
+    restart: unless-stopped
+    entrypoint: ["sh", "/backup.sh"]
+    environment:
+      DB_HOST: db
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_HOUR_UTC: ${BACKUP_HOUR_UTC:-3}
+    volumes:
+      - ./backups:/backups
+      - ./docker/backup/backup.sh:/backup.sh:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mariadb:11.8
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env}
+    volumes:
+      - ./db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
