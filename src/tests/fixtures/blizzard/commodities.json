@@ -1,0 +1,19 @@
+{
+  "_links": {
+    "self": {
+      "href": "https://us.api.blizzard.com/data/wow/auctions/commodities?namespace=dynamic-us"
+    }
+  },
+  "auctions": [
+    {"id": 100000001, "item": {"id": 238371}, "quantity": 1000, "unit_price": 384000, "time_left": "VERY_LONG"},
+    {"id": 100000002, "item": {"id": 242639}, "quantity": 15000, "unit_price": 5300, "time_left": "LONG"},
+    {"id": 100000003, "item": {"id": 238371}, "quantity": 500, "unit_price": 390000, "time_left": "LONG"},
+    {"id": 100000004, "item": {"id": 238365}, "quantity": 50, "unit_price": 2100, "time_left": "SHORT"},
+    {"id": 100000005, "item": {"id": 238365}, "quantity": 400, "unit_price": 2000, "time_left": "VERY_LONG"},
+    {"id": 100000006, "item": {"id": 238511}, "quantity": 10, "unit_price": 62000, "time_left": "MEDIUM"},
+    {"id": 100000007, "item": {"id": 238371}, "quantity": 2000, "unit_price": 384000, "time_left": "VERY_LONG"},
+    {"id": 100000008, "item": {"id": 238365}, "quantity": 400, "unit_price": 2100, "time_left": "LONG"},
+    {"id": 100000009, "item": {"id": 242639}, "quantity": 200, "unit_price": 5100, "time_left": "SHORT"},
+    {"id": 100000010, "item": {"id": 238365}, "quantity": 1, "unit_price": 1999, "time_left": "VERY_LONG"}
+  ]
+}
