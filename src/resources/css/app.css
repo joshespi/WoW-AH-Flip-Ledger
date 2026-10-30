@@ -1,0 +1,143 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html {
+        font-feature-settings: 'cv11', 'ss01';
+    }
+
+    .dark *,
+    .dark ::before,
+    .dark ::after {
+        border-color: theme('colors.gray.700');
+    }
+
+    .dark body {
+        background-color: theme('colors.gray.950');
+        color: theme('colors.gray.200');
+    }
+
+    .dark input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']),
+    .dark select,
+    .dark textarea {
+        background-color: theme('colors.gray.950');
+        color: theme('colors.gray.200');
+        border-color: theme('colors.gray.700');
+    }
+
+    .dark ::placeholder {
+        color: theme('colors.gray.500');
+    }
+
+    /* Native controls (file picker, scrollbars, date pickers) follow the theme. */
+    html.dark {
+        color-scheme: dark;
+    }
+
+    ::selection {
+        background-color: theme('colors.indigo.400 / 35%');
+    }
+
+    /* Checkboxes and radios in the accent colour. */
+    [type='checkbox'],
+    [type='radio'] {
+        @apply text-indigo-500 focus:ring-indigo-500;
+    }
+
+    a:focus-visible,
+    button:focus-visible {
+        @apply outline-none ring-2 ring-indigo-400 ring-offset-2 ring-offset-white dark:ring-offset-gray-950;
+    }
+}
+
+@layer components {
+    /* Content panel on the ledger screens. */
+    .card {
+        @apply rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:shadow-card;
+    }
+
+    /* Small uppercase label above a figure or table. */
+    .eyebrow {
+        @apply text-[11px] font-medium uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400;
+    }
+
+    /* Text inputs, selects and textareas. Dark borders and fill come from the base layer above. */
+    .field {
+        @apply rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/40;
+    }
+
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition disabled:opacity-50;
+    }
+
+    .btn-primary {
+        @apply btn bg-indigo-400 text-gray-950 shadow-sm hover:bg-indigo-300 active:bg-indigo-500;
+    }
+
+    .btn-secondary {
+        @apply btn border border-gray-300 bg-white text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700/70;
+    }
+
+    .btn-danger {
+        @apply btn bg-red-600 text-white shadow-sm hover:bg-red-500 active:bg-red-700;
+    }
+
+    /* Dense, terminal-like tables: small type, monospaced figures. */
+    .data-table {
+        @apply min-w-full text-[13px];
+    }
+
+    .data-table thead tr {
+        @apply border-b border-gray-200 text-left dark:border-gray-800;
+    }
+
+    .data-table th {
+        @apply whitespace-nowrap px-3 py-2 text-[11px] font-medium uppercase tracking-[0.06em] text-gray-500 dark:text-gray-400;
+    }
+
+    .data-table td {
+        @apply whitespace-nowrap px-3 py-2;
+    }
+
+    .data-table tbody tr {
+        @apply border-b border-gray-100 transition-colors last:border-0 hover:bg-gray-50 dark:border-gray-800/80 dark:hover:bg-gray-800/40;
+    }
+
+    .data-table .num {
+        @apply text-right font-mono tabular-nums;
+    }
+
+    /* For wide tables inside a scrolling wrapper (max-h + overflow-auto): the heading row
+       sticks to the top and the first column to the left. Both need an opaque background,
+       and the heading keeps its bottom rule via a shadow (borders on <tr> don't stick). */
+    .data-table-sticky thead th {
+        @apply sticky top-0 z-10 bg-white shadow-[inset_0_-1px_0_theme(colors.gray.200)] dark:bg-gray-900 dark:shadow-[inset_0_-1px_0_theme(colors.gray.800)];
+    }
+
+    .data-table-sticky th:first-child,
+    .data-table-sticky td:first-child {
+        @apply sticky left-0 bg-white shadow-[inset_-1px_0_0_theme(colors.gray.100)] dark:bg-gray-900 dark:shadow-[inset_-1px_0_0_theme(colors.gray.800)];
+    }
+
+    .data-table-sticky tbody tr:hover td:first-child {
+        @apply bg-gray-50 dark:bg-gray-800;
+    }
+
+    .data-table-sticky thead th:first-child {
+        @apply z-20 shadow-[inset_-1px_-1px_0_theme(colors.gray.200)] dark:shadow-[inset_-1px_-1px_0_theme(colors.gray.800)];
+    }
+
+    /* Sidebar links. */
+    .side-link {
+        @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-400 transition hover:bg-white/5 hover:text-gray-100;
+    }
+
+    .side-link[aria-current='page'] {
+        @apply bg-indigo-400/10 text-indigo-300;
+    }
+
+    .side-link[aria-current='page'] svg {
+        @apply text-indigo-400;
+    }
+}
