@@ -1,0 +1,23 @@
+# one item name or i:ID per line; every rank of a name is listed
+Arcane Wyrmfish
+Void-Tempered Leather
+Void-Tempered Scales
+Sin'dorei Swarmer
+Practically Pork
+Shredded Glimmerline
+Shredded Bloomline
+Blood Hunter
+Lynxfish
+Refulgent Copper Ore
+Brilliant Silver Ore
+Umbral Tin Ore
+Eversong Trout
+Sunwell Fish
+
+# candidates
+Void-Tempered Hide
+Royal Roast
+Argentleaf
+Arcanoweave
+Azeroot
+Shimmersiren
