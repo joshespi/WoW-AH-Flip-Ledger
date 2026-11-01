@@ -24,7 +24,7 @@
             </div>
         @endif
 
-        <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-5 gap-4">
             <x-stat-tile :label="__('Realized P/L')" :hint="__('Net of the :cut% AH cut', ['cut' => \App\Support\Money::AH_CUT * 100])">
                 <x-money :copper="$s['realized']" pnl />
             </x-stat-tile>
@@ -62,6 +62,7 @@
                                 <th class="num">{{ __('Avg cost') }}</th>
                                 <th class="num">{{ __('Break-even') }}</th>
                                 <th class="num">{{ __('Floor') }}</th>
+                                <th class="num" title="{{ __('Held x floor, after the AH cut.') }}">{{ __('Value') }}</th>
                                 <th class="num">{{ __('vs break-even') }}</th>
                                 <th>{{ __('Status') }}</th>
                             </tr>
@@ -74,6 +75,7 @@
                                     <td class="num"><x-money :copper="$p->avgCost" /></td>
                                     <td class="num"><x-money :copper="$p->breakEven" /></td>
                                     <td class="num"><x-money :copper="$p->floor" /></td>
+                                    <td class="num"><x-money :copper="$p->valueAtFloor" /></td>
                                     <td class="num"><x-pct :value="$p->floorVsBreakEven" /></td>
                                     <td><x-position-status :position="$p" /></td>
                                 </tr>

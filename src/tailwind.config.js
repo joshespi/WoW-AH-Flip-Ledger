@@ -14,6 +14,7 @@ export default {
 
     theme: {
         extend: {
+            screens: { xs: '480px' },
             // Self-hosted variable fonts (@fontsource, bundled by Vite): nothing third-party at runtime.
             fontFamily: {
                 sans: ['"Inter Variable"', ...defaultTheme.fontFamily.sans],
