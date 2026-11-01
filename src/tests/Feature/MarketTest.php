@@ -9,6 +9,7 @@ use App\Models\WatchlistItem;
 use App\Services\ScanService;
 use App\Services\WatchlistService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\Support\SeedsMarketData;
 use Tests\TestCase;
@@ -142,6 +143,47 @@ class MarketTest extends TestCase
         $this->assertSame([200, 300], $ids($scan->scan($user, minItemId: 150)));
         $this->assertSame([100], $ids($scan->scan($user, top: 1)));
         $this->assertTrue($scan->scan($user, top: 1)[0]['knife']);
+    }
+
+    public function test_scan_modes_rank_margin_volume_and_past_winners(): void
+    {
+        $user = $this->user();
+        $scan = app(ScanService::class);
+        $ids = fn (string $mode) => array_column($scan->scan($user, mode: $mode), 'item_id');
+
+        // Margin per unit is typical x 0.95 - floor: only item 100 (95 - 70) is positive.
+        $this->assertSame([100], $ids('margin'));
+        $this->assertSame(25, $scan->scan($user, mode: 'margin')[0]['margin']);
+        $this->assertSame([100, 200], $ids('volume'));          // 300 is above typical
+        $this->assertSame([], $ids('winners'));
+
+        // Item 200: bought at 50, sold at 80 after the cut. Item 100: sold below cost.
+        $row = ['user_id' => $user->id, 'realm' => 'r', 'qty' => 10, 'sold_at' => '2026-10-01 00:00:00', 'source' => 'Auction'];
+        DB::table('trades')->insert([
+            ['user_id' => $user->id, 'item_id' => 200, 'traded_at' => '2026-09-01 00:00:00', 'qty' => 10, 'cost_copper' => 500, 'side' => 'buy'],
+            ['user_id' => $user->id, 'item_id' => 100, 'traded_at' => '2026-09-01 00:00:00', 'qty' => 10, 'cost_copper' => 900, 'side' => 'buy'],
+        ]);
+        DB::table('tsm_sales')->insert([
+            $row + ['item_id' => 200, 'unit_price_copper' => 80, 'dedupe_key' => str_repeat('a', 40)],
+            $row + ['item_id' => 100, 'unit_price_copper' => 60, 'dedupe_key' => str_repeat('b', 40)],
+        ]);
+        $this->assertSame([200], $ids('winners'));
+
+        $this->assertSame($ids('discount'), $ids('bogus'));   // unknown mode falls back
+    }
+
+    public function test_scan_rows_carry_a_sparkline_from_daily_prices(): void
+    {
+        $user = $this->user();
+
+        foreach ([1, 2, 3] as $i) {
+            DB::table('price_daily')->insert(['region' => $user->region, 'day' => "2026-10-0$i", 'item_id' => 100, 'floor_min' => 60, 'floor_median' => 70 + $i, 'qty_avg' => 1, 'auctions_avg' => 1, 'samples' => 1]);
+        }
+
+        $rows = app(ScanService::class)->scan($user);
+
+        $this->assertSame([71, 72, 73], $rows[0]['spark']);
+        $this->assertSame([], $rows[1]['spark']);
     }
 
     public function test_scan_page_adds_to_the_watchlist(): void

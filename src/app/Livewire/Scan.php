@@ -22,6 +22,9 @@ class Scan extends Component
 
     public string $top = '';
 
+    /** One of ScanService::MODES. */
+    public string $mode = 'discount';
+
     public function add(int $itemId, WatchlistService $watchlist): void
     {
         if ($this->attempt('add', fn () => $watchlist->add(auth()->user(), $itemId))) {
@@ -31,6 +34,8 @@ class Scan extends Component
 
     public function render(ScanService $scan): View
     {
+        $modes = $this->modes();
+        $mode = array_key_exists($this->mode, $modes) ? $this->mode : 'discount';
         $discount = is_numeric($this->minDiscount) ? max(0.0, min(99.0, (float) $this->minDiscount)) : null;
 
         $rows = $scan->scan(
@@ -39,8 +44,20 @@ class Scan extends Component
             Bounds::wholeNumber($this->minSold) ?? 0,
             $discount === null ? null : 1 - $discount / 100,
             Bounds::wholeNumber($this->top) ?: null,
+            $mode,
         );
 
-        return view('livewire.scan', ['rows' => $rows]);
+        return view('livewire.scan', ['rows' => $rows, 'days' => $rows === [] ? $scan->daysCollected(auth()->user()) : 0, 'modes' => $modes, 'activeMode' => $mode]);
+    }
+
+    /** @return array<string, string> */
+    private function modes(): array
+    {
+        return [
+            'discount' => __('Cheapest vs typical'),
+            'margin' => __('Best margin'),
+            'volume' => __('Fast sellers'),
+            'winners' => __('Your past winners'),
+        ];
     }
 }
