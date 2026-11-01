@@ -216,7 +216,7 @@ class ItemDetailService
         }
 
         if ($stat !== null) {
-            $out[] = ['ts' => Utc::ts($stat->taken_at), 'median' => (int) $stat->floor, 'min' => (int) $stat->floor];
+            $out[] = ['ts' => Utc::ts($stat->taken_at), 'median' => (int) $stat->floor, 'min' => (int) $stat->floor, 'live' => true];
         }
 
         return $out;

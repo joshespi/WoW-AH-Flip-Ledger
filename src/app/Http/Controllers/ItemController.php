@@ -24,6 +24,7 @@ class ItemController extends Controller
             'hist60' => $market['hist60'] ?? null,
             'labels' => [
                 'median' => __('Daily median floor'),
+                'ma' => __('7-day average'),
                 'min' => __('Daily low'),
                 'typical' => __('Typical (30d)'),
                 'hist60' => __('60d average'),

@@ -10,7 +10,7 @@
     @php($p = $d['position'])
 
     <div class="card p-4 sm:p-6">
-        <dl class="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8 text-sm">
+        <dl class="grid grid-cols-1 xs:grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8 text-sm">
             <div><dt class="text-gray-500 dark:text-gray-400">{{ __('Held') }}</dt><dd class="font-medium">{{ number_format($p['held']) }}</dd></div>
             <div><dt class="text-gray-500 dark:text-gray-400">{{ __('Avg cost') }}</dt><dd><x-money :copper="$p['avg'] === null ? null : (int) round($p['avg'])" /></dd></div>
             <div><dt class="text-gray-500 dark:text-gray-400">{{ __('Realized') }}</dt><dd><x-money :copper="$p['realized']" pnl /></dd></div>
@@ -37,11 +37,19 @@
             <p class="mt-3 text-sm text-gray-600 dark:text-gray-400">{{ __('Nothing to chart yet.') }}</p>
         @else
             {{-- Colour is inherited by the script for axis text, so it follows the theme. --}}
-            <div class="mt-3 h-72 sm:h-96 text-gray-600 dark:text-gray-300" x-data="itemChart(@js($chart))" role="img"
-                 aria-label="{{ __('Chart of daily floor prices with your buys and sales') }}">
-                <canvas x-ref="canvas"></canvas>
+            <div x-data="itemChart(@js($chart))" class="text-gray-600 dark:text-gray-300">
+                <div class="mt-3 flex gap-1" role="group" aria-label="{{ __('Chart range') }}">
+                    <template x-for="r in ranges" :key="r">
+                        <button type="button" @click="setRange(r)" :aria-pressed="range === r"
+                                :class="range === r ? 'btn-primary' : 'btn-secondary'" class="!px-3 !py-1 text-xs" x-text="r + 'd'"></button>
+                    </template>
+                </div>
+                <div class="mt-3 h-80 sm:h-[28rem]" role="img"
+                     aria-label="{{ __('Chart of daily floor prices with your buys and sales') }}">
+                    <canvas x-ref="canvas"></canvas>
+                </div>
             </div>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Last :n days. Sales are plotted after the AH cut.', ['n' => \App\Services\ItemDetailService::CHART_DAYS]) }}</p>
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Dot and triangle size follow quantity; hover for details. Sales are plotted after the AH cut. Click a legend entry to hide a line.') }}</p>
         @endif
     </div>
 

@@ -87,35 +87,54 @@ document.addEventListener('alpine:init', () => {
     }));
 
     // Price chart for the item page. Chart.js is loaded on demand so other pages don't carry it.
-    // `d` is built by ItemController: x is epoch seconds, y copper per unit.
+    // `d` is built by ItemController: x is epoch seconds, y copper per unit. The range buttons
+    // only move the x window; Chart.js refits the y axis to what is visible.
     window.Alpine.data('itemChart', (d) => ({
         chart: null,
+        range: 30,
+        ranges: [7, 30, 90],
 
         async init() {
             const { default: Chart } = await import('chart.js/auto');
             const text = getComputedStyle(this.$el).color;
-            const grid = 'rgba(128, 128, 128, 0.25)';
+            const grid = 'rgba(128, 128, 128, 0.18)';
             const gold = (c) => c / 10000;
-            const pts = (rows, y) => rows.map((r) => ({ x: r.ts * 1000, y: gold(y(r)) }));
+            const g = (v) => v.toLocaleString(undefined, { maximumFractionDigits: v < 10 ? 2 : 0 }) + 'g';
+            const now = Date.now();
+            const pts = (rows, y) => rows.map((r) => ({ x: r.ts * 1000, y: gold(y(r)), q: r.qty }));
             const line = (label, data, color, extra = {}) => ({
-                label, data, borderColor: color, backgroundColor: color, borderWidth: 2, pointRadius: 0, tension: 0, ...extra,
+                label, data, borderColor: color, backgroundColor: color, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, hitRadius: 8, tension: 0, ...extra,
+            });
+            // Marker area follows the quantity, so a 500-unit sale reads bigger than a 5-unit one.
+            const radius = (c) => 3 + Math.min(7, Math.sqrt(c.raw?.q ?? 1) / 2.5);
+            // Reference lines are not hover targets.
+            const ref = { hitRadius: 0, pointHoverRadius: 0 };
+            const flat = (v) => [{ x: now - Math.max(...this.ranges) * 864e5, y: gold(v) }, { x: now, y: gold(v) }];
+
+            const avg = d.steps.filter((s) => s.avg !== null).map((s) => ({ x: s.ts * 1000, y: gold(s.avg) }));
+            // Runs to now while stock is held; ends at the last sale once the position is closed.
+            const lastStep = d.steps[d.steps.length - 1];
+            if (avg.length) avg.push({ x: lastStep.avg === null ? lastStep.ts * 1000 : now, y: avg[avg.length - 1].y });
+
+            // Trailing 7-day mean of the daily medians; smooths the day-to-day noise.
+            let sum = 0;
+            const ma = d.daily.filter((r) => !r.live).map((r, i, a) => {
+                sum += r.median - (i >= 7 ? a[i - 7].median : 0);
+                return { x: r.ts * 1000, y: gold(sum / Math.min(i + 1, 7)) };
             });
 
-            const xs = d.daily.map((r) => r.ts * 1000);
-            const span = xs.length ? [Math.min(...xs), Math.max(...xs)] : null;
-            const flat = (v) => span ? span.map((x) => ({ x, y: gold(v) })) : [];
-
             const sets = [
-                line(d.labels.median, pts(d.daily, (r) => r.median), '#6366f1'),
-                line(d.labels.min, pts(d.daily, (r) => r.min), '#94a3b8', { borderWidth: 1 }),
+                line(d.labels.median, pts(d.daily, (r) => r.median), '#e5b64a', { borderWidth: 2.5 }),
+                line(d.labels.ma, ma, '#fde68a', { borderWidth: 1.5, borderDash: [3, 3] }),
+                line(d.labels.min, pts(d.daily, (r) => r.min), '#94a3b8', { borderWidth: 1, hidden: true }),
             ];
 
-            if (d.typical) sets.push(line(d.labels.typical, flat(d.typical), '#f59e0b', { borderDash: [6, 4], borderWidth: 1 }));
-            if (d.hist60) sets.push(line(d.labels.hist60, flat(d.hist60), '#a855f7', { borderDash: [2, 4], borderWidth: 1 }));
-            if (d.steps.length) sets.push(line(d.labels.avg, d.steps.filter((s) => s.avg !== null).map((s) => ({ x: s.ts * 1000, y: gold(s.avg) })), '#0ea5e9', { stepped: 'after', borderWidth: 1 }));
+            if (d.typical) sets.push(line(d.labels.typical, flat(d.typical), '#94a3b8', { borderDash: [6, 4], borderWidth: 1, ...ref }));
+            if (d.hist60) sets.push(line(d.labels.hist60, flat(d.hist60), '#64748b', { borderDash: [2, 4], borderWidth: 1, ...ref }));
+            if (avg.length) sets.push(line(d.labels.avg, avg, '#38bdf8', { stepped: 'after', borderWidth: 1.5, borderDash: [4, 3], ...ref }));
 
-            sets.push({ type: 'scatter', label: d.labels.buys, data: pts(d.buys, (r) => r.unit), backgroundColor: '#2563eb', pointRadius: 4, pointStyle: 'triangle' });
-            sets.push({ type: 'scatter', label: d.labels.sales, data: pts(d.sales, (r) => r.unit), backgroundColor: '#16a34a', pointRadius: 4, pointStyle: 'rectRot' });
+            sets.push({ type: 'scatter', label: d.labels.buys, data: pts(d.buys, (r) => r.unit), backgroundColor: '#38bdf8', borderColor: '#0c4a6e', pointRadius: radius, pointHoverRadius: 10, pointStyle: 'triangle' });
+            sets.push({ type: 'scatter', label: d.labels.sales, data: pts(d.sales, (r) => r.unit), backgroundColor: 'rgba(34, 197, 94, 0.75)', borderColor: '#14532d', pointRadius: radius, pointHoverRadius: 10, pointStyle: 'circle' });
 
             this.chart = new Chart(this.$refs.canvas, {
                 type: 'line',
@@ -124,21 +143,37 @@ document.addEventListener('alpine:init', () => {
                     responsive: true,
                     maintainAspectRatio: false,
                     parsing: false,
-                    interaction: { mode: 'nearest', intersect: false },
+                    animation: false,
+                    interaction: { mode: 'nearest', intersect: true },
                     scales: {
                         x: {
                             type: 'linear',
+                            min: now - this.range * 864e5,
+                            max: now,
                             grid: { color: grid },
                             ticks: { color: text, maxTicksLimit: 8, callback: (v) => new Date(v).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) },
                         },
-                        y: { grid: { color: grid }, ticks: { color: text, callback: (v) => v.toLocaleString() + 'g' } },
+                        y: { grace: '8%', grid: { color: grid }, ticks: { color: text, callback: (v) => g(v) } },
                     },
                     plugins: {
-                        legend: { labels: { color: text, usePointStyle: true } },
-                        tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${c.parsed.y.toLocaleString(undefined, { maximumFractionDigits: 2 })}g` } },
+                        legend: { position: 'bottom', labels: { color: text, usePointStyle: true, boxWidth: 8 } },
+                        tooltip: {
+                            callbacks: {
+                                title: (items) => new Date(items[0].parsed.x).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
+                                label: (c) => `${c.dataset.label}: ${g(c.parsed.y)}` + (c.raw?.q ? ` × ${c.raw.q.toLocaleString()}` : ''),
+                            },
+                        },
                     },
                 },
             });
+        },
+
+        setRange(days) {
+            this.range = days;
+            const x = this.chart.options.scales.x;
+            x.min = Date.now() - days * 864e5;
+            x.max = Date.now();
+            this.chart.update();
         },
 
         destroy() {
