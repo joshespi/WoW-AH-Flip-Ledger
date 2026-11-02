@@ -15,7 +15,7 @@ use ReflectionMethod;
 class LivewireWriteGuardTest extends TestCase
 {
     /** Public methods that never write to the database. */
-    private const READS_ONLY = ['mount', 'render', 'updatingSearch', 'suggestions', 'unitCopper', 'pick', 'edit', 'cancel', 'selectAll', 'clearSelection'];
+    private const READS_ONLY = ['mount', 'render', 'updatingSearch', 'suggestions', 'unitCopper', 'pick', 'edit', 'cancel', 'selectAll', 'clearSelection', 'sortBy', 'updatedMode'];
 
     public function test_every_write_action_goes_through_attempt(): void
     {

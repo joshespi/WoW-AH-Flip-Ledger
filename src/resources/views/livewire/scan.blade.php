@@ -47,7 +47,7 @@
         <x-input-error class="mt-2" :messages="$errors->get('add')" />
     </x-section>
 
-    <div class="card p-4 sm:p-6">
+    <div class="card p-4 sm:p-6 transition-opacity" wire:loading.class="opacity-60" wire:target="minDiscount,minSold,minItemId,top,mode,sortBy">
         @if ($rows === [])
             @if ($days < \App\Support\MarketStats::minDays())
                 <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ __('Still collecting price history.') }}</p>
@@ -61,14 +61,11 @@
                     <caption class="sr-only">{{ __('Items cheapest against their typical price.') }}</caption>
                     <thead>
                         <tr>
-                            <th scope="col">{{ __('Item') }}</th>
-                            <th scope="col" class="num">{{ __('Floor') }}</th>
-                            <th scope="col" class="num">{{ __('Recent') }}</th>
-                            <th scope="col" class="num">{{ __('Typical') }}</th>
-                            <th scope="col" class="num">{{ __('Floor / typical') }}</th>
-                            <th scope="col" class="num">{{ __('Margin / unit') }}</th>
-                            <th scope="col" class="num">{{ __('ROI') }}</th>
-                            <th scope="col" class="num">{{ __('Sold / day') }}</th>
+                            @foreach (['name' => __('Item'), 'floor' => __('Floor'), 'recent' => __('Recent'), 'typical' => __('Typical'), 'ratio' => __('Floor / typical'), 'margin' => __('Margin / unit'), 'roi' => __('ROI'), 'sold' => __('Sold / day')] as $col => $label)
+                                <th scope="col" @class(['num' => $col !== 'name']) aria-sort="{{ $sort === $col ? ($dir === 'asc' ? 'ascending' : 'descending') : 'none' }}">
+                                    <button type="button" wire:click="sortBy('{{ $col }}')">{{ $label }}{{ $sort === $col ? ($dir === 'asc' ? ' ▲' : ' ▼') : '' }}</button>
+                                </th>
+                            @endforeach
                             <th scope="col">{{ __(':n days', ['n' => \App\Services\ScanService::SPARK_DAYS]) }}</th>
                             <th scope="col">{{ __('Signal') }}</th>
                             <th scope="col"><span class="sr-only">{{ __('Actions') }}</span></th>
