@@ -49,6 +49,15 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // Press "/" to jump to the page's search box, unless already typing somewhere.
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+        const t = e.target;
+        if (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) return;
+        const box = document.querySelector('input[type="search"]');
+        if (box && box.offsetParent !== null) { e.preventDefault(); box.focus(); box.select(); }
+    });
+
     // Click-to-sort for server-rendered tables. Headers call sort(columnIndex, 'num' | 'text');
     // body cells carry data-v with the sort key (money cells render colored markup, so the
     // number lives in the attribute). Reorders the existing <tr>s, so no client-side formatting.
