@@ -18,7 +18,9 @@
                 </x-session-banner>
             @endif
 
-            <x-freshness-bar />
+            @auth
+                <livewire:freshness-strip />
+            @endauth
 
             <!-- Page Heading: the header slot, else the page title -->
             @if (isset($header) || filled($title))
