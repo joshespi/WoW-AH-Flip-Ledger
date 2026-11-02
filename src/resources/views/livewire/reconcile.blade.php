@@ -19,8 +19,8 @@
                 @if ($selected !== [])
                     <button type="button" wire:click="clearSelection" class="underline text-gray-600 dark:text-gray-400">{{ __('Clear') }}</button>
                     <span class="flex gap-2 sm:ms-auto">
-                        <x-primary-button type="button" wire:click="acceptSelected" wire:confirm="{{ __('Add the selected buys to your ledger?') }}">{{ __('Accept selected') }}</x-primary-button>
-                        <x-secondary-button type="button" wire:click="ignoreSelected" wire:confirm="{{ __('Ignore the selected suggestions? They will not come back.') }}">{{ __('Ignore selected') }}</x-secondary-button>
+                        <x-primary-button type="button" wire:click="acceptSelected" wire:loading.attr="disabled" wire:target="acceptSelected,ignoreSelected" wire:confirm="{{ __('Add the selected buys to your ledger?') }}">{{ __('Accept selected') }}</x-primary-button>
+                        <x-secondary-button type="button" wire:click="ignoreSelected" wire:loading.attr="disabled" wire:target="acceptSelected,ignoreSelected" wire:confirm="{{ __('Ignore the selected suggestions? They will not come back.') }}">{{ __('Ignore selected') }}</x-secondary-button>
                     </span>
                 @endif
             </div>

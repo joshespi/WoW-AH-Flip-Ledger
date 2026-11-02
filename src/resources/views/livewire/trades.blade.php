@@ -50,7 +50,7 @@
             </div>
 
             <div class="sm:col-span-2 lg:col-span-7 flex items-center gap-3">
-                <x-primary-button type="submit">{{ $editing ? __('Save changes') : __('Add buy') }}</x-primary-button>
+                <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="save">{{ $editing ? __('Save changes') : __('Add buy') }}</x-primary-button>
                 @if ($editing)
                     <x-secondary-button type="button" wire:click="cancel">{{ __('Cancel') }}</x-secondary-button>
                 @endif
@@ -65,11 +65,11 @@
             <textarea wire:model="pasted" rows="4" spellcheck="false" aria-label="{{ __('Pasted chat lines') }}"
                       class="block w-full field font-mono text-xs"></textarea>
             <x-input-error :messages="$errors->get('pasted')" />
-            <x-secondary-button type="submit">{{ __('Add pasted buys') }}</x-secondary-button>
+            <x-secondary-button type="submit" wire:loading.attr="disabled" wire:target="addPasted">{{ __('Add pasted buys') }}</x-secondary-button>
         </form>
     </x-section>
 
-    <div class="card p-4 sm:p-6">
+    <div class="card p-4 sm:p-6 transition-opacity" wire:loading.class="opacity-60" wire:target="search,delete,gotoPage,nextPage,previousPage">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <input type="search" wire:model.live.debounce.300ms="search" placeholder="{{ __('Filter by item') }}" aria-label="{{ __('Filter by item') }}"
                    class="w-full sm:w-64 field text-sm">

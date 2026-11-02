@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use InvalidArgumentException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -38,6 +39,7 @@ class Trades extends Component
 
     public string $pasted = '';
 
+    #[Url(as: 'q', except: '')]
     public string $search = '';
 
     public function mount(): void

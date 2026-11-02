@@ -15,7 +15,7 @@
                 <x-input-label for="w-group" :value="__('Group (optional)')" />
                 <input id="w-group" type="text" maxlength="64" wire:model="group" class="mt-1 block w-48 field text-sm">
             </div>
-            <x-primary-button type="submit">{{ __('Add') }}</x-primary-button>
+            <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="add">{{ __('Add') }}</x-primary-button>
         </form>
         <x-input-error class="mt-2" :messages="$errors->get('add')" />
     </x-section>
@@ -82,7 +82,7 @@
                                             <label class="text-xs">{{ __('Sell at') }}<input type="text" wire:model="sell" placeholder="20g" class="mt-1 block w-32 field text-sm"></label>
                                             <label class="text-xs">{{ __('Group') }}<input type="text" maxlength="64" wire:model="editGroup" class="mt-1 block w-40 field text-sm"></label>
                                             <label class="text-xs grow">{{ __('Notes') }}<input type="text" maxlength="{{ \App\Support\Bounds::MAX_NOTE }}" wire:model="notes" class="mt-1 block w-full field text-sm"></label>
-                                            <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
+                                            <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="save">{{ __('Save') }}</x-primary-button>
                                             <x-secondary-button type="button" wire:click="cancel">{{ __('Cancel') }}</x-secondary-button>
                                         </form>
                                         <x-input-error :messages="$errors->get('edit')" />
