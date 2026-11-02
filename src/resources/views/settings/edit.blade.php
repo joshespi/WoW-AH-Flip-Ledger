@@ -126,7 +126,7 @@
                             </p>
                         </div>
                         <form method="post" action="{{ route('settings.tokens.destroy', $token->id) }}"
-                              onsubmit="return confirm('Revoke this token? An uploader using it will stop working.')">
+                              x-data @submit="confirm(@js(__('Revoke this token? An uploader using it will stop working.'))) || $event.preventDefault()">
                             @csrf
                             @method('delete')
                             <x-danger-button>{{ __('Revoke') }}</x-danger-button>

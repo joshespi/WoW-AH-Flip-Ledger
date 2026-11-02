@@ -44,7 +44,7 @@
                                 <td class="num">{{ number_format($u->trades) }}</td>
                                 <td class="text-end whitespace-nowrap">
                                     @unless ($u->is_admin || $u->is_demo || $u->id === $me->id || ! $u->email_verified_at)
-                                        <form method="post" action="{{ route('admin.impersonate', $u->id) }}" onsubmit="return confirm('{{ __('View the site as this user? It is read-only and is logged.') }}')">
+                                        <form method="post" action="{{ route('admin.impersonate', $u->id) }}" x-data @submit="confirm(@js(__('View the site as this user? It is read-only and is logged.'))) || $event.preventDefault()">
                                             @csrf
                                             <button class="text-sm underline text-gray-600 dark:text-gray-400">{{ __('View as') }}</button>
                                         </form>
