@@ -107,15 +107,14 @@ document.addEventListener('alpine:init', () => {
     // Realized P/L chart for the dashboard. `d` is built by RealizedRangesService: per range key,
     // bucket labels plus copper per bucket (pnls) and running total (cum). Bars are the bucket's
     // P/L (green up, red down), the line is the running total on its own axis.
-    window.Alpine.data('realizedChart', (d) => ({
-        chart: null,
+    window.Alpine.data('realizedChart', (d) => { let chart = null; return {
         range: 'month',
 
         async init() {
             const { default: Chart } = await import('chart.js/auto');
             const text = getComputedStyle(this.$el).color;
 
-            this.chart = new Chart(this.$refs.canvas, {
+            chart = new Chart(this.$refs.canvas, {
                 data: {
                     labels: [],
                     datasets: [
@@ -149,26 +148,25 @@ document.addEventListener('alpine:init', () => {
         },
 
         show() {
-            if (!this.chart) return; // a click before Chart.js has loaded; init() shows the stored range
+            if (!chart) return; // a click before Chart.js has loaded; init() shows the stored range
             const r = d.ranges[this.range];
-            const [bars, line] = this.chart.data.datasets;
-            this.chart.data.labels = r.labels;
+            const [bars, line] = chart.data.datasets;
+            chart.data.labels = r.labels;
             bars.data = r.pnls.map(gold);
             bars.backgroundColor = r.pnls.map((v) => (v < 0 ? 'rgba(239, 68, 68, 0.75)' : saleGreen));
             line.data = r.cum.map(gold);
-            this.chart.update();
+            chart.update();
         },
 
         destroy() {
-            this.chart?.destroy();
+            chart?.destroy();
         },
-    }));
+    }; });
 
     // Price chart for the item page. Chart.js is loaded on demand so other pages don't carry it.
     // `d` is built by ItemController: x is epoch seconds, y copper per unit. The range buttons
     // only move the x window; Chart.js refits the y axis to what is visible.
-    window.Alpine.data('itemChart', (d) => ({
-        chart: null,
+    window.Alpine.data('itemChart', (d) => { let chart = null; return {
         range: 30,
         ranges: [7, 30, 90],
 
@@ -211,7 +209,7 @@ document.addEventListener('alpine:init', () => {
             sets.push({ type: 'scatter', label: d.labels.buys, data: pts(d.buys, (r) => r.unit), backgroundColor: '#38bdf8', borderColor: '#0c4a6e', pointRadius: radius, pointHoverRadius: 10, pointStyle: 'triangle' });
             sets.push({ type: 'scatter', label: d.labels.sales, data: pts(d.sales, (r) => r.unit), backgroundColor: saleGreen, borderColor: '#14532d', pointRadius: radius, pointHoverRadius: 10, pointStyle: 'circle' });
 
-            this.chart = new Chart(this.$refs.canvas, {
+            chart = new Chart(this.$refs.canvas, {
                 type: 'line',
                 data: { datasets: sets },
                 options: {
@@ -245,14 +243,14 @@ document.addEventListener('alpine:init', () => {
 
         setRange(days) {
             this.range = days;
-            const x = this.chart.options.scales.x;
+            const x = chart.options.scales.x;
             x.min = Date.now() - days * 864e5;
             x.max = Date.now();
-            this.chart.update();
+            chart.update();
         },
 
         destroy() {
-            this.chart?.destroy();
+            chart?.destroy();
         },
-    }));
+    }; });
 });
