@@ -111,7 +111,7 @@ class Trades extends Component
 
     public function edit(int $id): void
     {
-        $t = Trade::ownedBy(auth()->id())->findOrFail($id);
+        $t = Trade::ownedBy(auth()->id())->where('side', Trade::SIDE_BUY)->findOrFail($id);
 
         $this->resetErrorBag();
         $this->message = null;
@@ -138,7 +138,7 @@ class Trades extends Component
             $this->resetForm();
         }
 
-        $this->message = __('Buy deleted.');
+        $this->message = __('Deleted.');
     }
 
     public function addPasted(TradesService $trades): void
@@ -168,7 +168,7 @@ class Trades extends Component
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w->whereRaw('lower(items.name) like ?', [Sql::like($q)])
                 ->when($id !== null && Bounds::validItemId($id), fn ($w) => $w->orWhere('trades.item_id', $id))))
             ->orderByDesc('trades.traded_at')->orderByDesc('trades.id')
-            ->select('trades.id', 'trades.item_id', 'trades.traded_at', 'trades.qty', 'trades.cost_copper', 'trades.note', 'trades.source', 'items.name')
+            ->select('trades.id', 'trades.item_id', 'trades.traded_at', 'trades.qty', 'trades.cost_copper', 'trades.note', 'trades.source', 'trades.side', 'items.name')
             ->paginate(self::PER_PAGE);
 
         return view('livewire.trades', ['rows' => $rows, 'user' => $user]);

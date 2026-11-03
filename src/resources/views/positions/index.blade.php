@@ -58,6 +58,7 @@
                                             class="font-medium select-none rounded hover:text-gray-900 dark:hover:text-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{{ __($label) }}<span aria-hidden="true" x-text="arrow({{ $i }})"></span></button>
                                 </th>
                             @endforeach
+                            <th scope="col"><span class="sr-only">{{ __('Actions') }}</span></th>
                         </tr>
                     </thead>
                     <tbody x-ref="body">
@@ -91,8 +92,14 @@
                                 <td data-v="{{ $p->daysToSell }}" class="num">{{ $p->daysToSell === null ? '—' : number_format($p->daysToSell, 1) }}</td>
                                 <td data-v="{{ $p->valueAtFloor }}" class="num"><x-money :copper="$p->valueAtFloor" /></td>
                                 <td data-v="{{ $p->unrealized }}" class="num"><x-money :copper="$p->unrealized" pnl /></td>
-                                <td data-v="{{ $p->soldQty > 0 ? $p->realized : '' }}" class="num"><x-money :copper="$p->soldQty > 0 ? $p->realized : null" pnl /></td>
+                                <td data-v="{{ $p->hasRealized() ? $p->realized : '' }}" class="num"><x-money :copper="$p->hasRealized() ? $p->realized : null" pnl /></td>
                                 <td data-v="{{ $p->status }}"><x-position-status :position="$p" /></td>
+                                <td class="whitespace-nowrap text-end">
+                                    @if ($p->held > 0)
+                                        <a href="{{ route('items.show', $p->itemId) }}#correct" class="text-sm underline text-gray-600 dark:text-gray-400"
+                                           title="{{ __('Set what you hold, for stock the ledger counts but you no longer have.') }}">{{ __('Correct') }}</a>
+                                    @endif
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>

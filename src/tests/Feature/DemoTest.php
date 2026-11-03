@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\CorrectHoldings;
 use App\Livewire\Market;
 use App\Livewire\Reconcile;
 use App\Livewire\Trades;
@@ -107,6 +108,9 @@ class DemoTest extends TestCase
             ->set('item', 'i:'.$trade->item_id)->set('qty', '1')->set('cost', '1g')->call('save')->assertHasErrors('form')->assertSee('The demo is read-only')
             ->call('delete', $trade->id)->assertHasErrors('form')
             ->set('pasted', 'You won an auction for [Thing]x1 for 1g')->call('addPasted')->assertHasErrors('pasted');
+
+        Livewire::actingAs($demo)->test(CorrectHoldings::class, ['itemId' => $trade->item_id, 'ledgerHeld' => 1_000_000])
+            ->set('held', '0')->call('save')->assertHasErrors('correct');
 
         Livewire::actingAs($demo)->test(Market::class)
             ->set('item', 'i:100')->call('add')->assertHasErrors('add')

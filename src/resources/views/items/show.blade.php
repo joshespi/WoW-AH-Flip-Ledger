@@ -77,7 +77,7 @@
                             <tr>
                                 <td class="whitespace-nowrap">{{ $user->local($e['ts'])->format('Y-m-d H:i') }}</td>
                                 <td>
-                                    {{ match ($e['kind']) { 'buy' => __('Bought'), 'sale' => __('Sold'), 'adjust' => __('Adjusted'), 'expired' => __('Expired'), default => __('Cancelled') } }}
+                                    {{ match ($e['kind']) { 'buy' => __('Bought'), 'sale' => __('Sold'), 'expired' => __('Expired'), 'cancelled' => __('Cancelled'), default => \App\Models\Trade::correctionLabel($e['kind']) } }}
                                     @if (! $e['tracked'])<span class="text-xs text-gray-400" title="{{ __('Before your first tracked buy, so not in the ledger.') }}">({{ __('untracked') }})</span>@endif
                                 </td>
                                 <td class="num">{{ number_format($e['qty']) }}</td>
@@ -95,4 +95,6 @@
             @endif
         @endif
     </div>
+
+    <livewire:correct-holdings :item-id="$d['id']" :ledger-held="$p['held']" />
 </x-app-layout>

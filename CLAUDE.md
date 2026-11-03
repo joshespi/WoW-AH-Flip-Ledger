@@ -66,7 +66,7 @@ Things that bite:
 
 ## Ledger screens
 
-`PositionsService::forUser()` is the one place that turns a user's trades, TSM sales and the shared `item_stats` into a `Portfolio` of `PositionRow`s; the dashboard and positions controllers only render it. Trades are the user's own buys (`trades`, side `buy`; `adjust` semantics are still open), imported by `TradesImportService` (page, or `php artisan trades:import`). Sales come from `tsm_sales`.
+`PositionsService::forUser()` is the one place that turns a user's trades, TSM sales and the shared `item_stats` into a `Portfolio` of `PositionRow`s; the dashboard and positions controllers only render it. Trades are the user's own buys (`trades`, side `buy`) and corrections (`Trade::CORRECTIONS`: `adjust` removes stock at average cost with no P/L, `writeoff` books that cost as a realized loss; made on the item page through `TradesService::correctHeld()`), imported by `TradesImportService` (page, or `php artisan trades:import`). Sales come from `tsm_sales`.
 
 Things that bite:
 - **Derived metrics are gated.** `recent`, `typical`, `hist60`, `sold_per_day_est`, the below/above chips and days-to-sell are `null` until `days_of_data >= ledger.prices.min_days`; the floor, cost and P/L are always exact. Views show `<x-collecting>` or "no price yet", never a made-up number.

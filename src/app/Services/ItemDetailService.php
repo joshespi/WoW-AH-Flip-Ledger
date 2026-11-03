@@ -42,8 +42,8 @@ class ItemDetailService
     {
         $trades = DB::table('trades')->ownedBy($user)->where('item_id', $itemId)->where('side', Trade::SIDE_BUY)
             ->orderBy('traded_at')->orderBy('id')->limit(self::MAX_EVENTS)->get(['traded_at', 'qty', 'cost_copper']);
-        $adjusts = DB::table('trades')->ownedBy($user)->where('item_id', $itemId)->where('side', Trade::SIDE_ADJUST)
-            ->orderBy('traded_at')->orderBy('id')->limit(self::MAX_EVENTS)->get(['traded_at', 'qty']);
+        $corrections = DB::table('trades')->ownedBy($user)->where('item_id', $itemId)->whereIn('side', Trade::CORRECTIONS)
+            ->orderBy('traded_at')->orderBy('id')->limit(self::MAX_EVENTS)->get(['side', 'traded_at', 'qty']);
         $sales = DB::table('tsm_sales')->ownedBy($user)->where('item_id', $itemId)->where('source', TsmData::SOURCE_AUCTION)
             ->orderBy('sold_at')->orderBy('id')->limit(self::MAX_EVENTS)->get(['sold_at', 'qty', 'unit_price_copper']);
         $expired = DB::table('tsm_expired')->ownedBy($user)->where('item_id', $itemId)->orderBy('at')->limit(self::MAX_EVENTS)->get(['at', 'qty']);
@@ -63,8 +63,9 @@ class ItemDetailService
             $events[] = ['ts' => Utc::ts($t->traded_at), 'order' => 0, 'kind' => 'buy', 'qty' => (int) $t->qty, 'total' => (int) $t->cost_copper];
         }
 
-        foreach ($adjusts as $t) {
-            $events[] = ['ts' => Utc::ts($t->traded_at), 'order' => 3, 'kind' => 'adjust', 'qty' => (int) $t->qty, 'total' => null];
+        // Kind is the side ('adjust' or 'writeoff'); same order as the ledger's.
+        foreach ($corrections as $t) {
+            $events[] = ['ts' => Utc::ts($t->traded_at), 'order' => $t->side === Trade::SIDE_WRITEOFF ? 4 : 3, 'kind' => $t->side, 'qty' => (int) $t->qty, 'total' => null];
         }
 
         foreach ($sales as $s) {
@@ -138,12 +139,19 @@ class ItemDetailService
             if ($e['kind'] === 'buy') {
                 $held += $e['qty'];
                 $cost += $e['total'];
-            } elseif ($e['kind'] === 'adjust') {
+            } elseif (in_array($e['kind'], Trade::CORRECTIONS, true)) {
                 if ($first === null || $e['ts'] < $first) {
                     $row['tracked'] = false;
                 } else {
                     $m = min($e['qty'], $held);
-                    $cost -= $held > 0 ? Num::mulDiv($cost, $m, $held) : 0;
+                    $removed = $held > 0 ? Num::mulDiv($cost, $m, $held) : 0;
+
+                    if ($e['kind'] === Trade::SIDE_WRITEOFF) {
+                        $row['pnl'] = -$removed;
+                        $realized -= $removed;
+                    }
+
+                    $cost -= $removed;
                     $held -= $m;
                 }
             } elseif ($e['kind'] === 'sale') {
@@ -162,7 +170,7 @@ class ItemDetailService
                 }
             }
 
-            if (in_array($e['kind'], ['buy', 'sale', 'adjust'], true) && $row['tracked']) {
+            if (in_array($e['kind'], ['buy', 'sale', ...Trade::CORRECTIONS], true) && $row['tracked']) {
                 $steps[] = ['ts' => $e['ts'], 'held' => $held, 'avg' => $held > 0 ? $cost / $held : null];
                 $row['held'] = $held;
                 $row['avg'] = $held > 0 ? $cost / $held : null;

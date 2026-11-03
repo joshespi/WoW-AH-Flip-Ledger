@@ -124,9 +124,9 @@ class LedgerServiceTest extends TestCase
     {
         $trades = [
             ['ts' => 100, 'item' => 1, 'qty' => 100, 'cost' => 100_000],
-            ['ts' => 300, 'item' => 1, 'qty' => 30, 'cost' => 0, 'adjust' => true],
-            ['ts' => 50, 'item' => 1, 'qty' => 5, 'cost' => 0, 'adjust' => true],      // before the first buy: ignored
-            ['ts' => 300, 'item' => 2, 'qty' => 9, 'cost' => 0, 'adjust' => true],     // no buys: no position
+            ['ts' => 300, 'item' => 1, 'qty' => 30, 'cost' => 0, 'correction' => 'adjust'],
+            ['ts' => 50, 'item' => 1, 'qty' => 5, 'cost' => 0, 'correction' => 'adjust'],      // before the first buy: ignored
+            ['ts' => 300, 'item' => 2, 'qty' => 9, 'cost' => 0, 'correction' => 'adjust'],     // no buys: no position
         ];
         $sales = [['item' => 1, 'ts' => 200, 'qty' => 40, 'unit_price' => 2000]];
 
@@ -137,6 +137,24 @@ class LedgerServiceTest extends TestCase
         $this->assertSame(30_000, $out[1]['cost']);   // 60 left at 60,000, then 30 removed at 1,000 each
         $this->assertSame(80_000 - 40_000, $out[1]['pnl']);
         $this->assertSame(100, $out[1]['bq']);
+    }
+
+    public function test_a_write_off_removes_units_at_average_cost_as_a_loss(): void
+    {
+        $trades = [
+            ['ts' => 100, 'item' => 1, 'qty' => 100, 'cost' => 100_000],
+            ['ts' => 300, 'item' => 1, 'qty' => 30, 'cost' => 0, 'correction' => 'writeoff'],
+            ['ts' => 400, 'item' => 1, 'qty' => 500, 'cost' => 0, 'correction' => 'writeoff'],  // more than held: only what is left
+        ];
+        $sales = [['item' => 1, 'ts' => 200, 'qty' => 40, 'unit_price' => 2000]];
+
+        $out = (new LedgerService)->buildFromSales($trades, $sales)[1];
+
+        $this->assertSame(0, $out['inv']);
+        $this->assertSame(0, $out['cost']);
+        $this->assertSame(80_000 - 40_000 - 60_000, $out['pnl']);   // the 60 written off cost 1,000 each
+        $this->assertSame(40, $out['sq']);
+        $this->assertSame(0, $out['oq']);
     }
 
     public function test_sales_before_the_first_buy_vendor_sales_and_junk_rows_are_ignored(): void

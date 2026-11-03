@@ -47,4 +47,10 @@ final readonly class PositionRow
     {
         return $this->held === 0;
     }
+
+    /** Something sold or was written off, so realized P/L means something (it may be 0). */
+    public function hasRealized(): bool
+    {
+        return $this->soldQty > 0 || $this->realized !== 0;
+    }
 }

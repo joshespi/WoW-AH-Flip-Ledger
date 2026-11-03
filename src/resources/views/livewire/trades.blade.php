@@ -102,13 +102,22 @@
                             <tr wire:key="t{{ $t->id }}" @class(['bg-indigo-50 dark:bg-indigo-950/30' => $editing === $t->id])>
                                 <td class="whitespace-nowrap">{{ $user->local($t->traded_at)->format('Y-m-d H:i') }}</td>
                                 <td><x-item-link :id="$t->item_id" :name="$t->name" /></td>
-                                <td class="num">{{ number_format($t->qty) }}</td>
-                                <td class="num"><x-money :copper="$t->cost_copper" /></td>
-                                <td class="num"><x-money :copper="$t->qty > 0 ? $t->cost_copper / $t->qty : null" /></td>
+                                @php($buy = $t->side === \App\Models\Trade::SIDE_BUY)
+                                @if ($buy)
+                                    <td class="num">{{ number_format($t->qty) }}</td>
+                                    <td class="num"><x-money :copper="$t->cost_copper" /></td>
+                                    <td class="num"><x-money :copper="$t->qty > 0 ? $t->cost_copper / $t->qty : null" /></td>
+                                @else
+                                    {{-- A correction removes stock at average cost; it has no price of its own. --}}
+                                    <td class="num">−{{ number_format($t->qty) }}</td>
+                                    <td colspan="2" class="text-end text-xs text-gray-500 dark:text-gray-400">{{ \App\Models\Trade::correctionLabel($t->side) }}</td>
+                                @endif
                                 <td class="text-gray-600 dark:text-gray-400">{{ $t->note }}</td>
                                 <td class="whitespace-nowrap text-end">
-                                    <button type="button" wire:click="edit({{ $t->id }})" class="text-sm underline text-gray-600 dark:text-gray-400">{{ __('Edit') }}</button>
-                                    <button type="button" wire:click="delete({{ $t->id }})" wire:confirm="{{ __('Delete this buy?') }}"
+                                    @if ($buy)
+                                        <button type="button" wire:click="edit({{ $t->id }})" class="text-sm underline text-gray-600 dark:text-gray-400">{{ __('Edit') }}</button>
+                                    @endif
+                                    <button type="button" wire:click="delete({{ $t->id }})" wire:confirm="{{ $buy ? __('Delete this buy?') : __('Undo this correction?') }}"
                                             class="ms-3 text-sm underline text-red-600 dark:text-red-400">{{ __('Delete') }}</button>
                                 </td>
                             </tr>

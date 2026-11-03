@@ -62,6 +62,32 @@ class PositionsService
         return new Portfolio($rows, $summary, $this->concentration($rows, $summary['stock_cost']), $this->recent($trades, $newest, $names));
     }
 
+    /** Units of one item the ledger says the user holds, by the same rule as forUser(). */
+    public function held(User $user, int $itemId): int
+    {
+        [$trades, $adjustments] = $this->trades($user, $itemId);
+
+        if ($trades === []) {
+            return 0;
+        }
+
+        $first = min(array_column($trades, 'ts'));
+        $ledger = $this->ledger->buildFromSales([...$trades, ...$adjustments], $this->sales($user, [$itemId => $first], new SplMinHeap));
+
+        return $ledger[$itemId]['inv'];
+    }
+
+    /**
+     * One item's count in the latest TSM inventory snapshot, by the same rule as forUser(): an
+     * item missing from a snapshot that exists is 0; null when no upload carried a snapshot.
+     */
+    public function tsmStock(User $user, int $itemId): ?int
+    {
+        $qty = DB::table('inventory')->ownedBy($user)->where('item_id', $itemId)->value('qty');
+
+        return $qty !== null ? (int) $qty : (DB::table('inventory')->ownedBy($user)->exists() ? 0 : null);
+    }
+
     /**
      * @param  array{bq: int, bc: int, sq: int, sr: int, pnl: int, oq: int, orev: int, inv: int, cost: int}  $a
      */
@@ -190,22 +216,23 @@ class PositionsService
     }
 
     /**
-     * The user's buys, and their stock corrections (units removed at average cost with no P/L,
-     * see LedgerService), from one query.
+     * The user's buys, and their stock corrections (units removed at average cost, as a loss for
+     * a write-off, see LedgerService), from one query. All items, or just $itemId.
      *
-     * @return array{0: list<array{ts: int, item: int, qty: int, cost: int}>, 1: list<array{ts: int, item: int, qty: int, cost: int, adjust: true}>}
+     * @return array{0: list<array{ts: int, item: int, qty: int, cost: int}>, 1: list<array{ts: int, item: int, qty: int, cost: int, correction: string}>}
      */
-    private function trades(User $user): array
+    private function trades(User $user, ?int $itemId = null): array
     {
         $buys = [];
         $adjustments = [];
 
-        foreach (DB::table('trades')->ownedBy($user)->whereIn('side', [Trade::SIDE_BUY, Trade::SIDE_ADJUST])
+        foreach (DB::table('trades')->ownedBy($user)->whereIn('side', [Trade::SIDE_BUY, ...Trade::CORRECTIONS])
+            ->when($itemId !== null, fn ($q) => $q->where('item_id', $itemId))
             ->get(['side', 'item_id', 'traded_at', 'qty', 'cost_copper']) as $r) {
             $row = ['ts' => Utc::ts($r->traded_at), 'item' => (int) $r->item_id, 'qty' => (int) $r->qty];
 
-            if ($r->side === Trade::SIDE_ADJUST) {
-                $adjustments[] = $row + ['cost' => 0, 'adjust' => true];
+            if ($r->side !== Trade::SIDE_BUY) {
+                $adjustments[] = $row + ['cost' => 0, 'correction' => $r->side];
             } else {
                 $buys[] = $row + ['cost' => (int) $r->cost_copper];
             }

@@ -124,7 +124,7 @@ alert_states(user_id, item_id, kind, last_state, last_sent_at)
 - **Idempotent ingest.** `dedupe_key` = hash of (item, time, qty, price, source) plus an occurrence index among identical rows in the file. A re-upload inserts nothing new, and two genuinely identical sales both survive.
 - **Data minimization.** Don't store buyer or seller names. Store realm only where it's needed.
 - **Raw files are never stored.** Parsed in memory, then dropped. The cost: a failed parse can't be replayed, so log structured diagnostics (section sizes, counts, failing section) instead.
-- `side='adjust'` is for write-offs and corrections. Qty can be negative. P/L treatment is still open.
+- Corrections remove stock at average cost, and the user picks the reason each time (decided): `side='adjust'` (the ledger was wrong: no P/L) or `side='writeoff'` (vendored, used, lost: the removed cost is a realized loss). Qty is the positive number removed; adding stock is a buy.
 - **Tenant isolation.** Policies on every owned model and explicit `user_id` scoping in Services. A feature test walks every authenticated route with another user's IDs and expects 403/404.
 - **Retention.** Hourly `price_snapshots` for all commodities for 30 days, then rolled up to `price_daily` and pruned. Tune after measuring row counts.
 
@@ -276,6 +276,7 @@ Carried forward:
 - [x] Item page `/items/{item}` (`ItemController`, `ItemDetailService`): timeline of buys, sales, expired and cancelled (newest 100), with profit and held/avg after each buy and sale; summary tiles with gated market numbers; 404 when the user has no history and the item has no prices. Item names link to it from positions, dashboard, trades, market and scan. Rank variants are separate item ids, so each has its own page.
 - [x] Price chart (Chart.js, lazy-loaded chunk, `itemChart` in `app.js`): last 90 days of `price_daily` floors (median and low) plus the latest snapshot, typical and 60d lines when gated in, my average cost as a step line, my buys and sales (after cut) as points. Hourly `price_snapshots` are not plotted, only the daily rollup.
 - [x] Running position: replay matches `LedgerService` (tested against `PositionsService`).
+- [x] Correct holdings (Livewire `CorrectHoldings` at the foot of the item page, `#correct`; "Correct" link on each held Positions row): set held to N (default 0, or the TSM stock when a snapshot has less), choose "the ledger was wrong" or "written off", optional note. `TradesService::correctHeld()` recomputes held server-side (`PositionsService::held()`) and writes one correction for the difference, stamped now. Corrections are listed with Undo there and on `/trades` (no edit), shown in the item timeline, and exported as `corrections.csv`.
 
 ### Phase 9: Onboarding, privacy, alerts, admin
 - [x] `/setup` wizard (`SetupController`, login-gated): download per platform with the visitor's OS suggested, SHA-256 and size, SmartScreen/Gatekeeper notes, a token form that shows the token once with the exact `setup --server ... --token ...` command filled in, and a Livewire `SetupProgress` that polls every 3 s until the first successful upload (shows the last rejection while waiting). Linked from the dashboard empty state and the uploads page.
@@ -314,7 +315,6 @@ WoW addons cannot make network requests and read files only at login or `/reload
 
 - **Brevo sender** (Phase 2, before real signups): verify a sender on `wowledger.joshespi.com` (`.env.example` assumes `noreply@wowledger.joshespi.com`) and create the SMTP key. The DNS record for the hostname itself is also mine to add.
 - **Blizzard API credentials** (Phase 4): I need to create a client at the Blizzard developer portal.
-- **Adjust semantics** (Phase 6): should a negative adjustment (vendored or used stock) book a loss at average cost, or just remove inventory with no P/L?
 - **Public name** (before launch): "WoW" is Blizzard's mark. Keep the name with a disclaimer, or drop "WoW" before opening signup.
 - **Folder rename** (Phase 0): `tsm-ledger` to `wow-flip-ledger`. Renaming the folder mid-session would break paths, so do it between sessions.
 

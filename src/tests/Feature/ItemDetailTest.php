@@ -103,6 +103,25 @@ class ItemDetailTest extends TestCase
         $this->assertSame([100, 60, 30], array_column($d['steps'], 'held'));
     }
 
+    public function test_write_offs_agree_with_the_ledger_service(): void
+    {
+        $user = $this->user();
+        $trades = app(TradesService::class);
+        $trades->add($user, 100, 100, 100_000, self::T, null);
+        $this->sale($user, self::T + 200, 40, 2000);
+        $trades->correctHeld($user, 100, 30, 'writeoff');
+
+        $d = app(ItemDetailService::class)->forUser($user, 100);
+        $row = collect(app(PositionsService::class)->forUser($user)->positions)->firstWhere('itemId', 100);
+
+        $this->assertSame(30, $row->held);
+        $this->assertSame(40_000 - 30_000, $row->realized);
+        $this->assertSame($row->realized, $d['position']['realized']);
+        $this->assertSame($row->held, $d['position']['held']);
+        $this->assertSame(['writeoff', 'sale', 'buy'], array_column($d['timeline'], 'kind'));
+        $this->assertSame(-30_000, $d['timeline'][0]['pnl']);
+    }
+
     public function test_steps_follow_each_buy_and_sale(): void
     {
         $user = $this->user();

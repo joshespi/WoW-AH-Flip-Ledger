@@ -45,6 +45,13 @@ class DataExportService
                         ->select('trades.traded_at', 'trades.item_id', 'trades.qty', 'trades.cost_copper', 'trades.note', $name, 'trades.source')->cursor(),
                     fn ($r) => [$iso($r->traded_at), 'i:'.$r->item_id, $r->qty, Money::fmt($r->cost_copper), $r->note, $r->item_name, $r->source],
                 ],
+                'corrections.csv' => [
+                    ['time', 'item', 'qty_removed', 'kind', 'note', 'item_name'],
+                    DB::table('trades')->leftJoin('items', 'items.id', '=', 'trades.item_id')
+                        ->ownedBy($user, 'trades.user_id')->whereIn('trades.side', Trade::CORRECTIONS)->orderBy('trades.traded_at')->orderBy('trades.id')
+                        ->select('trades.traded_at', 'trades.item_id', 'trades.qty', 'trades.side', 'trades.note', $name)->cursor(),
+                    fn ($r) => [$iso($r->traded_at), 'i:'.$r->item_id, $r->qty, $r->side, $r->note, $r->item_name],
+                ],
                 'sales.csv' => [
                     ['time', 'item', 'item_name', 'qty', 'unit_price_after_cut_copper', 'realm', 'source'],
                     DB::table('tsm_sales')->leftJoin('items', 'items.id', '=', 'tsm_sales.item_id')
@@ -132,6 +139,8 @@ class DataExportService
 
             trades.csv           Your buys, in the trades import format (time,item,qty,cost,note);
                                  the extra columns are ignored on import. cost is the lot total.
+            corrections.csv      Stock you removed from a position: kind "adjust" (the ledger was
+                                 wrong, no profit or loss) or "writeoff" (booked as a loss).
             sales.csv            Auction sales read from your TradeSkillMaster data. Prices are
                                  copper per unit, after the 5% auction house cut.
             expired.csv          Expired auctions.

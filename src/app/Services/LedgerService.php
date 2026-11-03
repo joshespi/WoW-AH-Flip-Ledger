@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Trade;
 use App\Support\Bounds;
 use App\Support\ItemName;
 use App\Support\Num;
@@ -56,22 +57,23 @@ class LedgerService
      *
      * Item ids are only used as array keys, so any int or string id works (the app passes ints).
      *
-     * A trade with `adjust` set removes qty units at the average cost with no revenue and no P/L
-     * (a correction for stock the log counted but the user never held). It counts only from the
-     * item's first buy onward, like a sale, and sorts after buys and sales at the same time.
+     * A trade with `correction` set (a Trade::CORRECTIONS side) removes qty units at the average
+     * cost with no revenue: with no P/L for `adjust` (stock the log counted but the user never
+     * held), or as a realized loss for `writeoff` (stock vendored, used or lost). It counts only
+     * from the item's first buy onward, like a sale, and sorts after buys and sales at the same time.
      *
-     * @param  list<array{ts: int, item: int|string, qty: int, cost: int, adjust?: bool}>  $trades
+     * @param  list<array{ts: int, item: int|string, qty: int, cost: int, correction?: string}>  $trades
      * @param  iterable<array{item: int|string, ts: int, qty: int, unit_price: int}>  $sales  unit_price after the AH cut; may be a generator
      * @return array<int|string, array{bq: int, bc: int, sq: int, sr: int, pnl: int, oq: int, orev: int, inv: int, cost: int}>
      */
     public function buildFromSales(array $trades, iterable $sales): array
     {
         $events = [];
-        $adjusts = [];
+        $corrections = [];
 
         foreach ($trades as $t) {
-            if ($t['adjust'] ?? false) {
-                $adjusts[] = $t;
+            if (isset($t['correction'])) {
+                $corrections[] = $t;
 
                 continue;
             }
@@ -81,9 +83,9 @@ class LedgerService
 
         $first = array_map(static fn (array $e): int => min(array_column($e, 0)), $events);
 
-        foreach ($adjusts as $t) {
+        foreach ($corrections as $t) {
             if (isset($first[$t['item']]) && $t['ts'] >= $first[$t['item']]) {
-                $events[$t['item']][] = [$t['ts'], 2, $t['qty'], 0];
+                $events[$t['item']][] = [$t['ts'], $t['correction'] === Trade::SIDE_WRITEOFF ? 3 : 2, $t['qty'], 0];
             }
         }
 
@@ -108,7 +110,7 @@ class LedgerService
     }
 
     /**
-     * @param  list<array{int, int, int, int}>  $events  [ts, side (0 buy, 1 sell, 2 adjust), qty, total copper]
+     * @param  list<array{int, int, int, int}>  $events  [ts, side (0 buy, 1 sell, 2 adjust, 3 write-off), qty, total copper]
      * @return array{bq: int, bc: int, sq: int, sr: int, pnl: int, oq: int, orev: int, inv: int, cost: int}
      */
     private function replay(array $events): array
@@ -125,9 +127,11 @@ class LedgerService
                 continue;
             }
 
-            if ($side === 2) {
+            if ($side >= 2) {
                 $m = min($q, $a['inv']);
-                $a['cost'] -= $a['inv'] > 0 ? Num::mulDiv($a['cost'], $m, $a['inv']) : 0;
+                $removed = $a['inv'] > 0 ? Num::mulDiv($a['cost'], $m, $a['inv']) : 0;
+                $a['pnl'] -= $side === 3 ? $removed : 0;
+                $a['cost'] -= $removed;
                 $a['inv'] -= $m;
 
                 continue;

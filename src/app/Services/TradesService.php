@@ -16,7 +16,7 @@ use InvalidArgumentException;
  */
 class TradesService
 {
-    public function __construct(private TradesPasteParser $paste) {}
+    public function __construct(private TradesPasteParser $paste, private PositionsService $positions) {}
 
     /**
      * "i:242639", "242639" or an exact item name that matches exactly one item.
@@ -58,6 +58,36 @@ class TradesService
     public function adjust(User $user, int $itemId, int $qty, int $ts, ?string $note = null): Trade
     {
         return $this->create($user, Trade::SIDE_ADJUST, $itemId, $qty, 0, $ts, $note, 'system');
+    }
+
+    /**
+     * Brings the ledger's held quantity down to $held now, by one correction ($side, one of
+     * Trade::CORRECTIONS) for the difference. Stock can only be removed here; more stock is a buy.
+     *
+     * @throws InvalidArgumentException
+     */
+    public function correctHeld(User $user, int $itemId, int $held, string $side, ?string $note = null): Trade
+    {
+        if (! in_array($side, Trade::CORRECTIONS, true)) {
+            throw new InvalidArgumentException('Pick what happened to the rest.');
+        }
+
+        $current = $this->positions->held($user, $itemId);
+
+        if ($current === 0) {
+            throw new InvalidArgumentException('The ledger holds none of this item.');
+        }
+
+        if ($held < 0 || $held >= $current) {
+            throw new InvalidArgumentException('Held must be less than '.number_format($current).'. To add stock, add a buy.');
+        }
+
+        return $this->create($user, $side, $itemId, $current - $held, 0, time(), $note, 'manual');
+    }
+
+    public function deleteCorrection(User $user, int $id): void
+    {
+        Trade::ownedBy($user)->whereIn('side', Trade::CORRECTIONS)->findOrFail($id)->delete();
     }
 
     /** @throws InvalidArgumentException */
