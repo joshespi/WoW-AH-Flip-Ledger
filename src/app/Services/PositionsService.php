@@ -41,7 +41,11 @@ class PositionsService
 
         $ids = array_keys($firstBuy);
         $newest = new SplMinHeap;
-        $ledger = $this->ledger->buildFromSales([...$trades, ...$adjustments], $this->sales($user, $firstBuy, $newest));
+        $events = [];
+        $ledger = $this->ledger->buildFromSales([...$trades, ...$adjustments], $this->sales($user, $firstBuy, $newest),
+            function (int $ts, int $pnl) use (&$events): void {
+                $events[] = [$ts, $pnl];
+            });
 
         $names = $this->names($ids);
         $inventory = DB::table('inventory')->ownedBy($user)->pluck('qty', 'item_id')->all();
@@ -59,7 +63,7 @@ class PositionsService
 
         $summary = $this->summary($rows);
 
-        return new Portfolio($rows, $summary, $this->concentration($rows, $summary['stock_cost']), $this->recent($trades, $newest, $names));
+        return new Portfolio($rows, $summary, $this->concentration($rows, $summary['stock_cost']), $this->recent($trades, $newest, $names), $events);
     }
 
     /** Units of one item the ledger says the user holds, by the same rule as forUser(). */

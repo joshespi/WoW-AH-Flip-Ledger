@@ -4,6 +4,15 @@
 
 import '@fontsource-variable/inter';
 import '@fontsource-variable/jetbrains-mono';
+
+// Shared by the Chart.js components. Values are plotted in gold; axis text takes the element's
+// own (theme) colour, passed in as `text`.
+const chartGrid = 'rgba(128, 128, 128, 0.18)';
+const gold = (copper) => copper / 10000;
+const goldLabel = (v) => v.toLocaleString(undefined, { maximumFractionDigits: Math.abs(v) < 10 ? 2 : 0 }) + 'g';
+const chartLegend = (text) => ({ position: 'bottom', labels: { color: text, usePointStyle: true, boxWidth: 8 } });
+const saleGreen = 'rgba(34, 197, 94, 0.75)';
+
 document.addEventListener('alpine:init', () => {
     // Light / system / dark buttons. The theme logic itself (reading the saved choice, setting
     // <html class="dark">, following the OS setting) lives in partials/theme-init.blade.php as
@@ -95,6 +104,66 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // Realized P/L chart for the dashboard. `d` is built by RealizedRangesService: per range key,
+    // bucket labels plus copper per bucket (pnls) and running total (cum). Bars are the bucket's
+    // P/L (green up, red down), the line is the running total on its own axis.
+    window.Alpine.data('realizedChart', (d) => ({
+        chart: null,
+        range: 'month',
+
+        async init() {
+            const { default: Chart } = await import('chart.js/auto');
+            const text = getComputedStyle(this.$el).color;
+
+            this.chart = new Chart(this.$refs.canvas, {
+                data: {
+                    labels: [],
+                    datasets: [
+                        { type: 'bar', label: d.labels.bucket, data: [], yAxisID: 'y', borderRadius: 2 },
+                        { type: 'line', label: d.labels.total, data: [], yAxisID: 'y1', borderColor: '#e5b64a', backgroundColor: '#e5b64a', borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0 },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: text, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+                        y: { grid: { color: chartGrid }, ticks: { color: text, callback: goldLabel } },
+                        y1: { position: 'right', grid: { display: false }, ticks: { color: text, callback: goldLabel } },
+                    },
+                    plugins: {
+                        legend: chartLegend(text),
+                        tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${goldLabel(c.parsed.y)}` } },
+                    },
+                },
+            });
+
+            this.show();
+        },
+
+        select(key) {
+            this.range = key;
+            this.show();
+        },
+
+        show() {
+            if (!this.chart) return; // a click before Chart.js has loaded; init() shows the stored range
+            const r = d.ranges[this.range];
+            const [bars, line] = this.chart.data.datasets;
+            this.chart.data.labels = r.labels;
+            bars.data = r.pnls.map(gold);
+            bars.backgroundColor = r.pnls.map((v) => (v < 0 ? 'rgba(239, 68, 68, 0.75)' : saleGreen));
+            line.data = r.cum.map(gold);
+            this.chart.update();
+        },
+
+        destroy() {
+            this.chart?.destroy();
+        },
+    }));
+
     // Price chart for the item page. Chart.js is loaded on demand so other pages don't carry it.
     // `d` is built by ItemController: x is epoch seconds, y copper per unit. The range buttons
     // only move the x window; Chart.js refits the y axis to what is visible.
@@ -106,9 +175,6 @@ document.addEventListener('alpine:init', () => {
         async init() {
             const { default: Chart } = await import('chart.js/auto');
             const text = getComputedStyle(this.$el).color;
-            const grid = 'rgba(128, 128, 128, 0.18)';
-            const gold = (c) => c / 10000;
-            const g = (v) => v.toLocaleString(undefined, { maximumFractionDigits: v < 10 ? 2 : 0 }) + 'g';
             const now = Date.now();
             const pts = (rows, y) => rows.map((r) => ({ x: r.ts * 1000, y: gold(y(r)), q: r.qty }));
             const line = (label, data, color, extra = {}) => ({
@@ -143,7 +209,7 @@ document.addEventListener('alpine:init', () => {
             if (avg.length) sets.push(line(d.labels.avg, avg, '#38bdf8', { stepped: 'after', borderWidth: 1.5, borderDash: [4, 3], ...ref }));
 
             sets.push({ type: 'scatter', label: d.labels.buys, data: pts(d.buys, (r) => r.unit), backgroundColor: '#38bdf8', borderColor: '#0c4a6e', pointRadius: radius, pointHoverRadius: 10, pointStyle: 'triangle' });
-            sets.push({ type: 'scatter', label: d.labels.sales, data: pts(d.sales, (r) => r.unit), backgroundColor: 'rgba(34, 197, 94, 0.75)', borderColor: '#14532d', pointRadius: radius, pointHoverRadius: 10, pointStyle: 'circle' });
+            sets.push({ type: 'scatter', label: d.labels.sales, data: pts(d.sales, (r) => r.unit), backgroundColor: saleGreen, borderColor: '#14532d', pointRadius: radius, pointHoverRadius: 10, pointStyle: 'circle' });
 
             this.chart = new Chart(this.$refs.canvas, {
                 type: 'line',
@@ -159,17 +225,17 @@ document.addEventListener('alpine:init', () => {
                             type: 'linear',
                             min: now - this.range * 864e5,
                             max: now,
-                            grid: { color: grid },
+                            grid: { color: chartGrid },
                             ticks: { color: text, maxTicksLimit: 8, callback: (v) => new Date(v).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) },
                         },
-                        y: { grace: '8%', grid: { color: grid }, ticks: { color: text, callback: (v) => g(v) } },
+                        y: { grace: '8%', grid: { color: chartGrid }, ticks: { color: text, callback: goldLabel } },
                     },
                     plugins: {
-                        legend: { position: 'bottom', labels: { color: text, usePointStyle: true, boxWidth: 8 } },
+                        legend: chartLegend(text),
                         tooltip: {
                             callbacks: {
                                 title: (items) => new Date(items[0].parsed.x).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
-                                label: (c) => `${c.dataset.label}: ${g(c.parsed.y)}` + (c.raw?.q ? ` × ${c.raw.q.toLocaleString()}` : ''),
+                                label: (c) => `${c.dataset.label}: ${goldLabel(c.parsed.y)}` + (c.raw?.q ? ` × ${c.raw.q.toLocaleString()}` : ''),
                             },
                         },
                     },

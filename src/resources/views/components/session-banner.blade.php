@@ -7,7 +7,7 @@
     'bg-red-100 dark:bg-red-900/40 text-red-900 dark:text-red-200' => $tone === 'red',
     'bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200' => $tone !== 'red',
 ]) role="status">
-    <div class="mx-auto max-w-[96rem] px-4 py-2 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-2">
+    <div class="px-4 py-2 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-2">
         <span>{{ $slot }}</span>
         <form method="post" action="{{ $action }}">
             @csrf

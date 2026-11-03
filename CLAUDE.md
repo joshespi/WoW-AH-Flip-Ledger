@@ -91,7 +91,7 @@ Things that bite:
   - Market gate: `MarketStats::ready($stat)` / `derived($stat, 'recent')` / `minDays()` are the only implementation of the "needs `min_days` of history" rule; use them for anything shaped like an `item_stats` row.
   - Models: `User::issueIngestToken()` (token limit included), `isBeingImpersonated()`, `FetchRun::latestGood()` / `latestFinished()`, `User::factory()->admin()` in tests.
   - Livewire: every ledger component uses `Concerns\ReportsErrors`; wrap each service call in `attempt('errorKey', fn () => ...)` so a user-facing `InvalidArgumentException` (bad input, read-only session) becomes a form error. Pages that are one component go through the `livewire-page` view (loop in `routes/web.php`); the view variable is `livewire`, never `component` (Blade reserves it).
-  - Blade: the app layout already wraps every page in the `py-8 max-w-7xl space-y-6` container, so views start straight with their cards. `<x-item-link :id :name>`, `<x-chip type tone>` (green, red, amber, sky, indigo, gray), `<x-session-banner>`, `<x-shell>` (the HTML document all three layouts share), `<x-legal-links>`, and the `.field` class for hand-written inputs, selects and textareas.
+  - Blade: the app layout already wraps every page in a full-width `py-6 space-y-6` container, so views start straight with their cards. `<x-item-link :id :name>`, `<x-chip type tone>` (green, red, amber, sky, indigo, gray), `<x-session-banner>`, `<x-shell>` (the HTML document all three layouts share), `<x-legal-links>`, and the `.field` class for hand-written inputs, selects and textareas.
 
 ## Trades and reconcile
 

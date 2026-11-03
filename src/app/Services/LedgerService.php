@@ -64,9 +64,10 @@ class LedgerService
      *
      * @param  list<array{ts: int, item: int|string, qty: int, cost: int, correction?: string}>  $trades
      * @param  iterable<array{item: int|string, ts: int, qty: int, unit_price: int}>  $sales  unit_price after the AH cut; may be a generator
+     * @param  (callable(int, int): void)|null  $onPnl  called with (ts, copper) for every sale or write-off that moves realized P/L
      * @return array<int|string, array{bq: int, bc: int, sq: int, sr: int, pnl: int, oq: int, orev: int, inv: int, cost: int}>
      */
-    public function buildFromSales(array $trades, iterable $sales): array
+    public function buildFromSales(array $trades, iterable $sales, ?callable $onPnl = null): array
     {
         $events = [];
         $corrections = [];
@@ -103,7 +104,7 @@ class LedgerService
 
         foreach ($events as $k => $list) {
             usort($list, static fn (array $a, array $b): int => $a <=> $b);
-            $out[$k] = $this->replay($list);
+            $out[$k] = $this->replay($list, $onPnl ?? static function (): void {});
         }
 
         return $out;
@@ -111,13 +112,14 @@ class LedgerService
 
     /**
      * @param  list<array{int, int, int, int}>  $events  [ts, side (0 buy, 1 sell, 2 adjust, 3 write-off), qty, total copper]
+     * @param  callable(int, int): void  $onPnl
      * @return array{bq: int, bc: int, sq: int, sr: int, pnl: int, oq: int, orev: int, inv: int, cost: int}
      */
-    private function replay(array $events): array
+    private function replay(array $events, callable $onPnl): array
     {
         $a = ['bq' => 0, 'bc' => 0, 'sq' => 0, 'sr' => 0, 'pnl' => 0, 'oq' => 0, 'orev' => 0, 'inv' => 0, 'cost' => 0];
 
-        foreach ($events as [, $side, $q, $c]) {
+        foreach ($events as [$ts, $side, $q, $c]) {
             if ($side === 0) {
                 $a['inv'] += $q;
                 $a['cost'] += $c;
@@ -130,7 +132,11 @@ class LedgerService
             if ($side >= 2) {
                 $m = min($q, $a['inv']);
                 $removed = $a['inv'] > 0 ? Num::mulDiv($a['cost'], $m, $a['inv']) : 0;
-                $a['pnl'] -= $side === 3 ? $removed : 0;
+                if ($side === 3) {
+                    $a['pnl'] -= $removed;
+                    $removed !== 0 && $onPnl($ts, -$removed);
+                }
+
                 $a['cost'] -= $removed;
                 $a['inv'] -= $m;
 
@@ -142,6 +148,8 @@ class LedgerService
             $rev = Num::mulDiv($c, $m, $q);
 
             $a['pnl'] += $rev - $cogs;
+            $rev !== $cogs && $onPnl($ts, $rev - $cogs);
+
             $a['sq'] += $m;
             $a['sr'] += $rev;
             $a['oq'] += $q - $m;

@@ -3,7 +3,7 @@
 @php($f = $freshness)
 
 <div class="border-b border-gray-200 bg-white font-mono text-[11px] text-gray-600 dark:border-gray-800 dark:bg-gray-900/60 dark:text-gray-400">
-    <div class="mx-auto max-w-[96rem] px-4 py-2 sm:px-6 lg:px-8 flex flex-wrap items-center gap-x-6 gap-y-1">
+    <div class="px-4 py-2 sm:px-6 lg:px-8 flex flex-wrap items-center gap-x-6 gap-y-1">
         <span>
             <span class="font-medium text-gray-700 dark:text-gray-300">{{ __('TSM saved') }}</span>
             @if ($f->tsmSavedAt === null)

@@ -43,6 +43,37 @@
             </x-stat-tile>
         </div>
 
+        @php
+            $rangeNames = [
+                'day' => [__('Today'), __('Yesterday')],
+                'week' => [__('This week'), __('Last week')],
+                'month' => [__('This month'), __('Last month')],
+                'quarter' => [__('This quarter'), __('Last quarter')],
+                'all' => [__('All time'), ''],
+            ];
+        @endphp
+        <div class="card p-4 sm:p-6 text-gray-600 dark:text-gray-300"
+             x-data="realizedChart(@js(['ranges' => $ranges, 'labels' => ['bucket' => __('Realized P/L'), 'total' => __('Running total')]]))">
+            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ __('Realized over time') }}</h3>
+            <div class="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2" role="group" aria-label="{{ __('Chart range') }}">
+                @foreach ($rangeNames as $key => [$name, $prevName])
+                    <button type="button" @click="select('{{ $key }}')" :aria-pressed="range === '{{ $key }}'"
+                            :class="range === '{{ $key }}' ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-200 dark:border-gray-700'"
+                            class="rounded-md border px-3 py-2 text-start">
+                        <span class="eyebrow block">{{ $name }}</span>
+                        <span class="mt-1 block font-mono text-base font-semibold"><x-money :copper="$ranges[$key]['pnl']" pnl /></span>
+                        @if ($ranges[$key]['prev'] !== null)
+                            <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{{ $prevName }}: <x-money :copper="$ranges[$key]['prev']" pnl /></span>
+                        @endif
+                    </button>
+                @endforeach
+            </div>
+            <div class="mt-4 h-72 sm:h-80" role="img" aria-label="{{ __('Chart of realized profit and loss over the selected range') }}">
+                <canvas x-ref="canvas"></canvas>
+            </div>
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Profit is booked when a sale is recorded, net of the AH cut, in your timezone. Weeks start on Monday.') }}</p>
+        </div>
+
         <div class="card p-4 sm:p-6">
             <div class="flex items-baseline justify-between gap-4">
                 <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ __('Positions') }}</h3>

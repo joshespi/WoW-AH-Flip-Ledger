@@ -24,7 +24,7 @@
 
             <!-- Page Heading: the header slot, else the page title -->
             @if (isset($header) || filled($title))
-                <header class="mx-auto max-w-[96rem] px-4 pt-8 sm:px-6 lg:px-8">
+                <header class="px-4 pt-8 sm:px-6 lg:px-8">
                     @isset($header)
                         {{ $header }}
                     @else
@@ -35,7 +35,7 @@
 
             <!-- Page Content: every page sits in the same container -->
             <main class="py-6">
-                <div class="mx-auto max-w-[96rem] space-y-6 px-4 sm:px-6 lg:px-8">
+                <div class="space-y-6 px-4 sm:px-6 lg:px-8">
                     {{ $slot }}
                 </div>
             </main>
