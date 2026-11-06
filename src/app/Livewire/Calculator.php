@@ -44,7 +44,7 @@ class Calculator extends Component
 
         foreach ($cost === null ? [] : $margins as $m) {
             $sell = (int) ceil(Money::sellPrice($cost, $m));
-            $profit = Money::round($sell * (1 - Money::AH_CUT)) - $cost;
+            $profit = Money::round($sell * Money::NET) - $cost;
 
             $rows[] = [
                 'margin' => $m,

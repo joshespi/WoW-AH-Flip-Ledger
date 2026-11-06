@@ -27,12 +27,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // can't block the next one for the default 24 h.
         $configured = fn () => app(BlizzardClient::class)->configured();
 
-        // Cheap when nothing changed (If-Modified-Since / Last-Modified dedupe). Hourly until
-        // `prices:probe` shows Blizzard honors If-Modified-Since, then it can poll more often.
-        $schedule->command('prices:fetch')->hourlyAt(5)->when($configured)->onOneServer()->withoutOverlapping(30);
+        // Cheap when nothing changed (If-Modified-Since / Last-Modified dedupe). Every 30 minutes;
+        // if `prices:probe` shows Blizzard ignores If-Modified-Since, each poll is a full download.
+        $schedule->command('prices:fetch')->cron('5,35 * * * *')->when($configured)->onOneServer()->withoutOverlapping(30);
         $schedule->command('prices:names')->everyFifteenMinutes()->when($configured)->onOneServer()->withoutOverlapping(10);
-        // Fifteen minutes after the fetch; it does nothing unless that fetch brought new prices.
-        $schedule->command('alerts:send')->hourlyAt(20)->onOneServer()->withoutOverlapping(30);
+        // Fifteen minutes after each fetch; it does nothing unless that fetch brought new prices.
+        $schedule->command('alerts:send')->cron('20,50 * * * *')->onOneServer()->withoutOverlapping(30);
         // Tells the admins when fetching or backups go wrong (idle for what is not set up).
         $schedule->command('health:check')->everyThirtyMinutes()->onOneServer()->withoutOverlapping(20);
         $schedule->command('prices:prune')->dailyAt('03:30')->onOneServer()->withoutOverlapping(60);

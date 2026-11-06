@@ -1,4 +1,4 @@
-<x-app-layout :title="__('Admin')">
+<x-app-layout :title="__('Admin')" games="any">
     @include('admin.partials.tabs')
 
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

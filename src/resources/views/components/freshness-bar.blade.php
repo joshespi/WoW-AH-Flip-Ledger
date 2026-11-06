@@ -1,11 +1,11 @@
-{{-- How old the data is: TSM only writes its file on /reload or logout, so a stale warning
+{{-- How old the data is: the game only writes its files on /reload or logout, so a stale warning
      is the reminder to do that and send it. --}}
 @php($f = $freshness)
 
 <div class="border-b border-gray-200 bg-white font-mono text-[11px] text-gray-600 dark:border-gray-800 dark:bg-gray-900/60 dark:text-gray-400">
     <div class="px-4 py-2 sm:px-6 lg:px-8 flex flex-wrap items-center gap-x-6 gap-y-1">
         <span>
-            <span class="font-medium text-gray-700 dark:text-gray-300">{{ __('TSM saved') }}</span>
+            <span class="font-medium text-gray-700 dark:text-gray-300">{{ __('Game saved') }}</span>
             @if ($f->tsmSavedAt === null)
                 <span>{{ __('never') }}</span>
                 <a href="{{ route('uploads.index') }}" class="underline">{{ __('Upload your data') }}</a>
@@ -14,7 +14,7 @@
                 <span>({{ $f->ago($f->tsmSavedAt) }})</span>
                 @if ($f->tsmStale())
                     <span class="ms-1 inline-flex items-center rounded bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 font-medium text-amber-800 dark:text-amber-300"
-                          title="{{ __('TSM writes this file only on /reload or logout. Do that in game, then upload again.') }}">
+                          title="{{ __('The game writes this file only on /reload or logout. Do that in game, then upload again.') }}">
                         {{ __('Stale: /reload in game, then upload') }}
                     </span>
                 @endif

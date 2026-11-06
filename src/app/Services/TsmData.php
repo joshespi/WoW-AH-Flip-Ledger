@@ -11,15 +11,23 @@ final readonly class TsmData
     /** The only sale/buy source that is an auction house flip (vendor, trade and so on are ignored). */
     public const SOURCE_AUCTION = 'Auction';
 
+    public const ORIGIN_TSM = 'tsm';
+
+    public const ORIGIN_ADDON = 'addon';
+
     /**
      * @param  array<string, string>  $names  base item id (`i:123`) => item name
      * @param  array<string, list<array<string, string>>>  $csv  section (`csvSales`) => rows; each row also has `realm`
      * @param  array<string, int>  $inventory  base item id => total quantity across characters and locations
+     * @param  string  $origin  `tsm` (TradeSkillMaster.lua) or `addon` (the companion addon's own log)
+     * @param  int|null  $takenAt  when the inventory snapshot was taken (epoch), when the file says
      */
     public function __construct(
         public array $names,
         public array $csv,
         public array $inventory,
+        public string $origin = self::ORIGIN_TSM,
+        public ?int $takenAt = null,
     ) {}
 
     /**

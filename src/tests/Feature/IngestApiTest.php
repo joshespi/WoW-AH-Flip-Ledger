@@ -12,13 +12,14 @@ use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
 use Tests\Support\Fixtures;
+use Tests\Support\IngestsFiles;
 use Tests\Support\SeedsMarketData;
 use Tests\Support\TsmFile;
 use Tests\TestCase;
 
 class IngestApiTest extends TestCase
 {
-    use Fixtures, RefreshDatabase, SeedsMarketData;
+    use Fixtures, IngestsFiles, RefreshDatabase, SeedsMarketData;
 
     private User $user;
 
@@ -37,22 +38,12 @@ class IngestApiTest extends TestCase
      */
     private function ingest(string $body, ?string $token = null, array $headers = []): TestResponse
     {
-        // The auth manager caches the resolved user for the life of the app; tests that switch
-        // tokens mid-test need a fresh guard.
-        $this->app['auth']->forgetGuards();
-
-        $server = $this->transformHeadersToServerVars($headers + [
-            'Authorization' => 'Bearer '.($token ?? $this->token),
-            'Accept' => 'application/json',
-            'Content-Type' => 'application/octet-stream',
-        ]);
-
-        return $this->call('POST', '/api/v1/ingest', [], [], [], $server, $body);
+        return $this->postIngest($body, $token ?? $this->token, $headers);
     }
 
     private function rows(string $table, ?User $user = null): int
     {
-        return DB::table($table)->where('user_id', ($user ?? $this->user)->id)->count();
+        return $this->rowsOf($table, user: $user);
     }
 
     private function fixtureFile(): string

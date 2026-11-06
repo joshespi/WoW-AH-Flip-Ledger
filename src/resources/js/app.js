@@ -12,6 +12,54 @@ const gold = (copper) => copper / 10000;
 const goldLabel = (v) => v.toLocaleString(undefined, { maximumFractionDigits: Math.abs(v) < 10 ? 2 : 0 }) + 'g';
 const chartLegend = (text) => ({ position: 'bottom', labels: { color: text, usePointStyle: true, boxWidth: 8 } });
 const saleGreen = 'rgba(34, 197, 94, 0.75)';
+const GOLD = '#e5b64a';
+const line = (label, color, extra = {}) => ({
+    label, data: [], borderColor: color, backgroundColor: color, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0, ...extra,
+});
+
+// Options of a chart over RealizedRangesService buckets; `scales` adds axes (or overrides x/y).
+const rangeOptions = (text, scales = {}) => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    interaction: { mode: 'index', intersect: false },
+    scales: {
+        x: { grid: { display: false }, ticks: { color: text, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+        y: { grid: { color: chartGrid }, ticks: { color: text, callback: goldLabel } },
+        ...scales,
+    },
+    plugins: {
+        legend: chartLegend(text),
+        tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${goldLabel(c.parsed.y)}` } },
+    },
+});
+
+// An Alpine component for a chart with range buttons (`d.ranges[key]`): `config(text)` is the
+// Chart.js config, `fill(chart, range)` loads one range into it. Chart.js loads on demand.
+const rangeChart = (d, config, fill) => { let chart = null; return {
+    range: 'month',
+
+    async init() {
+        const { default: Chart } = await import('chart.js/auto');
+        chart = new Chart(this.$refs.canvas, config(getComputedStyle(this.$el).color));
+        this.show();
+    },
+
+    select(key) {
+        this.range = key;
+        this.show();
+    },
+
+    show() {
+        if (!chart) return; // a click before Chart.js has loaded; init() shows the stored range
+        fill(chart, d.ranges[this.range]);
+        chart.update();
+    },
+
+    destroy() {
+        chart?.destroy();
+    },
+}; };
 
 document.addEventListener('alpine:init', () => {
     // Light / system / dark buttons. The theme logic itself (reading the saved choice, setting
@@ -107,61 +155,44 @@ document.addEventListener('alpine:init', () => {
     // Realized P/L chart for the dashboard. `d` is built by RealizedRangesService: per range key,
     // bucket labels plus copper per bucket (pnls) and running total (cum). Bars are the bucket's
     // P/L (green up, red down), the line is the running total on its own axis.
-    window.Alpine.data('realizedChart', (d) => { let chart = null; return {
-        range: 'month',
-
-        async init() {
-            const { default: Chart } = await import('chart.js/auto');
-            const text = getComputedStyle(this.$el).color;
-
-            chart = new Chart(this.$refs.canvas, {
-                data: {
-                    labels: [],
-                    datasets: [
-                        { type: 'bar', label: d.labels.bucket, data: [], yAxisID: 'y', borderRadius: 2 },
-                        { type: 'line', label: d.labels.total, data: [], yAxisID: 'y1', borderColor: '#e5b64a', backgroundColor: '#e5b64a', borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0 },
-                    ],
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: false,
-                    interaction: { mode: 'index', intersect: false },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { color: text, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
-                        y: { grid: { color: chartGrid }, ticks: { color: text, callback: goldLabel } },
-                        y1: { position: 'right', grid: { display: false }, ticks: { color: text, callback: goldLabel } },
-                    },
-                    plugins: {
-                        legend: chartLegend(text),
-                        tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${goldLabel(c.parsed.y)}` } },
-                    },
-                },
-            });
-
-            this.show();
-        },
-
-        select(key) {
-            this.range = key;
-            this.show();
-        },
-
-        show() {
-            if (!chart) return; // a click before Chart.js has loaded; init() shows the stored range
-            const r = d.ranges[this.range];
-            const [bars, line] = chart.data.datasets;
+    window.Alpine.data('realizedChart', (d) => rangeChart(d,
+        (text) => ({
+            data: {
+                labels: [],
+                datasets: [
+                    { type: 'bar', label: d.labels.bucket, data: [], yAxisID: 'y', borderRadius: 2 },
+                    { type: 'line', yAxisID: 'y1', ...line(d.labels.total, GOLD) },
+                ],
+            },
+            options: rangeOptions(text, { y1: { position: 'right', grid: { display: false }, ticks: { color: text, callback: goldLabel } } }),
+        }),
+        (chart, r) => {
+            const [bars, total] = chart.data.datasets;
             chart.data.labels = r.labels;
             bars.data = r.pnls.map(gold);
             bars.backgroundColor = r.pnls.map((v) => (v < 0 ? 'rgba(239, 68, 68, 0.75)' : saleGreen));
-            line.data = r.cum.map(gold);
-            chart.update();
-        },
+            total.data = r.cum.map(gold);
+        }));
 
-        destroy() {
-            chart?.destroy();
-        },
-    }; });
+    // All screen: running realized P/L per game and in total on one axis (`d.ranges[range]` is
+    // RealizedRangesService::buildSplit()). Each game's colour and dash come from Support\Game::chart(),
+    // so lines differ without colour too; the total is thick and neutral.
+    window.Alpine.data('combinedChart', (d) => rangeChart(d,
+        (text) => ({
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    ...d.games.map((g) => line(d.labels[g], d.styles[g].color, d.styles[g].dash ? { borderDash: d.styles[g].dash } : {})),
+                    line(d.labels.total, text, { borderWidth: 3 }),
+                ],
+            },
+            options: rangeOptions(text),
+        }),
+        (chart, r) => {
+            chart.data.labels = r.labels;
+            [...d.games, 'total'].forEach((k, i) => { chart.data.datasets[i].data = r.cum[k].map(gold); });
+        }));
 
     // Price chart for the item page. Chart.js is loaded on demand so other pages don't carry it.
     // `d` is built by ItemController: x is epoch seconds, y copper per unit. The range buttons
@@ -175,9 +206,7 @@ document.addEventListener('alpine:init', () => {
             const text = getComputedStyle(this.$el).color;
             const now = Date.now();
             const pts = (rows, y) => rows.map((r) => ({ x: r.ts * 1000, y: gold(y(r)), q: r.qty }));
-            const line = (label, data, color, extra = {}) => ({
-                label, data, borderColor: color, backgroundColor: color, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, hitRadius: 8, tension: 0, ...extra,
-            });
+            const series = (label, data, color, extra = {}) => line(label, color, { data, hitRadius: 8, ...extra });
             // Marker area follows the quantity, so a 500-unit sale reads bigger than a 5-unit one.
             const radius = (c) => 3 + Math.min(7, Math.sqrt(c.raw?.q ?? 1) / 2.5);
             // Reference lines are not hover targets.
@@ -197,14 +226,14 @@ document.addEventListener('alpine:init', () => {
             });
 
             const sets = [
-                line(d.labels.median, pts(d.daily, (r) => r.median), '#e5b64a', { borderWidth: 2.5 }),
-                line(d.labels.ma, ma, '#fde68a', { borderWidth: 1.5, borderDash: [3, 3] }),
-                line(d.labels.min, pts(d.daily, (r) => r.min), '#94a3b8', { borderWidth: 1, hidden: true }),
+                series(d.labels.median, pts(d.daily, (r) => r.median), GOLD, { borderWidth: 2.5 }),
+                series(d.labels.ma, ma, '#fde68a', { borderWidth: 1.5, borderDash: [3, 3] }),
+                series(d.labels.min, pts(d.daily, (r) => r.min), '#94a3b8', { borderWidth: 1, hidden: true }),
             ];
 
-            if (d.typical) sets.push(line(d.labels.typical, flat(d.typical), '#94a3b8', { borderDash: [6, 4], borderWidth: 1, ...ref }));
-            if (d.hist60) sets.push(line(d.labels.hist60, flat(d.hist60), '#64748b', { borderDash: [2, 4], borderWidth: 1, ...ref }));
-            if (avg.length) sets.push(line(d.labels.avg, avg, '#38bdf8', { stepped: 'after', borderWidth: 1.5, borderDash: [4, 3], ...ref }));
+            if (d.typical) sets.push(series(d.labels.typical, flat(d.typical), '#94a3b8', { borderDash: [6, 4], borderWidth: 1, ...ref }));
+            if (d.hist60) sets.push(series(d.labels.hist60, flat(d.hist60), '#64748b', { borderDash: [2, 4], borderWidth: 1, ...ref }));
+            if (avg.length) sets.push(series(d.labels.avg, avg, '#38bdf8', { stepped: 'after', borderWidth: 1.5, borderDash: [4, 3], ...ref }));
 
             sets.push({ type: 'scatter', label: d.labels.buys, data: pts(d.buys, (r) => r.unit), backgroundColor: '#38bdf8', borderColor: '#0c4a6e', pointRadius: radius, pointHoverRadius: 10, pointStyle: 'triangle' });
             sets.push({ type: 'scatter', label: d.labels.sales, data: pts(d.sales, (r) => r.unit), backgroundColor: saleGreen, borderColor: '#14532d', pointRadius: radius, pointHoverRadius: 10, pointStyle: 'circle' });

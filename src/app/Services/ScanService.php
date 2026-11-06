@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Trade;
 use App\Models\User;
+use App\Support\Game;
 use App\Support\ItemName;
 use App\Support\MarketStats;
 use App\Support\Money;
@@ -27,7 +28,7 @@ class ScanService
     public function scan(User $user, int $minItemId = 0, int $minSoldPerDay = 0, ?float $maxRatio = null, ?int $top = null, string $mode = 'discount'): array
     {
         $top = max(1, min($top ?? (int) config('ledger.market.scan_default_top'), (int) config('ledger.market.scan_max_top')));
-        $net = 1 - Money::AH_CUT;
+        $net = Money::NET;
 
         $query = DB::table('item_stats as s')
             ->leftJoin('items', 'items.id', '=', 's.item_id')
@@ -84,10 +85,10 @@ class ScanService
      */
     private function winnerIds(User $user): array
     {
-        $buys = DB::table('trades')->ownedBy($user)->where('side', Trade::SIDE_BUY)->where('qty', '>', 0)
+        $buys = DB::table('trades')->ownedBy($user)->inGame(Game::RETAIL)->where('side', Trade::SIDE_BUY)->where('qty', '>', 0)
             ->groupBy('item_id')->selectRaw('item_id, sum(cost_copper) * 1.0 / sum(qty) as unit')->pluck('unit', 'item_id');
 
-        $sales = DB::table('tsm_sales')->ownedBy($user)->where('source', TsmData::SOURCE_AUCTION)->where('qty', '>', 0)
+        $sales = DB::table('tsm_sales')->ownedBy($user)->inGame(Game::RETAIL)->where('source', TsmData::SOURCE_AUCTION)->where('qty', '>', 0)
             ->groupBy('item_id')->selectRaw('item_id, sum(qty * unit_price_copper) * 1.0 / sum(qty) as unit')->pluck('unit', 'item_id');
 
         $ids = [];

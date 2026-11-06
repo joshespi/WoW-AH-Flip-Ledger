@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['user_id', 'source', 'client_version', 'wow_account', 'file_mtime', 'received_at', 'bytes', 'status', 'error', 'counts'])]
+#[Fillable(['user_id', 'game', 'source', 'client_version', 'wow_account', 'file_mtime', 'received_at', 'bytes', 'status', 'error', 'counts'])]
 class Upload extends Model
 {
     use OwnedByUser;

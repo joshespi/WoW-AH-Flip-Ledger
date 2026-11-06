@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\DB;
+
 final class ItemName
 {
     private const MAX_LENGTH = 120;
@@ -30,6 +32,29 @@ final class ItemName
     public static function display(?string $name, int $id): string
     {
         return $name ?? 'Item #'.$id;
+    }
+
+    /**
+     * Catalog ids per name, matched case-insensitively (lowercased on both sides: MariaDB's
+     * collation ignores case already, SQLite's does not). A name is only usable when it maps to
+     * exactly one id; callers check that, never guess.
+     *
+     * @param  list<string>  $names
+     * @return array<string, list<int>> lowercased name => ids
+     */
+    public static function idsByName(array $names, bool $commoditiesOnly = false): array
+    {
+        $ids = [];
+
+        foreach (array_chunk(array_values(array_unique(array_map('mb_strtolower', $names))), Bulk::CHUNK) as $chunk) {
+            $q = DB::table('items')->whereRaw('lower(name) in ('.implode(',', array_fill(0, count($chunk), '?')).')', $chunk);
+
+            foreach (($commoditiesOnly ? $q->where('is_commodity', 1) : $q)->get(['id', 'name']) as $item) {
+                $ids[mb_strtolower($item->name)][] = (int) $item->id;
+            }
+        }
+
+        return $ids;
     }
 
     /** Names arrive from user uploads, so they are untrusted. Null means "not a usable name". */

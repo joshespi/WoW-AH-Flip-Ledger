@@ -171,7 +171,7 @@ class TradesPageTest extends TestCase
 
         $csv = $this->actingAs($user)->get('/trades/export')->assertOk()->streamedContent();
 
-        $this->assertStringContainsString("2026-10-12T16:51+00:00,i:100,5,\"2,730g 82s 05c\",'=SUM(A1)", $csv);
+        $this->assertStringContainsString("2026-10-12T16:51:00+00:00,i:100,5,\"2,730g 82s 05c\",'=SUM(A1)", $csv);
         $this->assertStringNotContainsString('theirs', $csv);
 
         $this->get('/trades/export')->assertOk();

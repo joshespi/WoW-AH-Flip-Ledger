@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\IssuesIngestToken;
+use App\Support\Game;
 use DateTimeZone;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -40,6 +41,14 @@ class SettingsController extends Controller
             fn (array $n): array => ['sometimes', $n[0], "between:{$n[1]},{$n[2]}"],
             self::NUMBERS,
         ));
+
+        // The game checkboxes only count when their form marker came along (a partial post leaves them alone).
+        if ($request->has('games_form')) {
+            $games = $request->validate(['games' => ['required', 'array', 'min:1'], 'games.*' => [Rule::in(Game::GAMES)]], [
+                'games.required' => __('Keep at least one game on.'),
+            ])['games'];
+            $request->user()->setEnabledGames($games);
+        }
 
         $request->user()->update($data);
 

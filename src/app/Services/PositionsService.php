@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Trade;
 use App\Models\User;
+use App\Support\Game;
 use App\Support\ItemName;
 use App\Support\MarketStats;
 use App\Support\Money;
@@ -25,12 +26,12 @@ class PositionsService
 {
     public function __construct(private LedgerService $ledger) {}
 
-    public function forUser(User $user): Portfolio
+    public function forUser(User $user, string $game = Game::RETAIL): Portfolio
     {
-        [$trades, $adjustments] = $this->trades($user);
+        [$trades, $adjustments] = $this->trades($user, $game);
 
         if ($trades === []) {
-            return new Portfolio([], $this->summary([]), null, []);
+            return new Portfolio([], $this->summary([], $game), null, []);
         }
 
         $firstBuy = [];
@@ -42,15 +43,15 @@ class PositionsService
         $ids = array_keys($firstBuy);
         $newest = new SplMinHeap;
         $events = [];
-        $ledger = $this->ledger->buildFromSales([...$trades, ...$adjustments], $this->sales($user, $firstBuy, $newest),
+        $ledger = $this->ledger->buildFromSales([...$trades, ...$adjustments], $this->sales($user, $game, $firstBuy, $newest),
             function (int $ts, int $pnl) use (&$events): void {
                 $events[] = [$ts, $pnl];
             });
 
         $names = $this->names($ids);
-        $inventory = DB::table('inventory')->ownedBy($user)->pluck('qty', 'item_id')->all();
+        $inventory = DB::table('inventory')->ownedBy($user)->inGame($game)->pluck('qty', 'item_id')->all();
         $hasSnapshot = $inventory !== [];
-        $stats = DB::table('item_stats')->where('region', $user->region)->whereIn('item_id', $ids)->get()->keyBy('item_id')->all();
+        $stats = MarketStats::forItems($user->region, $game, $ids);
 
         $rows = [];
 
@@ -61,22 +62,22 @@ class PositionsService
         usort($rows, fn (PositionRow $a, PositionRow $b) => [$a->closed(), $b->costBasis, $b->realized, $a->name]
             <=> [$b->closed(), $a->costBasis, $a->realized, $b->name]);
 
-        $summary = $this->summary($rows);
+        $summary = $this->summary($rows, $game);
 
         return new Portfolio($rows, $summary, $this->concentration($rows, $summary['stock_cost']), $this->recent($trades, $newest, $names), $events);
     }
 
     /** Units of one item the ledger says the user holds, by the same rule as forUser(). */
-    public function held(User $user, int $itemId): int
+    public function held(User $user, int $itemId, string $game = Game::RETAIL): int
     {
-        [$trades, $adjustments] = $this->trades($user, $itemId);
+        [$trades, $adjustments] = $this->trades($user, $game, $itemId);
 
         if ($trades === []) {
             return 0;
         }
 
         $first = min(array_column($trades, 'ts'));
-        $ledger = $this->ledger->buildFromSales([...$trades, ...$adjustments], $this->sales($user, [$itemId => $first], new SplMinHeap));
+        $ledger = $this->ledger->buildFromSales([...$trades, ...$adjustments], $this->sales($user, $game, [$itemId => $first], new SplMinHeap));
 
         return $ledger[$itemId]['inv'];
     }
@@ -85,11 +86,11 @@ class PositionsService
      * One item's count in the latest TSM inventory snapshot, by the same rule as forUser(): an
      * item missing from a snapshot that exists is 0; null when no upload carried a snapshot.
      */
-    public function tsmStock(User $user, int $itemId): ?int
+    public function tsmStock(User $user, int $itemId, string $game = Game::RETAIL): ?int
     {
-        $qty = DB::table('inventory')->ownedBy($user)->where('item_id', $itemId)->value('qty');
+        $qty = DB::table('inventory')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->value('qty');
 
-        return $qty !== null ? (int) $qty : (DB::table('inventory')->ownedBy($user)->exists() ? 0 : null);
+        return $qty !== null ? (int) $qty : (DB::table('inventory')->ownedBy($user)->inGame($game)->exists() ? 0 : null);
     }
 
     /**
@@ -97,7 +98,7 @@ class PositionsService
      */
     private function row(int $id, array $a, string $name, ?object $stat, User $user, ?int $inStock): PositionRow
     {
-        $cut = 1 - Money::AH_CUT;
+        $cut = Money::NET;
         $held = $a['inv'];
 
         $avg = $held > 0 ? $a['cost'] / $held : null;
@@ -154,10 +155,12 @@ class PositionsService
     }
 
     /**
+     * Floor value and unrealized P/L are null for a game with no price feed: there is no floor.
+     *
      * @param  list<PositionRow>  $rows
-     * @return array{realized: int, stock_cost: int, stock_at_floor: int, unrealized: int, own_stock_sales: int, unpriced_items: int}
+     * @return array{realized: int, stock_cost: int, stock_at_floor: ?int, unrealized: ?int, own_stock_sales: int, unpriced_items: int}
      */
-    private function summary(array $rows): array
+    private function summary(array $rows, string $game): array
     {
         $s = ['realized' => 0, 'stock_cost' => 0, 'stock_at_floor' => 0, 'unrealized' => 0, 'own_stock_sales' => 0, 'unpriced_items' => 0];
 
@@ -172,6 +175,10 @@ class PositionsService
             } elseif ($r->held > 0) {
                 $s['unpriced_items']++;
             }
+        }
+
+        if (! Game::hasMarket($game)) {
+            $s['stock_at_floor'] = $s['unrealized'] = null;
         }
 
         return $s;
@@ -225,12 +232,12 @@ class PositionsService
      *
      * @return array{0: list<array{ts: int, item: int, qty: int, cost: int}>, 1: list<array{ts: int, item: int, qty: int, cost: int, correction: string}>}
      */
-    private function trades(User $user, ?int $itemId = null): array
+    private function trades(User $user, string $game, ?int $itemId = null): array
     {
         $buys = [];
         $adjustments = [];
 
-        foreach (DB::table('trades')->ownedBy($user)->whereIn('side', [Trade::SIDE_BUY, ...Trade::CORRECTIONS])
+        foreach (DB::table('trades')->ownedBy($user)->inGame($game)->whereIn('side', [Trade::SIDE_BUY, ...Trade::CORRECTIONS])
             ->when($itemId !== null, fn ($q) => $q->where('item_id', $itemId))
             ->get(['side', 'item_id', 'traded_at', 'qty', 'cost_copper']) as $r) {
             $row = ['ts' => Utc::ts($r->traded_at), 'item' => (int) $r->item_id, 'qty' => (int) $r->qty];
@@ -254,10 +261,10 @@ class PositionsService
      * @param  SplMinHeap<array{int, int, int, int}>  $newest
      * @return \Generator<int, array{item: int, ts: int, qty: int, unit_price: int}>
      */
-    private function sales(User $user, array $firstBuy, SplMinHeap $newest): \Generator
+    private function sales(User $user, string $game, array $firstBuy, SplMinHeap $newest): \Generator
     {
         $keep = (int) config('ledger.positions.recent_activity');
-        $rows = DB::table('tsm_sales')->ownedBy($user)->where('source', TsmData::SOURCE_AUCTION)
+        $rows = DB::table('tsm_sales')->ownedBy($user)->inGame($game)->where('source', TsmData::SOURCE_AUCTION)
             ->whereIn('item_id', array_keys($firstBuy))->select('item_id', 'qty', 'unit_price_copper', 'sold_at')->cursor();
 
         foreach ($rows as $r) {

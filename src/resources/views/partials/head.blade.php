@@ -14,7 +14,7 @@
 <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
 <meta name="theme-color" content="#1c1d22" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f9fafb" media="(prefers-color-scheme: light)">
-@php($blurb = __('Track your World of Warcraft auction house flips: realized profit and loss, open positions and live market prices, from your TradeSkillMaster data.'))
+@php($blurb = __('Track your World of Warcraft auction house flips: realized profit and loss, open positions and live market prices, from your own recorded auctions or TradeSkillMaster data.'))
 <meta name="description" content="{{ $blurb }}">
 <meta property="og:site_name" content="{{ config('app.name') }}">
 <meta property="og:title" content="{{ filled($title ?? null) ? $title.' · '.config('app.name') : config('app.name') }}">

@@ -76,6 +76,24 @@ class DataExportTest extends TestCase
         $this->assertMatchesRegularExpression('/-0[67]:00$/', $this->rows($files['trades.csv'])[0]['time']);
     }
 
+    public function test_rows_carry_their_game(): void
+    {
+        $user = $this->fixtureUser();
+        Trade::create(['user_id' => $user->id, 'game' => 'forever', 'item_id' => 1, 'traded_at' => now(), 'qty' => 1, 'cost_copper' => 1, 'side' => 'buy', 'note' => 'FOREVER']);
+        DB::table('tsm_sales')->insert(['user_id' => $user->id, 'game' => 'forever', 'item_id' => 1, 'sold_at' => now(), 'qty' => 1, 'unit_price_copper' => 5, 'realm' => 'X', 'source' => 'Auction', 'dedupe_key' => 'forever:k']);
+
+        $files = $this->unzip(app(DataExportService::class)->build($user));
+
+        foreach (['trades.csv', 'corrections.csv', 'sales.csv', 'expired.csv', 'cancelled.csv', 'buy_suggestions.csv', 'uploads.csv'] as $file) {
+            $this->assertStringContainsString(',game', strtok($files[$file], "\n"), $file);
+        }
+
+        $trades = collect($this->rows($files['trades.csv']));
+        $this->assertSame('forever', $trades->firstWhere('note', 'FOREVER')['game']);
+        $this->assertSame(['forever', 'retail'], $trades->pluck('game')->unique()->sort()->values()->all());
+        $this->assertSame(['forever', 'retail'], collect($this->rows($files['sales.csv']))->pluck('game')->unique()->sort()->values()->all());
+    }
+
     public function test_exported_trades_import_into_another_account(): void
     {
         $user = $this->fixtureUser();

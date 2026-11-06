@@ -10,7 +10,7 @@ class ItemController extends Controller
 {
     public function show(Request $request, ItemDetailService $details, int $item): View
     {
-        $data = $details->forUser($request->user(), $item) ?? abort(404);
+        $data = $details->forUser($request->user(), $item, $request->user()->activeGame()) ?? abort(404);
 
         $market = $data['market'];
 

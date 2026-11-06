@@ -46,6 +46,28 @@ class ManualUploadTest extends TestCase
         $this->actingAs($user)->get('/uploads')->assertOk()->assertSee('manual')->assertSee('OK');
     }
 
+    public function test_the_chosen_game_decides_where_a_manual_upload_lands(): void
+    {
+        $user = User::factory()->create();
+        $content = TsmFile::make(sales: [['i:100', 5, 200, TsmFile::T0, 'Auction']]);
+
+        $this->actingAs($user)->post('/uploads', ['file' => $this->file($content), 'game' => 'forever'])
+            ->assertSessionHas('status', 'upload-ok');
+
+        $this->assertSame(1, DB::table('tsm_sales')->where('user_id', $user->id)->where('game', 'forever')->count());
+        $this->assertSame(0, DB::table('tsm_sales')->where('user_id', $user->id)->where('game', 'retail')->count());
+        $this->assertDatabaseHas('uploads', ['user_id' => $user->id, 'game' => 'forever']);
+
+        $this->actingAs($user)->get('/uploads')->assertOk()->assertSee('Which game is this file from?')->assertSee('Forever');
+    }
+
+    public function test_an_unknown_game_is_refused_on_upload(): void
+    {
+        $this->actingAs(User::factory()->create())
+            ->post('/uploads', ['file' => $this->file(TsmFile::make()), 'game' => 'wotlk'])
+            ->assertSessionHasErrors('game');
+    }
+
     public function test_a_gzipped_manual_upload_works(): void
     {
         $user = User::factory()->create();

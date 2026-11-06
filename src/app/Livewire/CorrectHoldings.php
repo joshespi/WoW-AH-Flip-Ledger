@@ -47,7 +47,7 @@ class CorrectHoldings extends Component
         // The form only shows while something is held. TSM stock is a hint, not the default: the gap
         // is usually sales still in the mail, which would count as own-stock sales once collected.
         if ($ledgerHeld > 0) {
-            $this->tsmStock = $positions->tsmStock(auth()->user(), $itemId);
+            $this->tsmStock = $positions->tsmStock(auth()->user(), $itemId, auth()->user()->activeGame());
         }
     }
 
@@ -55,7 +55,7 @@ class CorrectHoldings extends Component
     {
         $saved = $this->attempt('correct', function () use ($trades) {
             $held = Bounds::wholeNumber($this->held) ?? throw new InvalidArgumentException('Held must be a whole number.');
-            $trades->correctHeld(auth()->user(), $this->itemId, $held, $this->reason, $this->note);
+            $trades->correctHeld(auth()->user(), $this->itemId, $held, $this->reason, $this->note, auth()->user()->activeGame());
         });
 
         if ($saved) {
@@ -72,7 +72,7 @@ class CorrectHoldings extends Component
 
     public function render(): View
     {
-        $corrections = Trade::ownedBy(auth()->user())->where('item_id', $this->itemId)->whereIn('side', Trade::CORRECTIONS)
+        $corrections = Trade::ownedBy(auth()->user())->inGame(auth()->user()->activeGame())->where('item_id', $this->itemId)->whereIn('side', Trade::CORRECTIONS)
             ->orderByDesc('traded_at')->orderByDesc('id')->limit(20)->get(['id', 'side', 'traded_at', 'qty', 'note']);
 
         return view('livewire.correct-holdings', ['corrections' => $corrections, 'user' => auth()->user()]);

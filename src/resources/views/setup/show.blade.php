@@ -1,4 +1,4 @@
-<x-app-layout :title="__('Set up')">
+<x-app-layout :title="__('Set up')" games="any">
     @php
         $labels = [
             'windows-amd64' => 'Windows (64-bit)',
@@ -16,7 +16,7 @@
 
     <div class="max-w-3xl mx-auto space-y-6">
         <x-section :title="__('1. Download the uploader')" width="max-w-none"
-                   :description="__('A small program that sends your TradeSkillMaster file to this site after each /reload or logout. It reads that one file and writes nothing to your WoW folder unless you turn on the optional in-game addon (step 4). Prefer not to install anything? You can upload the file by hand instead.')">
+                   :description="__('A small program that sends the files WoW saves (our addon\'s record and, if you use it, TradeSkillMaster\'s) to this site after each /reload or logout. It reads only those two files and writes nothing to your WoW folder unless you turn on the addon\'s data file (step 4). Prefer not to install anything? You can upload the file by hand instead.')">
             @if ($current === null)
                 <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">{{ __('The uploader has not been published on this server yet.') }}</p>
                 <x-secondary-button :href="route('uploads.index')" class="mt-4">{{ __('Upload by hand') }}</x-secondary-button>
@@ -79,7 +79,7 @@
         </x-section>
 
         <x-section :title="__('4. Optional: see it in game')" width="max-w-none"
-                   :description="__('A small addon adds your cost, floor and profit to item tooltips (including the auction house), a /wfl panel, and a login alert when a watched item hits its target.')">
+                   :description="__('Install the addon first: it records your auction buys and sales (no TradeSkillMaster needed), and adds your cost, floor and profit to item tooltips (including the auction house), a /wfl panel, and a login alert when a watched item hits its target.')">
             @if ($addon === null)
                 <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">{{ __('The addon has not been published on this server yet.') }}</p>
             @else
@@ -89,7 +89,7 @@
             @endif
 
             <ol class="mt-4 list-decimal ms-5 space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                <li>{{ __('Unzip it so the WowFlipLedger folder sits in World of Warcraft\\_retail_\\Interface\\AddOns\\.') }}</li>
+                <li>{{ __('Unzip it so the WowFlipLedger folder sits in World of Warcraft\\_retail_\\Interface\\AddOns\\ (or _forever_ for World of Warcraft: Forever; the uploader sends each game to its own ledger).') }}</li>
                 <li>{{ __('Run:') }} <code class="text-xs">{{ $run }} addon enable</code></li>
                 <li>{{ __('Keep the uploader running. It refreshes the addon\'s data file about every 5 minutes and after each upload.') }}</li>
                 <li>{{ __('In game, type /reload to load the new data. WoW only reads addon files at login and /reload.') }}</li>

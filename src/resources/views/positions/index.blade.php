@@ -18,23 +18,23 @@
         $above = config('ledger.positions.above_ratio');
         // [label, sort type, tooltip]; numbers in the tooltips come from the same config the service uses
         $cols = [
-            ['Item', 'text', null],
-            ['Held', 'num', null],
-            ['Avg cost', 'num', __('Weighted average cost of what you still hold.')],
-            ['Break-even', 'num', __('Average cost / :net: the sell price that covers the :cut% AH cut.', ['net' => 1 - $cut, 'cut' => $cut * 100])],
-            ['Target sell', 'num', __('Average cost with your :margin% target margin and the AH cut (change it in Settings).', ['margin' => $user->target_margin_pct])],
-            ['Floor', 'num', __('Lowest unit price on the auction house at the last Blizzard snapshot.')],
-            ['vs break-even', 'num', __('Floor relative to break-even.')],
-            ['Recent', 'num', __('Estimate: median floor over the last 24 hours.')],
-            ['Typical', 'num', __('Estimate: median of daily median floors over 30 days.')],
-            ['60d avg', 'num', __('Estimate: mean of daily median floors over 60 days.')],
-            ['Floor / typical', 'num', __(':below or less is cheap, :above or more is rich.', ['below' => $below, 'above' => $above])],
-            ['Sold / day', 'num', __('Estimate from hourly supply drops. Cancels and expiries also reduce supply, so treat it as a rough ceiling.')],
-            ['Days to sell', 'num', __('Held / (sold per day x your market share, :share%).', ['share' => $user->market_share_pct])],
-            ['Value at floor', 'num', __('Held x floor, after the AH cut.')],
-            ['Unrealized', 'num', __('Value at floor minus cost.')],
-            ['Realized', 'num', __('Profit or loss on what has sold, after the AH cut.')],
-            ['Status', 'text', null],
+            [__('Item'), 'text', null],
+            [__('Held'), 'num', null],
+            [__('Avg cost'), 'num', __('Weighted average cost of what you still hold.')],
+            [__('Break-even'), 'num', __('Average cost / :net: the sell price that covers the :cut% AH cut.', ['net' => 1 - $cut, 'cut' => $cut * 100])],
+            [__('Target sell'), 'num', __('Average cost with your :margin% target margin and the AH cut (change it in Settings).', ['margin' => $user->target_margin_pct])],
+            [__('Floor'), 'num', __('Lowest unit price on the auction house at the last Blizzard snapshot.')],
+            [__('vs break-even'), 'num', __('Floor relative to break-even.')],
+            [__('Recent'), 'num', __('Estimate: median floor over the last 24 hours.')],
+            [__('Typical'), 'num', __('Estimate: median of daily median floors over 30 days.')],
+            [__('60d avg'), 'num', __('Estimate: mean of daily median floors over 60 days.')],
+            [__('Floor / typical'), 'num', __(':below or less is cheap, :above or more is rich.', ['below' => $below, 'above' => $above])],
+            [__('Sold / day'), 'num', __('Estimate from hourly supply drops. Cancels and expiries also reduce supply, so treat it as a rough ceiling.')],
+            [__('Days to sell'), 'num', __('Held / (sold per day x your market share, :share%).', ['share' => $user->market_share_pct])],
+            [__('Value at floor'), 'num', __('Held x floor, after the AH cut.')],
+            [__('Unrealized'), 'num', __('Value at floor minus cost.')],
+            [__('Realized'), 'num', __('Profit or loss on what has sold, after the AH cut.')],
+            [__('Status'), 'text', null],
         ];
     @endphp
 
@@ -51,13 +51,7 @@
                     <caption class="sr-only">{{ __('Your positions. Use the column buttons to sort.') }}</caption>
                     <thead>
                         <tr>
-                            @foreach ($cols as $i => [$label, $type, $tip])
-                                <th scope="col" class="{{ $type === 'num' ? 'num' : '' }}" :aria-sort="ariaSort({{ $i }})"
-                                    @if ($tip) title="{{ $tip }}" @endif>
-                                    <button type="button" @click="sort({{ $i }}, '{{ $type }}')"
-                                            class="font-medium select-none rounded hover:text-gray-900 dark:hover:text-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{{ __($label) }}<span aria-hidden="true" x-text="arrow({{ $i }})"></span></button>
-                                </th>
-                            @endforeach
+                            <x-sort-headers :cols="$cols" />
                             <th scope="col"><span class="sr-only">{{ __('Actions') }}</span></th>
                         </tr>
                     </thead>

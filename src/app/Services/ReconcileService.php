@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Models\Trade;
 use App\Models\User;
 use App\Support\Bulk;
+use App\Support\Game;
 use App\Support\Utc;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -42,7 +44,7 @@ class ReconcileService
      *
      * @return list<array{id: int, item_id: int, name: ?string, qty: int, cost: int, at: int, double: bool}>
      */
-    public function pending(User $user): array
+    public function pending(User $user, string $game = Game::RETAIL): array
     {
         $out = [];
         // The user's trades of each item seen so far, as [time, qty, unit price, source].
@@ -52,11 +54,11 @@ class ReconcileService
         // a page at a time until LIMIT are shown, with trades loaded only for the items on each page.
         DB::table('tsm_buy_candidates')
             ->leftJoin('items', 'items.id', '=', 'tsm_buy_candidates.item_id')
-            ->ownedBy($user, 'tsm_buy_candidates.user_id')->where('status', self::PENDING)
+            ->ownedBy($user, 'tsm_buy_candidates.user_id')->inGame($game, 'tsm_buy_candidates.game')->where('status', self::PENDING)
             ->orderByDesc('at')->orderByDesc('tsm_buy_candidates.id')
             ->select('tsm_buy_candidates.id', 'tsm_buy_candidates.item_id', 'qty', 'cost_copper', 'at', 'items.name')
-            ->chunk(self::PAGE, function ($page) use ($user, &$out, &$trades) {
-                $this->loadTrades($user, $page->pluck('item_id')->map(fn ($id) => (int) $id)->unique()->all(), $trades);
+            ->chunk(self::PAGE, function ($page) use ($user, $game, &$out, &$trades) {
+                $this->loadTrades($user, $game, $page->pluck('item_id')->map(fn ($id) => (int) $id)->unique()->all(), $trades);
 
                 return $this->collect($page, $trades, $out);
             });
@@ -68,7 +70,7 @@ class ReconcileService
      * @param  list<int>  $itemIds
      * @param  array<int, list<array{int, int, float, string}>>  $trades
      */
-    private function loadTrades(User $user, array $itemIds, array &$trades): void
+    private function loadTrades(User $user, string $game, array $itemIds, array &$trades): void
     {
         $new = array_values(array_diff($itemIds, array_keys($trades)));
 
@@ -78,7 +80,7 @@ class ReconcileService
 
         $trades += array_fill_keys($new, []);
 
-        foreach (DB::table('trades')->ownedBy($user)->whereIn('item_id', $new)
+        foreach (DB::table('trades')->ownedBy($user)->inGame($game)->whereIn('item_id', $new)
             ->select('item_id', 'traded_at', 'qty', 'cost_copper', 'source')->cursor() as $t) {
             $trades[(int) $t->item_id][] = [Utc::ts($t->traded_at), (int) $t->qty, (int) $t->cost_copper / max(1, (int) $t->qty), $t->source];
         }
@@ -132,6 +134,17 @@ class ReconcileService
         return true;
     }
 
+    /** One pending candidate of this user's, or null (already handled, or not theirs). */
+    public function findPending(User $user, int $id): ?object
+    {
+        return $this->pendingRows($user)->where('id', $id)->first();
+    }
+
+    private function pendingRows(User $user): Builder
+    {
+        return DB::table('tsm_buy_candidates')->ownedBy($user)->where('status', self::PENDING);
+    }
+
     /**
      * Records the candidate as a buy, with the TSM values unless the user corrected them.
      *
@@ -140,8 +153,7 @@ class ReconcileService
     public function accept(User $user, int $id, ?int $qty = null, ?int $cost = null, ?int $ts = null): Trade
     {
         return DB::transaction(function () use ($user, $id, $qty, $cost, $ts) {
-            $c = DB::table('tsm_buy_candidates')->ownedBy($user)->where('status', self::PENDING)
-                ->where('id', $id)->lockForUpdate()->first();
+            $c = $this->pendingRows($user)->where('id', $id)->lockForUpdate()->first();
 
             if ($c === null) {
                 throw new InvalidArgumentException('That suggestion was already handled.');
@@ -149,7 +161,7 @@ class ReconcileService
 
             $trade = app(TradesService::class)->add(
                 $user, (int) $c->item_id, $qty ?? (int) $c->qty, $cost ?? (int) $c->cost_copper,
-                $ts ?? Utc::ts($c->at), null, 'tsm', $c->tsm_ref,
+                $ts ?? Utc::ts($c->at), null, 'tsm', $c->tsm_ref, $c->game,
             );
 
             DB::table('tsm_buy_candidates')->where('id', $c->id)->update(['status' => self::ACCEPTED]);
@@ -196,8 +208,7 @@ class ReconcileService
         $n = 0;
 
         foreach (array_chunk(array_unique($ids), Bulk::CHUNK) as $chunk) {
-            $n += DB::table('tsm_buy_candidates')->ownedBy($user)->where('status', self::PENDING)
-                ->whereIn('id', $chunk)->update(['status' => self::IGNORED]);
+            $n += $this->pendingRows($user)->whereIn('id', $chunk)->update(['status' => self::IGNORED]);
         }
 
         return $n;

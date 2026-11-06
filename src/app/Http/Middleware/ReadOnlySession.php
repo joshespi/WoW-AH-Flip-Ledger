@@ -20,7 +20,7 @@ class ReadOnlySession
         $user = $request->user();
 
         if ($user && $user->readOnly() && ! $request->isMethodSafe()
-            && ! $request->routeIs('logout', 'impersonate.stop') && ! $request->is('livewire-*/update')) {
+            && ! $request->routeIs('logout', 'impersonate.stop', 'game.switch') && ! $request->is('livewire-*/update')) {
             if ($request->expectsJson()) {
                 abort(403, 'This session is read-only.');
             }

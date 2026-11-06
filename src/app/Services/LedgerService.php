@@ -111,6 +111,19 @@ class LedgerService
     }
 
     /**
+     * Takes up to $qty units out of a holding at average cost: [units taken, their cost]. The one
+     * rule behind sales, adjustments and write-offs here and in ItemDetailService's replay.
+     *
+     * @return array{int, int}
+     */
+    public static function take(int $held, int $cost, int $qty): array
+    {
+        $m = min($qty, $held);
+
+        return [$m, $held > 0 ? Num::mulDiv($cost, $m, $held) : 0];
+    }
+
+    /**
      * @param  list<array{int, int, int, int}>  $events  [ts, side (0 buy, 1 sell, 2 adjust, 3 write-off), qty, total copper]
      * @param  callable(int, int): void  $onPnl
      * @return array{bq: int, bc: int, sq: int, sr: int, pnl: int, oq: int, orev: int, inv: int, cost: int}
@@ -130,8 +143,7 @@ class LedgerService
             }
 
             if ($side >= 2) {
-                $m = min($q, $a['inv']);
-                $removed = $a['inv'] > 0 ? Num::mulDiv($a['cost'], $m, $a['inv']) : 0;
+                [$m, $removed] = self::take($a['inv'], $a['cost'], $q);
                 if ($side === 3) {
                     $a['pnl'] -= $removed;
                     $removed !== 0 && $onPnl($ts, -$removed);
@@ -143,8 +155,7 @@ class LedgerService
                 continue;
             }
 
-            $m = min($q, $a['inv']);
-            $cogs = $a['inv'] > 0 ? Num::mulDiv($a['cost'], $m, $a['inv']) : 0;
+            [$m, $cogs] = self::take($a['inv'], $a['cost'], $q);
             $rev = Num::mulDiv($c, $m, $q);
 
             $a['pnl'] += $rev - $cogs;

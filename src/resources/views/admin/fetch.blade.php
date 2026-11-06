@@ -1,4 +1,4 @@
-<x-app-layout :title="__('Admin: price fetches')">
+<x-app-layout :title="__('Admin: price fetches')" games="any">
     @include('admin.partials.tabs')
     @include('admin.partials.fetch-health')
 

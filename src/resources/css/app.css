@@ -128,6 +128,20 @@
         @apply z-20 shadow-[inset_-1px_-1px_0_theme(colors.gray.200)] dark:shadow-[inset_-1px_-1px_0_theme(colors.gray.800)];
     }
 
+    /* Forever (teal) and Classic (violet) screens: a rule on every card; the badge says it in words too.
+       Retail screens get none; a Retail card on a mixed page (`.card[data-game]`) gets gold. */
+    .card[data-game='retail'] {
+        @apply border-t-2 border-t-indigo-400/70;
+    }
+
+    [data-game='forever'] .card, .card[data-game='forever'] {
+        @apply border-t-2 border-t-teal-400/70;
+    }
+
+    [data-game='classic'] .card, .card[data-game='classic'] {
+        @apply border-t-2 border-t-violet-400/70;
+    }
+
     /* Sidebar links. */
     .side-link {
         @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-400 transition hover:bg-white/5 hover:text-gray-100;

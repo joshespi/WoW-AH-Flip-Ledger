@@ -6,7 +6,6 @@ use App\Livewire\Concerns\ReportsErrors;
 use App\Services\ReconcileService;
 use App\Support\Bounds;
 use App\Support\Money;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -33,10 +32,10 @@ class Reconcile extends Component
         }
     }
 
-    public function edit(int $id): void
+    public function edit(int $id, ReconcileService $reconcile): void
     {
         $user = auth()->user();
-        $c = DB::table('tsm_buy_candidates')->ownedBy($user)->where('status', ReconcileService::PENDING)->where('id', $id)->first();
+        $c = $reconcile->findPending($user, $id);
 
         if ($c === null) {
             return;
@@ -116,7 +115,7 @@ class Reconcile extends Component
 
     public function selectAll(ReconcileService $reconcile, bool $skipDoubles = false): void
     {
-        $rows = $reconcile->pending(auth()->user());
+        $rows = $reconcile->pending(auth()->user(), auth()->user()->activeGame());
         $this->selected = array_column($skipDoubles ? array_filter($rows, fn (array $r): bool => ! $r['double']) : $rows, 'id');
     }
 
@@ -140,7 +139,7 @@ class Reconcile extends Component
     public function render(ReconcileService $reconcile): View
     {
         $user = auth()->user();
-        $rows = $reconcile->pending($user);
+        $rows = $reconcile->pending($user, $user->activeGame());
         $shown = array_column($rows, 'id');
 
         // Rows that were handled elsewhere drop out of the selection.

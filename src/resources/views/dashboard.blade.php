@@ -1,4 +1,4 @@
-<x-app-layout :title="__('Dashboard')">
+<x-app-layout :title="__('Dashboard')" games="any">
     @php
         $s = $portfolio->summary;
         $open = $portfolio->open();
@@ -43,20 +43,11 @@
             </x-stat-tile>
         </div>
 
-        @php
-            $rangeNames = [
-                'day' => [__('Today'), __('Yesterday')],
-                'week' => [__('This week'), __('Last week')],
-                'month' => [__('This month'), __('Last month')],
-                'quarter' => [__('This quarter'), __('Last quarter')],
-                'all' => [__('All time'), ''],
-            ];
-        @endphp
         <div class="card p-4 sm:p-6 text-gray-600 dark:text-gray-300"
              x-data="realizedChart(@js(['ranges' => $ranges, 'labels' => ['bucket' => __('Realized P/L'), 'total' => __('Running total')]]))">
             <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ __('Realized over time') }}</h3>
             <div class="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2" role="group" aria-label="{{ __('Chart range') }}">
-                @foreach ($rangeNames as $key => [$name, $prevName])
+                @foreach (\App\Services\RealizedRangesService::labels() as $key => [$name, $prevName])
                     <button type="button" @click="select('{{ $key }}')" :aria-pressed="range === '{{ $key }}'"
                             :class="range === '{{ $key }}' ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-200 dark:border-gray-700'"
                             class="rounded-md border px-3 py-2 text-start">
@@ -68,6 +59,9 @@
                     </button>
                 @endforeach
             </div>
+            @if ((int) $ranges['all']['pnl'] === 0)
+                <p class="mt-3 text-sm text-gray-600 dark:text-gray-400">{{ __('No realized profit yet. The chart fills in as your sales are matched against your buys.') }}</p>
+            @endif
             <div class="mt-4 h-72 sm:h-80" role="img" aria-label="{{ __('Chart of realized profit and loss over the selected range') }}">
                 <canvas x-ref="canvas"></canvas>
             </div>
@@ -83,32 +77,33 @@
             @if ($open === [])
                 <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">{{ __('Nothing held right now.') }}</p>
             @else
-                <div class="mt-3 overflow-x-auto">
+                @php
+                    $posCols = [
+                        [__('Item'), 'text', null], [__('Held'), 'num', null], [__('Avg cost'), 'num', null],
+                        [__('Break-even'), 'num', null], [__('Floor'), 'num', null],
+                        [__('Value'), 'num', __('Held x floor, after the AH cut.')],
+                        [__('vs break-even'), 'num', null], [__('Status'), 'text', null],
+                    ];
+                @endphp
+                <div class="mt-3 overflow-x-auto" x-data="sortableTable">
                     <table class="data-table">
-                        <caption class="sr-only">{{ __('Largest open positions') }}</caption>
+                        <caption class="sr-only">{{ __('Largest open positions. Use the column buttons to sort.') }}</caption>
                         <thead>
                             <tr>
-                                <th>{{ __('Item') }}</th>
-                                <th class="num">{{ __('Held') }}</th>
-                                <th class="num">{{ __('Avg cost') }}</th>
-                                <th class="num">{{ __('Break-even') }}</th>
-                                <th class="num">{{ __('Floor') }}</th>
-                                <th class="num" title="{{ __('Held x floor, after the AH cut.') }}">{{ __('Value') }}</th>
-                                <th class="num">{{ __('vs break-even') }}</th>
-                                <th>{{ __('Status') }}</th>
+                                <x-sort-headers :cols="$posCols" />
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody x-ref="body">
                             @foreach (array_slice($open, 0, $rows) as $p)
                                 <tr>
-                                    <td class="text-gray-900 dark:text-gray-100"><x-item-link :id="$p->itemId" :name="$p->name" /></td>
-                                    <td class="num">{{ number_format($p->held) }}</td>
-                                    <td class="num"><x-money :copper="$p->avgCost" /></td>
-                                    <td class="num"><x-money :copper="$p->breakEven" /></td>
-                                    <td class="num"><x-money :copper="$p->floor" /></td>
-                                    <td class="num"><x-money :copper="$p->valueAtFloor" /></td>
-                                    <td class="num"><x-pct :value="$p->floorVsBreakEven" /></td>
-                                    <td><x-position-status :position="$p" /></td>
+                                    <td data-v="{{ $p->name }}" class="text-gray-900 dark:text-gray-100"><x-item-link :id="$p->itemId" :name="$p->name" /></td>
+                                    <td data-v="{{ $p->held }}" class="num">{{ number_format($p->held) }}</td>
+                                    <td data-v="{{ $p->avgCost }}" class="num"><x-money :copper="$p->avgCost" /></td>
+                                    <td data-v="{{ $p->breakEven }}" class="num"><x-money :copper="$p->breakEven" /></td>
+                                    <td data-v="{{ $p->floor }}" class="num"><x-money :copper="$p->floor" /></td>
+                                    <td data-v="{{ $p->valueAtFloor }}" class="num"><x-money :copper="$p->valueAtFloor" /></td>
+                                    <td data-v="{{ $p->floorVsBreakEven }}" class="num"><x-pct :value="$p->floorVsBreakEven" /></td>
+                                    <td data-v="{{ $p->status }}"><x-position-status :position="$p" /></td>
                                 </tr>
                             @endforeach
                         </tbody>

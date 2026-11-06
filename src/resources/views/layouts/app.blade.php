@@ -2,7 +2,7 @@
     <div class="min-h-screen">
         @include('layouts.navigation')
 
-        <div class="lg:ps-64">
+        <div class="lg:ps-64" @auth @unless (auth()->user()->viewsAll()) data-game="{{ auth()->user()->activeGame() }}" @endunless @endauth>
             @if (auth()->user()?->isBeingImpersonated())
                 <x-session-banner tone="red" :action="route('impersonate.stop')" :button="__('Stop viewing as this user')">
                     {{ __('Viewing as :name (:email), read-only. This is logged.', ['name' => auth()->user()->name, 'email' => auth()->user()->email]) }}
@@ -20,6 +20,7 @@
 
             @auth
                 <livewire:freshness-strip />
+                <x-game-banner :games="$games" />
             @endauth
 
             <!-- Page Heading: the header slot, else the page title -->

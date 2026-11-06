@@ -1,10 +1,10 @@
-<x-app-layout :title="__('Settings')">
+<x-app-layout :title="__('Settings')" games="any">
     @php
         // field => [label, hint]; the limits come from the controller, which validates against the same ones.
         $numbers = [
             'target_margin_pct' => [__('Target margin (%)'), __('Sets the target sell price: average cost with this margin on top, after the :cut% AH cut.', ['cut' => \App\Support\Money::AH_CUT * 100])],
             'market_share_pct' => [__('Market share (%)'), __('The share of the region\'s sales you expect to capture. Days to sell is your stock divided by estimated sold per day times this.')],
-            'stale_minutes' => [__('Warn when TSM data is older than (minutes)'), null],
+            'stale_minutes' => [__('Warn when saved data is older than (minutes)'), null],
         ];
     @endphp
 
@@ -38,6 +38,21 @@
                 </select>
                 <x-input-error class="mt-2" :messages="$errors->get('region')" />
             </div>
+
+            <fieldset>
+                <legend class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ __('Games I play') }}</legend>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ __('Only these show up in the game switcher, the upload form and the combined view. Turning one off hides it; nothing is deleted, and an upload from a game turns it back on.') }}</p>
+                <input type="hidden" name="games_form" value="1">
+                <div class="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-700 dark:text-gray-300">
+                    @foreach (\App\Support\Game::GAMES as $game)
+                        <label class="inline-flex items-center gap-2">
+                            <input type="checkbox" name="games[]" value="{{ $game }}" @checked(in_array($game, old('games', $user->enabledGames()), true))>
+                            <x-game-badge :game="$game" />
+                        </label>
+                    @endforeach
+                </div>
+                <x-input-error class="mt-2" :messages="$errors->get('games')" />
+            </fieldset>
 
             @foreach ($numbers as $name => [$label, $hint])
                 @php([, $min, $max, $step] = $limits[$name])

@@ -43,7 +43,7 @@ class TradesImportController extends Controller
         }
 
         try {
-            $result = $import->import($request->user(), $content);
+            $result = $import->import($request->user(), $content, $request->user()->activeGame());
         } catch (InvalidArgumentException $e) {
             $keep = strlen((string) $request->input('csv_text')) <= self::MAX_FLASH_BYTES ? $request->only('csv_text') : [];
 

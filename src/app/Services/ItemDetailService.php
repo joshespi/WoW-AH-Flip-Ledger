@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Trade;
 use App\Models\User;
+use App\Support\Game;
 use App\Support\ItemName;
 use App\Support\MarketStats;
 use App\Support\Num;
@@ -38,19 +39,19 @@ class ItemDetailService
      *     market: ?array<string, mixed>, daily: list<array{ts: int, median: int, min: int}>
      * }
      */
-    public function forUser(User $user, int $itemId): ?array
+    public function forUser(User $user, int $itemId, string $game = Game::RETAIL): ?array
     {
-        $trades = DB::table('trades')->ownedBy($user)->where('item_id', $itemId)->where('side', Trade::SIDE_BUY)
+        $trades = DB::table('trades')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->where('side', Trade::SIDE_BUY)
             ->orderBy('traded_at')->orderBy('id')->limit(self::MAX_EVENTS)->get(['traded_at', 'qty', 'cost_copper']);
-        $corrections = DB::table('trades')->ownedBy($user)->where('item_id', $itemId)->whereIn('side', Trade::CORRECTIONS)
+        $corrections = DB::table('trades')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->whereIn('side', Trade::CORRECTIONS)
             ->orderBy('traded_at')->orderBy('id')->limit(self::MAX_EVENTS)->get(['side', 'traded_at', 'qty']);
-        $sales = DB::table('tsm_sales')->ownedBy($user)->where('item_id', $itemId)->where('source', TsmData::SOURCE_AUCTION)
+        $sales = DB::table('tsm_sales')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->where('source', TsmData::SOURCE_AUCTION)
             ->orderBy('sold_at')->orderBy('id')->limit(self::MAX_EVENTS)->get(['sold_at', 'qty', 'unit_price_copper']);
-        $expired = DB::table('tsm_expired')->ownedBy($user)->where('item_id', $itemId)->orderBy('at')->limit(self::MAX_EVENTS)->get(['at', 'qty']);
-        $cancelled = DB::table('tsm_cancelled')->ownedBy($user)->where('item_id', $itemId)->orderBy('at')->limit(self::MAX_EVENTS)->get(['at', 'qty']);
+        $expired = DB::table('tsm_expired')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->orderBy('at')->limit(self::MAX_EVENTS)->get(['at', 'qty']);
+        $cancelled = DB::table('tsm_cancelled')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->orderBy('at')->limit(self::MAX_EVENTS)->get(['at', 'qty']);
 
-        $stat = DB::table('item_stats')->where('region', $user->region)->where('item_id', $itemId)->first();
-        $daily = $this->daily($user->region, $itemId, $stat);
+        $stat = MarketStats::forItems($user->region, $game, [$itemId])[$itemId] ?? null;
+        $daily = ! Game::hasMarket($game) ? [] : $this->daily($user->region, $itemId, $stat);
         $name = DB::table('items')->where('id', $itemId)->value('name');
 
         if ($trades->isEmpty() && $sales->isEmpty() && $expired->isEmpty() && $cancelled->isEmpty() && $stat === null && $daily === [] && $name === null) {
@@ -143,8 +144,7 @@ class ItemDetailService
                 if ($first === null || $e['ts'] < $first) {
                     $row['tracked'] = false;
                 } else {
-                    $m = min($e['qty'], $held);
-                    $removed = $held > 0 ? Num::mulDiv($cost, $m, $held) : 0;
+                    [$m, $removed] = LedgerService::take($held, $cost, $e['qty']);
 
                     if ($e['kind'] === Trade::SIDE_WRITEOFF) {
                         $row['pnl'] = -$removed;
@@ -158,8 +158,7 @@ class ItemDetailService
                 if ($first === null || $e['ts'] < $first) {
                     $row['tracked'] = false;
                 } else {
-                    $m = min($e['qty'], $held);
-                    $cogs = $held > 0 ? Num::mulDiv($cost, $m, $held) : 0;
+                    [$m, $cogs] = LedgerService::take($held, $cost, $e['qty']);
                     $rev = Num::mulDiv($e['total'], $m, $e['qty']);
 
                     $row['pnl'] = $rev - $cogs;

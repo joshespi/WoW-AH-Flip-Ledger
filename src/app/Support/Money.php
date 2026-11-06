@@ -12,6 +12,9 @@ final class Money
 {
     public const AH_CUT = 0.05;
 
+    /** What a sale nets after the AH cut, per copper of price. */
+    public const NET = 1 - self::AH_CUT;
+
     public const COPPER_PER_GOLD = 10_000;
 
     /** parseGold input is user text; cap it so the unit regex can't be fed a long whitespace run. */
@@ -25,7 +28,7 @@ final class Money
     /** The listing price that nets `$marginPct` over `$cost` after the AH cut; 0 is break-even. */
     public static function sellPrice(float|int $cost, float|int $marginPct = 0): float
     {
-        return $cost * (1 + $marginPct / 100) / (1 - self::AH_CUT);
+        return $cost * (1 + $marginPct / 100) / self::NET;
     }
 
     /**

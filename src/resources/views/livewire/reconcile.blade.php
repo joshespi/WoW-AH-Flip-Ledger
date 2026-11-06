@@ -5,7 +5,7 @@
 
     <div class="card p-4 sm:p-6">
         <p class="text-sm text-gray-600 dark:text-gray-400">
-            {{ __('TSM logged these auction buys, but it often double-counts commodity lots, so they are only suggestions. Accept the ones that are real, correct a quantity or cost first if needed, and ignore the rest. Buys you already recorded within :min minutes are not listed.', ['min' => intdiv(\App\Services\ReconcileService::WINDOW, 60)]) }}
+            {{ __('Your addon or TSM logged these auction buys. TSM often double-counts commodity lots, so they are only suggestions. Accept the ones that are real, correct a quantity or cost first if needed, and ignore the rest. Buys you already recorded within :min minutes are not listed.', ['min' => intdiv(\App\Services\ReconcileService::WINDOW, 60)]) }}
         </p>
 
         @if ($rows === [])

@@ -36,7 +36,7 @@ class LedgerSettingsTest extends TestCase
             ->assertSee('Target margin')
             ->assertSee('value="22.5"', false)
             ->assertSee('Market share')
-            ->assertSee('Warn when TSM data is older than');
+            ->assertSee('Warn when saved data is older than');
     }
 
     public function test_the_ledger_fields_save(): void

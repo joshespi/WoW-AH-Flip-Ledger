@@ -6,7 +6,7 @@ use App\Models\Concerns\OwnedByUser;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['user_id', 'item_id', 'traded_at', 'qty', 'cost_copper', 'side', 'note', 'source', 'tsm_ref', 'import_key'])]
+#[Fillable(['user_id', 'game', 'item_id', 'traded_at', 'qty', 'cost_copper', 'side', 'note', 'source', 'tsm_ref', 'import_key'])]
 class Trade extends Model
 {
     use OwnedByUser;

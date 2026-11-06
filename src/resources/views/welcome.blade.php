@@ -42,8 +42,8 @@
 
     <div class="mt-12 grid gap-4 sm:grid-cols-3">
         <div class="card p-5">
-            <h2 class="font-medium">{{ __('Your sales, from TSM') }}</h2>
-            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{{ __('Upload TradeSkillMaster\'s saved data and your sales, expirations and cancellations are read straight from it. The file itself is never kept.') }}</p>
+            <h2 class="font-medium">{{ __('Your sales, recorded for you') }}</h2>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{{ __('Our in-game addon records your buys, sales, expirations and cancellations, or import TradeSkillMaster\'s saved data. Upload the saved file and it is read straight away. The file itself is never kept.') }}</p>
         </div>
         <div class="card p-5">
             <h2 class="font-medium">{{ __('Live market prices') }}</h2>

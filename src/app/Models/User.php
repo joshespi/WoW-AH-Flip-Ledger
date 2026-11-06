@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Game;
 use Database\Factories\UserFactory;
 use DateTimeImmutable;
 use DateTimeInterface;
@@ -36,6 +37,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'target_margin_pct' => 15,
         'stale_minutes' => 30,
         'market_share_pct' => 5,
+        'game_view' => Game::RETAIL,
+        'enabled_games' => Game::RETAIL,
         'is_demo' => false,
         'is_admin' => false,
         'alerts_enabled' => false,
@@ -115,6 +118,74 @@ class User extends Authenticatable implements MustVerifyEmail
         // Sanctum tokens are polymorphic with no foreign key, so unlike our own tables they
         // don't cascade when the user is deleted.
         static::deleting(fn (self $user) => $user->tokens()->delete());
+    }
+
+    /**
+     * The games this user plays, in display order; the screens show only these. Never empty.
+     *
+     * @return list<string>
+     */
+    public function enabledGames(): array
+    {
+        return Game::normalize(explode(',', (string) $this->enabled_games));
+    }
+
+    public function playsSeveral(): bool
+    {
+        return count($this->enabledGames()) > 1;
+    }
+
+    /** @param  list<string>  $games */
+    public function setEnabledGames(array $games): void
+    {
+        $this->forceFill(['enabled_games' => implode(',', Game::normalize($games))])->saveQuietly();
+    }
+
+    /** Data arriving for a game means the user plays it. */
+    public function enableGame(string $game): void
+    {
+        if (! in_array($game, $this->enabledGames(), true)) {
+            $this->setEnabledGames([...$this->enabledGames(), $game]);
+        }
+    }
+
+    /**
+     * Which game the screens show: one enabled game, or `all` when more than one is enabled. A
+     * read-only session (demo, impersonation) cannot save the choice, so the session holds it first.
+     */
+    public function gameView(): string
+    {
+        $view = session('game_view', $this->game_view);
+        $enabled = $this->enabledGames();
+
+        return match (true) {
+            $view === Game::ALL && $this->playsSeveral() => Game::ALL,
+            in_array($view, $enabled, true) => $view,
+            default => $enabled[0],
+        };
+    }
+
+    /** Saves the view; a read-only session keeps it in the session only. The caller validates $view. */
+    public function setGameView(string $view): void
+    {
+        session(['game_view' => $view]);
+
+        if (! $this->readOnly()) {
+            $this->forceFill(['game_view' => $view])->saveQuietly();
+        }
+    }
+
+    /** The one game a page that cannot mix games works on: the view, or the first enabled game when showing all. */
+    public function activeGame(): string
+    {
+        $view = $this->gameView();
+
+        return $view === Game::ALL ? $this->enabledGames()[0] : $view;
+    }
+
+    public function viewsAll(): bool
+    {
+        return $this->gameView() === Game::ALL;
     }
 
     /** A stored UTC time (a date, a database string or epoch seconds) in this user's timezone, for display. */

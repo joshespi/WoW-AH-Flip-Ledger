@@ -1,4 +1,4 @@
-<x-app-layout :title="__('Admin: uploads')">
+<x-app-layout :title="__('Admin: uploads')" games="any">
     @include('admin.partials.tabs')
 
     <div class="card p-4 sm:p-6">

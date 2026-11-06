@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Upload;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Route as LaravelRoute;
@@ -121,6 +122,7 @@ class TenantIsolationTest extends TestCase
         $owned = [
             'token' => $alice->createToken('alice pc', ['ingest'])->accessToken->id,
             'id' => $alice->id,
+            'upload' => Upload::create(['user_id' => $alice->id, 'source' => 'manual', 'received_at' => now(), 'bytes' => 1, 'status' => 'ok'])->id,
             'hash' => sha1($alice->email),
             'item' => 987654,
             'user' => $alice->id,

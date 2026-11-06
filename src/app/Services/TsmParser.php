@@ -57,28 +57,7 @@ class TsmParser
         $mode = null;
         $inItemInfo = false;
         $rows = 0;
-        $lines = 0;
-        $pos = 0;
-        $len = strlen($contents);
-
-        while ($pos < $len) {
-            if (++$lines > $this->maxLines) {
-                throw new TsmParseException('That file has too many lines to be a TradeSkillMaster data file.');
-            }
-
-            $nl = strpos($contents, "\n", $pos);
-            $end = $nl === false ? $len : $nl;
-            $line = substr($contents, $pos, $end - $pos);
-            $pos = $end + 1;
-
-            if ($line !== '' && $line[strlen($line) - 1] === "\r") {
-                $line = substr($line, 0, -1);
-            }
-
-            if ($line === '') {
-                continue;
-            }
-
+        foreach (LuaLines::of($contents, $this->maxLines, 'TradeSkillMaster') as $line) {
             if ($mode === 'inventory') {
                 if ($line[0] === '}') {
                     $mode = null;

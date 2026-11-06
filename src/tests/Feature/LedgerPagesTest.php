@@ -147,7 +147,7 @@ class LedgerPagesTest extends TestCase
         $user = User::factory()->create(['stale_minutes' => 30]);
 
         $this->actingAs($user)->get('/dashboard')
-            ->assertSee('TSM saved')
+            ->assertSee('Game saved')
             ->assertSee('never')
             ->assertSee('Upload your data')
             ->assertDontSee('Stale: /reload');

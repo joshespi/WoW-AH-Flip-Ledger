@@ -6,6 +6,7 @@ use App\Models\Trade;
 use App\Models\User;
 use App\Support\Bounds;
 use App\Support\Bulk;
+use App\Support\Game;
 use App\Support\ItemName;
 use App\Support\Utc;
 use DateTimeZone;
@@ -43,7 +44,7 @@ class TradesImportService
      *
      * @throws InvalidArgumentException with a user-readable message
      */
-    public function import(User $user, string $csv): array
+    public function import(User $user, string $csv, string $game = Game::RETAIL): array
     {
         if (strlen($csv) > self::MAX_BYTES) {
             throw new InvalidArgumentException('That file is too large. Trade CSVs are limited to '.Number::fileSize(self::MAX_BYTES).'.');
@@ -77,6 +78,7 @@ class TradesImportService
 
             $rows[] = [
                 'user_id' => $user->id,
+                'game' => $game,
                 'item_id' => $id,
                 'traded_at' => Utc::sql($t['ts']),
                 'qty' => $t['qty'],
@@ -84,7 +86,7 @@ class TradesImportService
                 'side' => Trade::SIDE_BUY,
                 'note' => Bounds::note($t['note']),
                 'source' => 'csv',
-                'import_key' => sha1($base.'|'.$n),
+                'import_key' => sha1(Game::keyPrefix($game).$base.'|'.$n),
                 'created_at' => $now,
                 'updated_at' => $now,
             ];

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Trade;
 use App\Models\User;
 use App\Support\Bounds;
+use App\Support\Game;
 use App\Support\ItemName;
 use App\Support\Utc;
 use Illuminate\Support\Facades\DB;
@@ -28,10 +29,10 @@ class TradesService
         $text = trim($text);
 
         if (($id = ItemName::bareId($text)) === null) {
-            $ids = DB::table('items')->whereRaw('lower(name) = ?', [mb_strtolower($text)])->limit(2)->pluck('id');
+            $ids = ItemName::idsByName([$text])[mb_strtolower($text)] ?? [];
 
-            if ($ids->count() !== 1) {
-                throw new InvalidArgumentException($ids->isEmpty()
+            if (count($ids) !== 1) {
+                throw new InvalidArgumentException($ids === []
                     ? "No item named \"{$text}\" is known yet. Use its item id."
                     : "\"{$text}\" matches several items. Use its item id.");
             }
@@ -44,9 +45,9 @@ class TradesService
     }
 
     /** @throws InvalidArgumentException */
-    public function add(User $user, int $itemId, int $qty, int $cost, int $ts, ?string $note, string $source = 'manual', ?string $tsmRef = null): Trade
+    public function add(User $user, int $itemId, int $qty, int $cost, int $ts, ?string $note, string $source = 'manual', ?string $tsmRef = null, string $game = Game::RETAIL): Trade
     {
-        return $this->create($user, Trade::SIDE_BUY, $itemId, $qty, $cost, $ts, $note, $source, $tsmRef);
+        return $this->create($user, Trade::SIDE_BUY, $itemId, $qty, $cost, $ts, $note, $source, $tsmRef, $game);
     }
 
     /**
@@ -55,9 +56,9 @@ class TradesService
      *
      * @throws InvalidArgumentException
      */
-    public function adjust(User $user, int $itemId, int $qty, int $ts, ?string $note = null): Trade
+    public function adjust(User $user, int $itemId, int $qty, int $ts, ?string $note = null, string $game = Game::RETAIL): Trade
     {
-        return $this->create($user, Trade::SIDE_ADJUST, $itemId, $qty, 0, $ts, $note, 'system');
+        return $this->create($user, Trade::SIDE_ADJUST, $itemId, $qty, 0, $ts, $note, 'system', null, $game);
     }
 
     /**
@@ -66,13 +67,13 @@ class TradesService
      *
      * @throws InvalidArgumentException
      */
-    public function correctHeld(User $user, int $itemId, int $held, string $side, ?string $note = null): Trade
+    public function correctHeld(User $user, int $itemId, int $held, string $side, ?string $note = null, string $game = Game::RETAIL): Trade
     {
         if (! in_array($side, Trade::CORRECTIONS, true)) {
             throw new InvalidArgumentException('Pick what happened to the rest.');
         }
 
-        $current = $this->positions->held($user, $itemId);
+        $current = $this->positions->held($user, $itemId, $game);
 
         if ($current === 0) {
             throw new InvalidArgumentException('The ledger holds none of this item.');
@@ -82,7 +83,7 @@ class TradesService
             throw new InvalidArgumentException('Held must be less than '.number_format($current).'. To add stock, add a buy.');
         }
 
-        return $this->create($user, $side, $itemId, $current - $held, 0, time(), $note, 'manual');
+        return $this->create($user, $side, $itemId, $current - $held, 0, time(), $note, 'manual', null, $game);
     }
 
     public function deleteCorrection(User $user, int $id): void
@@ -119,7 +120,7 @@ class TradesService
      *
      * @throws InvalidArgumentException
      */
-    public function addPasted(User $user, string $text, int $ts): int
+    public function addPasted(User $user, string $text, int $ts, string $game = Game::RETAIL): int
     {
         if (strlen($text) > 256 * 1024) {
             throw new InvalidArgumentException('That paste is too large.');
@@ -132,13 +133,13 @@ class TradesService
         }
 
         // A throw rolls back the lines already added.
-        DB::transaction(function () use ($user, $lines, $ts) {
+        DB::transaction(function () use ($user, $lines, $ts, $game) {
             $ids = [];
 
             foreach ($lines as $l) {
                 try {
                     $id = $l['id'] ?? ($ids[mb_strtolower($l['name'])] ??= $this->resolveItem($l['name']));
-                    $this->add($user, $id, $l['qty'], $l['cost'], $ts, null, 'paste');
+                    $this->add($user, $id, $l['qty'], $l['cost'], $ts, null, 'paste', null, $game);
                 } catch (InvalidArgumentException $e) {
                     throw new InvalidArgumentException("line {$l['line']}: ".$e->getMessage());
                 }
@@ -149,11 +150,12 @@ class TradesService
     }
 
     /** @throws InvalidArgumentException */
-    private function create(User $user, string $side, int $itemId, int $qty, int $cost, int $ts, ?string $note, string $source, ?string $tsmRef = null): Trade
+    private function create(User $user, string $side, int $itemId, int $qty, int $cost, int $ts, ?string $note, string $source, ?string $tsmRef = null, string $game = Game::RETAIL): Trade
     {
         return Trade::create($this->attributes($itemId, $qty, $cost, $ts, $note) + [
             'tsm_ref' => $tsmRef,
             'user_id' => $user->id,
+            'game' => $game,
             'side' => $side,
             'source' => $source,
         ]);

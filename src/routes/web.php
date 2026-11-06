@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DataExportController;
 use App\Http\Controllers\DemoController;
 use App\Http\Controllers\DownloadController;
+use App\Http\Controllers\GameController;
 use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\PositionsController;
@@ -27,11 +28,12 @@ Route::post('/alerts/unsubscribe/{user}', [AlertUnsubscribeController::class, 's
 Route::post('/demo', DemoController::class)->middleware(['guest', 'throttle:20,60'])->name('demo');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::post('/game', [GameController::class, 'switch'])->name('game.switch');
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/positions', [PositionsController::class, 'index'])->name('positions.index');
 
-    foreach (['trades' => 'Trades', 'reconcile' => 'Reconcile', 'market' => 'Market', 'scan' => 'Scan', 'calculator' => 'Calculator'] as $page => $title) {
-        Route::view("/{$page}", 'livewire-page', ['title' => $title, 'livewire' => $page])->name("{$page}.index");
+    foreach (['trades' => ['Trades', 'one'], 'reconcile' => ['Reconcile', 'one'], 'market' => ['Market', 'market'], 'scan' => ['Scan', 'market'], 'calculator' => ['Calculator', 'market']] as $page => [$title, $games]) {
+        Route::view("/{$page}", 'livewire-page', ['title' => $title, 'livewire' => $page, 'games' => $games])->name("{$page}.index");
     }
 
     Route::get('/setup', [SetupController::class, 'show'])->name('setup.show');
@@ -47,6 +49,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/uploads', [UploadController::class, 'index'])->name('uploads.index');
     Route::post('/uploads', [UploadController::class, 'store'])->middleware('throttle:manual-upload')->name('uploads.store');
+    Route::delete('/uploads/{upload}', [UploadController::class, 'destroy'])->name('uploads.destroy');
 
     Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.edit');
     Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');

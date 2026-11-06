@@ -14,7 +14,7 @@ final readonly class Portfolio
 {
     /**
      * @param  list<PositionRow>  $positions  open positions first (largest cost basis first), then closed ones
-     * @param  array{realized: int, stock_cost: int, stock_at_floor: int, unrealized: int, own_stock_sales: int, unpriced_items: int}  $summary
+     * @param  array{realized: int, stock_cost: int, stock_at_floor: ?int, unrealized: ?int, own_stock_sales: int, unpriced_items: int}  $summary
      * @param  array{name: string, pct: float}|null  $concentration  set when one item is over the configured share of stock cost
      * @param  list<array{type: string, ts: int, item_id: int, name: string, qty: int, unit: int, total: int}>  $recent
      * @param  list<array{int, int}>  $realizedEvents  [epoch ts, copper] per sale or write-off; sums to summary.realized

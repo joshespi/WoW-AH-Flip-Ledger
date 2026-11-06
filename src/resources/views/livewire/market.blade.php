@@ -20,7 +20,7 @@
         <x-input-error class="mt-2" :messages="$errors->get('add')" />
     </x-section>
 
-    <div class="card p-4 sm:p-6">
+    <div class="card p-4 sm:p-6 transition-opacity" wire:loading.class="opacity-60" wire:target="move,remove,edit,save">
         <x-input-error class="mb-3" :messages="$errors->get('list')" />
         @if ($rows === [])
             <p class="text-sm text-gray-600 dark:text-gray-400">{{ __('Your watchlist is empty.') }}</p>
@@ -68,10 +68,10 @@
                                     @if ($r['knife'])<x-chip type="Falling knife" title="{{ __('Cheap versus typical, and still dropping.') }}" tone="red" />@endif
                                 </td>
                                 <td class="whitespace-nowrap text-end text-sm">
-                                    <button type="button" wire:click="move({{ $r['id'] }}, -1)" aria-label="{{ __('Move up') }}" class="px-1 text-gray-600 dark:text-gray-400">↑</button>
-                                    <button type="button" wire:click="move({{ $r['id'] }}, 1)" aria-label="{{ __('Move down') }}" class="px-1 text-gray-600 dark:text-gray-400">↓</button>
-                                    <button type="button" wire:click="edit({{ $r['id'] }})" class="ms-2 underline text-gray-600 dark:text-gray-400">{{ __('Edit') }}</button>
-                                    <button type="button" wire:click="remove({{ $r['id'] }})" wire:confirm="{{ __('Remove from watchlist?') }}" class="ms-2 underline text-red-600 dark:text-red-400">{{ __('Remove') }}</button>
+                                    <button type="button" wire:click="move({{ $r['id'] }}, -1)" aria-label="{{ __('Move up') }}" class="inline-flex h-8 w-8 items-center justify-center rounded text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">↑</button>
+                                    <button type="button" wire:click="move({{ $r['id'] }}, 1)" aria-label="{{ __('Move down') }}" class="inline-flex h-8 w-8 items-center justify-center rounded text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">↓</button>
+                                    <button type="button" wire:click="edit({{ $r['id'] }})" class="ms-2 inline-flex h-8 items-center px-1 underline text-gray-600 dark:text-gray-400">{{ __('Edit') }}</button>
+                                    <button type="button" wire:click="remove({{ $r['id'] }})" wire:confirm="{{ __('Remove from watchlist?') }}" class="ms-1 inline-flex h-8 items-center px-1 underline text-red-600 dark:text-red-400">{{ __('Remove') }}</button>
                                 </td>
                             </tr>
                             @if ($editing === $r['id'])

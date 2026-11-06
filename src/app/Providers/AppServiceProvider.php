@@ -30,6 +30,12 @@ class AppServiceProvider extends ServiceProvider
             return $this->where($column, $user instanceof User ? $user->id : $user);
         });
 
+        // `DB::table('tsm_sales')->inGame($game)` (Eloquent too: `Trade::ownedBy($u)->inGame($game)`): one economy's rows. Pass the qualified column when joining.
+        QueryBuilder::macro('inGame', function (string $game, string $column = 'game') {
+            /** @var QueryBuilder $this */
+            return $this->where($column, $game);
+        });
+
         $this->rateLimiters();
 
         // Dev-only tooling that reads TSM's own data (never available in production).

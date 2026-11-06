@@ -1,4 +1,4 @@
-<x-app-layout :title="$d['name']">
+<x-app-layout :title="$d['name']" games="market">
     <x-slot name="header">
         <div class="flex items-baseline justify-between gap-4">
             <h2 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">{{ $d['name'] }} <span class="text-sm font-normal text-gray-400">#{{ $d['id'] }}</span></h2>

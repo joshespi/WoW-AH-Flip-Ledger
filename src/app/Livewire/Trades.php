@@ -96,7 +96,7 @@ class Trades extends Component
             $ts = $user->parseInputTime($this->time);
 
             if ($this->editing === null) {
-                $trades->add($user, $itemId, $qty, $cost, $ts, $this->note);
+                $trades->add($user, $itemId, $qty, $cost, $ts, $this->note, game: $user->activeGame());
                 $this->message = __('Buy added.');
             } else {
                 $trades->update($user, $this->editing, $itemId, $qty, $cost, $ts, $this->note);
@@ -146,7 +146,7 @@ class Trades extends Component
         $added = 0;
 
         if (! $this->attempt('pasted', function () use ($trades, &$added) {
-            $added = $trades->addPasted(auth()->user(), $this->pasted, time());
+            $added = $trades->addPasted(auth()->user(), $this->pasted, time(), auth()->user()->activeGame());
         })) {
             return;
         }
@@ -164,7 +164,7 @@ class Trades extends Component
 
         $rows = DB::table('trades')
             ->leftJoin('items', 'items.id', '=', 'trades.item_id')
-            ->ownedBy($user, 'trades.user_id')
+            ->ownedBy($user, 'trades.user_id')->inGame($user->activeGame(), 'trades.game')
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w->whereRaw('lower(items.name) like ?', [Sql::like($q)])
                 ->when($id !== null && Bounds::validItemId($id), fn ($w) => $w->orWhere('trades.item_id', $id))))
             ->orderByDesc('trades.traded_at')->orderByDesc('trades.id')

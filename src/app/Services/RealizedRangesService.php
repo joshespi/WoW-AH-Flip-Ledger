@@ -23,19 +23,36 @@ class RealizedRangesService
     ];
 
     /**
+     * Range key => [this period's label, the previous period's label].
+     *
+     * @return array<string, array{string, string}>
+     */
+    public static function labels(): array
+    {
+        return [
+            'day' => [__('Today'), __('Yesterday')],
+            'week' => [__('This week'), __('Last week')],
+            'month' => [__('This month'), __('Last month')],
+            'quarter' => [__('This quarter'), __('Last quarter')],
+            'all' => [__('All time'), ''],
+        ];
+    }
+
+    /**
      * Keyed by range; `prev` is null for all time.
      *
      * @param  list<array{int, int}>  $events  [epoch ts, copper]
+     * @param  list<array{int, int}>|null  $axisEvents  events that decide where all time starts (default: $events), so several series share one axis
      * @return array<string, array{pnl: int, prev: ?int, labels: list<string>, pnls: list<int>, cum: list<int>}>
      */
-    public function build(User $user, array $events, ?int $now = null): array
+    public function build(User $user, array $events, ?int $now = null, ?array $axisEvents = null): array
     {
         $now = CarbonImmutable::createFromTimestamp($now ?? time(), $user->timezone);
         $out = [];
 
         foreach (self::RANGES as $key => [$period, $step, $format]) {
             // All time has no previous period and also counts anything dated after now.
-            $start = $period !== null ? $now->startOf($period) : $this->firstMonth($user, $events, $now);
+            $start = $period !== null ? $now->startOf($period) : $this->firstMonth($user, $axisEvents ?? $events, $now);
             $from = $start->getTimestamp();
             $to = $period !== null ? $now->getTimestamp() : PHP_INT_MAX;
             $prevFrom = $period !== null ? $start->sub($period, 1)->getTimestamp() : null;
@@ -81,6 +98,36 @@ class RealizedRangesService
             }
 
             $out[$key] = ['pnl' => $pnl, 'prev' => $prev, 'labels' => $labels, 'pnls' => array_values($buckets), 'cum' => $cum];
+        }
+
+        return $out;
+    }
+
+    /**
+     * One chart axis, a series per game plus the total. Every game's buckets line up because the
+     * total's events decide the axis.
+     *
+     * @param  array<string, list<array{int, int}>>  $byGame  game => [epoch ts, copper]
+     * @return array<string, array{labels: list<string>, pnl: array<string, int>, cum: array<string, list<int>>}>
+     */
+    public function buildSplit(User $user, array $byGame, ?int $now = null): array
+    {
+        $all = array_merge(...array_values($byGame) ?: [[]]);
+        $series = ['total' => $this->build($user, $all, $now)];
+
+        foreach ($byGame as $game => $events) {
+            $series[$game] = $this->build($user, $events, $now, $all);
+        }
+
+        $out = [];
+
+        foreach ($series['total'] as $range => $t) {
+            $out[$range] = ['labels' => $t['labels'], 'pnl' => [], 'cum' => []];
+
+            foreach ($series as $key => $s) {
+                $out[$range]['pnl'][$key] = $s[$range]['pnl'];
+                $out[$range]['cum'][$key] = $s[$range]['cum'];
+            }
         }
 
         return $out;

@@ -66,6 +66,8 @@
             </button>
         </div>
 
+        <x-game-switcher />
+
         <nav class="grow space-y-5 overflow-y-auto px-3 py-3">
             @foreach ($menu as [$section, $links])
                 <div class="space-y-0.5">
