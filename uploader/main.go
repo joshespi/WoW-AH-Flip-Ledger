@@ -1,7 +1,8 @@
-// wowflipledger-uploader sends your TradeSkillMaster data to WoW Flip Ledger.
+// wowflipledger-uploader sends your TradeSkillMaster data and the WoW Flip Ledger addon's own
+// record to WoW Flip Ledger.
 //
-// It reads exactly one file per WoW account (WTF/Account/<account>/SavedVariables/
-// TradeSkillMaster.lua) and uploads when TSM saves it (after /reload or logout). It writes
+// It reads two files per WoW account (WTF/Account/<account>/SavedVariables/TradeSkillMaster.lua
+// and WowFlipLedger.lua) and uploads when the game saves one (after /reload or logout). It writes
 // nothing under the WoW folder, except, only if you run 'addon enable', the in-game addon's own
 // Interface/AddOns/WowFlipLedger/Data.lua.
 package main
@@ -50,13 +51,13 @@ Commands:
   setup       Save your server address and token (from the site's Settings page)
   status      Show the configuration, the files found and the last upload
   once        Upload now (add --force to upload even if nothing changed)
-  run         Watch for TSM saves and upload them (what start-at-login runs)
+  run         Watch for saves and upload them (what start-at-login runs)
   addon       enable | disable | status: keep the in-game addon's data file current
   install     Start the uploader at login (Windows and macOS)
   uninstall   Remove the start-at-login entry
   version     Print the version
 
-TSM only writes its file when you /reload or log out in game.
+The game only writes these files when you /reload or log out.
 `
 
 type app struct {
@@ -177,9 +178,9 @@ func (a *app) setup(args []string) int {
 	if err != nil {
 		fmt.Fprintf(a.out, "Note: %v\n", err)
 	} else if files, _ := wow.FindFiles(root); len(files) == 0 {
-		fmt.Fprintf(a.out, "Found WoW at %s, but no TradeSkillMaster.lua yet. Log in, then /reload or log out once so TSM saves it.\n", root)
+		fmt.Fprintf(a.out, "Found WoW at %s, but no TradeSkillMaster.lua or WowFlipLedger.lua yet. Log in, then /reload or log out once so the game saves them.\n", root)
 	} else {
-		fmt.Fprintf(a.out, "Found WoW at %s with %d TSM data file(s).\n", root, len(files))
+		fmt.Fprintf(a.out, "Found WoW at %s with %d data file(s).\n", root, len(files))
 	}
 
 	fmt.Fprintln(a.out, "\nNext: run 'once' to upload now, and 'install' to start at login.")
@@ -200,8 +201,12 @@ func (a *app) status() int {
 	} else {
 		fmt.Fprintf(a.out, "WoW:      %s\n", root)
 		files, _ := wow.FindFiles(root)
+		for _, g := range wow.Siblings(root) {
+			name := wow.GameLabel(g)
+			fmt.Fprintf(a.out, "%-9s found (uploaded to its own %s ledger)\n", name+":", name)
+		}
 		if len(files) == 0 {
-			fmt.Fprintln(a.out, "Files:    none yet (log in, then /reload or log out so TSM saves its data)")
+			fmt.Fprintln(a.out, "Files:    none yet (log in, then /reload or log out so the game saves its data)")
 		}
 		st, _ := state.Open(a.dir)
 		for _, f := range files {
@@ -246,7 +251,7 @@ func (a *app) once(args []string) int {
 		fmt.Fprintf(a.out, "Addon: %s (%s)\n", ev.Kind, ev.Message)
 	}
 	if len(events) == 0 {
-		fmt.Fprintf(a.out, "Nothing to upload: no TradeSkillMaster.lua found, or it has not changed since the last upload. Use --force to send it anyway.\nDetails: %s\n", logx.Path(a.dir))
+		fmt.Fprintf(a.out, "Nothing to upload: no TradeSkillMaster.lua or WowFlipLedger.lua found, or they have not changed since the last upload. Use --force to send it anyway.\nDetails: %s\n", logx.Path(a.dir))
 		return exitOK
 	}
 

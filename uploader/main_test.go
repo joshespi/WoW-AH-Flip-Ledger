@@ -31,6 +31,7 @@ type api struct {
 	ingests int
 	feeds   int
 	bodies  []string
+	games   []string
 	pingSt  int
 	ingSt   int
 	srv     *httptest.Server
@@ -55,6 +56,7 @@ func newAPI(t *testing.T) *api {
 			io.WriteString(w, `{"status":"ok","message":"Token accepted.","min_client_version":"0.0.0"}`)
 		case "/api/v1/ingest":
 			a.ingests++
+			a.games = append(a.games, r.Header.Get("X-Wow-Game"))
 			if zr, err := gzip.NewReader(r.Body); err == nil {
 				b, _ := io.ReadAll(zr)
 				a.bodies = append(a.bodies, string(b))
@@ -153,7 +155,7 @@ func TestSetupSavesAfterAVerifiedPing(t *testing.T) {
 	dir := t.TempDir()
 
 	r := cli(t, dir, "", "setup", "--server", a.srv.URL+"/", "--token", " "+tok+" ", "--wow", root)
-	if r.code != exitOK || !strings.Contains(r.out, "token accepted") || !strings.Contains(r.out, "1 TSM data file") {
+	if r.code != exitOK || !strings.Contains(r.out, "token accepted") || !strings.Contains(r.out, "1 data file") {
 		t.Fatalf("setup: %+v", r)
 	}
 
@@ -476,5 +478,62 @@ func TestInstallAndUninstallOnUnsupportedSystems(t *testing.T) {
 	}
 	if r := cli(t, dir, "", "uninstall"); r.code != exitFailed {
 		t.Errorf("uninstall: %+v", r)
+	}
+}
+
+func TestOnceUploadsTheAddonRecordToo(t *testing.T) {
+	a := newAPI(t)
+	root, _ := wowTree(t, "TradeSkillMasterDB = {}")
+	rec := filepath.Join(root, "WTF", "Account", "ACCT", "SavedVariables", "WowFlipLedger.lua")
+	os.WriteFile(rec, []byte("WowFlipLedgerDB = {}"), 0o644)
+	dir := configured(t, a, root)
+
+	r := cli(t, dir, "", "once")
+	if r.code != exitOK || strings.Count(r.out, "uploaded") != 2 {
+		t.Fatalf("once: %+v", r)
+	}
+	if _, n := a.counts(); n != 2 {
+		t.Fatalf("ingests = %d, want TSM and addon", n)
+	}
+	got := strings.Join(a.bodies, "\n")
+	if !strings.Contains(got, "TradeSkillMasterDB") || !strings.Contains(got, "WowFlipLedgerDB") {
+		t.Errorf("bodies: %q", a.bodies)
+	}
+
+	// Only the addon file changes: only it is sent again.
+	os.WriteFile(rec, []byte("WowFlipLedgerDB = { } -- v2"), 0o644)
+	os.Chtimes(rec, mtimeAfter(rec), mtimeAfter(rec))
+	cli(t, dir, "", "once")
+	if _, n := a.counts(); n != 3 {
+		t.Errorf("ingests = %d, want 3 (only the changed file re-sent)", n)
+	}
+
+	if r = cli(t, dir, "", "status"); !strings.Contains(r.out, "acct-") || !strings.Contains(r.out, "-addon") {
+		t.Errorf("status should list both files: %s", r.out)
+	}
+}
+
+func TestForeverFilesAreSentTaggedWithTheirGame(t *testing.T) {
+	a := newAPI(t)
+	root, _ := wowTree(t, "TradeSkillMasterDB = {} -- retail")
+	forever := filepath.Join(filepath.Dir(root), "_forever_", "WTF", "Account", "ACCT", "SavedVariables")
+	os.MkdirAll(forever, 0o755)
+	os.WriteFile(filepath.Join(forever, "WowFlipLedger.lua"), []byte("WowFlipLedgerDB = {} -- forever"), 0o644)
+	dir := configured(t, a, root)
+
+	if r := cli(t, dir, "", "status"); !strings.Contains(r.out, "Forever:") {
+		t.Errorf("status should say Forever was found: %s", r.out)
+	}
+	cli(t, dir, "", "once")
+
+	seen := map[string]string{}
+	for i, b := range a.bodies {
+		seen[b] = a.games[i]
+	}
+	if seen["TradeSkillMasterDB = {} -- retail"] != "retail" {
+		t.Errorf("retail file game = %q", seen["TradeSkillMasterDB = {} -- retail"])
+	}
+	if seen["WowFlipLedgerDB = {} -- forever"] != "forever" {
+		t.Errorf("forever file should be sent with game=forever: %v", seen)
 	}
 }

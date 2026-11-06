@@ -116,3 +116,65 @@ func TestDefaultRootsAreAbsoluteAndRetail(t *testing.T) {
 		}
 	}
 }
+
+func TestFindFilesReturnsTheAddonRecordToo(t *testing.T) {
+	root := t.TempDir()
+	tsm := mkfile(t, root, "WTF", "Account", "ACCTA", "SavedVariables", "TradeSkillMaster.lua")
+	rec := mkfile(t, root, "WTF", "Account", "ACCTA", "SavedVariables", "WowFlipLedger.lua")
+	only := mkfile(t, root, "WTF", "Account", "ACCTB", "SavedVariables", "WowFlipLedger.lua")
+
+	// Not ours to open: the addon's own data feed, a backup, and the account-wide folder.
+	mkfile(t, root, "WTF", "Account", "ACCTA", "SavedVariables", "WowFlipLedger.lua.bak")
+	mkfile(t, root, "Interface", "AddOns", "WowFlipLedger", "Data.lua")
+	mkfile(t, root, "WTF", "Account", "SavedVariables", "WowFlipLedger.lua")
+
+	files, err := FindFiles(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 3 || files[0].Path != tsm || files[1].Path != rec || files[2].Path != only {
+		t.Fatalf("got %+v, want ACCTA TSM, ACCTA addon, ACCTB addon", files)
+	}
+	if files[0].Label != Label("ACCTA") || files[1].Label != Label("ACCTA")+"-addon" {
+		t.Errorf("labels: %q, %q", files[0].Label, files[1].Label)
+	}
+}
+
+func TestFindFilesIncludesSiblingsTagged(t *testing.T) {
+	for _, c := range []struct{ game, folder, file, label string }{
+		{GameForever, "_forever_", "WowFlipLedger.lua", Label("ACCTA") + "-forever-addon"},
+		{GameClassic, "_classic_", "TradeSkillMaster.lua", Label("ACCTA") + "-classic"},
+	} {
+		t.Run(c.game, func(t *testing.T) {
+			base := t.TempDir()
+			retail := filepath.Join(base, "_retail_")
+			mkfile(t, retail, "WTF", "Account", "ACCTA", "SavedVariables", "TradeSkillMaster.lua")
+			mkfile(t, filepath.Join(base, c.folder), "WTF", "Account", "ACCTA", "SavedVariables", c.file)
+
+			files, err := FindFiles(retail)
+			if err != nil || len(files) != 2 {
+				t.Fatalf("files = %v, err = %v", files, err)
+			}
+			if files[0].Game != GameRetail || files[1].Game != c.game || files[1].Label != c.label {
+				t.Errorf("files: %+v", files)
+			}
+			if got := Siblings(retail); len(got) != 1 || got[0] != c.game {
+				t.Errorf("siblings = %v, want %s", got, c.game)
+			}
+		})
+	}
+}
+
+func TestSiblingsForever(t *testing.T) {
+	base := t.TempDir()
+	retail := filepath.Join(base, "_retail_")
+	os.MkdirAll(filepath.Join(retail, "WTF", "Account"), 0o755)
+
+	if len(Siblings(retail)) != 0 {
+		t.Error("no _forever_ folder yet")
+	}
+	os.MkdirAll(filepath.Join(base, "_forever_", "WTF", "Account"), 0o755)
+	if got := Siblings(retail); len(got) != 1 || got[0] != GameForever {
+		t.Error("_forever_ with an Account folder should be found")
+	}
+}

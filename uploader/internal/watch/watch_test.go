@@ -32,7 +32,7 @@ type call struct {
 	label string
 }
 
-func (f *fakeUp) Upload(_ context.Context, data []byte, mtime time.Time, label string) (client.Result, client.Outcome, error) {
+func (f *fakeUp) Upload(_ context.Context, data []byte, mtime time.Time, label, game string) (client.Result, client.Outcome, error) {
 	f.calls = append(f.calls, call{string(data), mtime, label})
 	if len(f.queue) == 0 {
 		return client.Result{HTTPStatus: 200, Status: "ok"}, client.OK, nil

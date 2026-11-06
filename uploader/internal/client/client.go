@@ -89,8 +89,9 @@ func New(baseURL, token, version string) *Client {
 	}
 }
 
-// Upload sends the file gzipped. mtime is when TSM wrote it; label identifies the WoW account.
-func (c *Client) Upload(ctx context.Context, data []byte, mtime time.Time, label string) (Result, Outcome, error) {
+// Upload sends the file gzipped. mtime is when TSM wrote it; label identifies the WoW account;
+// game is "retail", "forever" or "classic".
+func (c *Client) Upload(ctx context.Context, data []byte, mtime time.Time, label, game string) (Result, Outcome, error) {
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
 	if _, err := zw.Write(data); err != nil {
@@ -109,6 +110,7 @@ func (c *Client) Upload(ctx context.Context, data []byte, mtime time.Time, label
 	if label != "" {
 		req.Header.Set("X-Wow-Account", label)
 	}
+	req.Header.Set("X-Wow-Game", game)
 	return c.do(req)
 }
 

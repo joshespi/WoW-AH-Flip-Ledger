@@ -2,7 +2,7 @@
 
 Sends your TradeSkillMaster data to WoW Flip Ledger automatically after each `/reload` or logout.
 
-- Reads exactly one file per WoW account: `WTF/Account/<account>/SavedVariables/TradeSkillMaster.lua`.
+- Reads exactly two files per WoW account, both in `WTF/Account/<account>/SavedVariables`: `TradeSkillMaster.lua` and `WowFlipLedger.lua` (the addon's own record of your buys and sales). Both go to the same endpoint; the server tells them apart by content. The same two files are read under `_retail_` and, when present, `_forever_` (World of Warcraft: Forever) and `_classic_` installs beside it; each is sent with an `X-Wow-Game` header (`retail`, `forever` or `classic`) so the server keeps the ledgers apart. `addon enable` and the in-game feed are retail only.
 - Writes nothing under the WoW folder unless you run `addon enable` (below); then it replaces one file, `Interface/AddOns/WowFlipLedger/Data.lua`, and never creates the addon folder. Its own `config.json`, `state.json` and `uploader.log` live in your user config folder (`%APPDATA%\WoWFlipLedger` on Windows, `~/Library/Application Support/WoWFlipLedger` on macOS), plus the start-at-login entry if you ask for it.
 - Sends the file gzipped over HTTPS with a token that can only upload. It never sends your account folder name; the site sees a short stable label like `acct-1a2b3c`.
 - Skips files that haven't changed (by modification time, then by content hash), and waits for TSM to finish writing before reading.

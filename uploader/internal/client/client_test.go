@@ -19,7 +19,7 @@ func newClient(srv *httptest.Server) *Client { return New(srv.URL, token, "1.2.3
 
 func upload(t *testing.T, c *Client, data []byte) (Result, Outcome, error) {
 	t.Helper()
-	return c.Upload(context.Background(), data, time.Unix(1_790_000_000, 0), "acct-abc123")
+	return c.Upload(context.Background(), data, time.Unix(1_790_000_000, 0), "acct-abc123", "retail")
 }
 
 func TestUploadSendsGzippedBodyAndHeaders(t *testing.T) {
@@ -56,6 +56,7 @@ func TestUploadSendsGzippedBodyAndHeaders(t *testing.T) {
 		"Authorization":    "Bearer " + token,
 		"X-File-Mtime":     "1790000000",
 		"X-Wow-Account":    "acct-abc123",
+		"X-Wow-Game":       "retail",
 		"X-Client-Version": "1.2.3",
 		"Content-Type":     "application/gzip",
 		"Accept":           "application/json",

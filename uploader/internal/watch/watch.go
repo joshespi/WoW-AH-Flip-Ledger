@@ -1,7 +1,7 @@
-// Package watch decides when a TradeSkillMaster.lua is worth uploading and uploads it.
+// Package watch decides when a TradeSkillMaster.lua or WowFlipLedger.lua is worth uploading and uploads it.
 //
-// TSM only writes the file on /reload or logout, so the loop just polls each file's mtime. A
-// changed file is uploaded once it has stopped changing (TSM may still be writing), unless its
+// The game only writes these files on /reload or logout, so the loop just polls each file's mtime. A
+// changed file is uploaded once it has stopped changing (the game may still be writing), unless its
 // content hash matches what the server already has. Failures back off per file.
 package watch
 
@@ -22,7 +22,7 @@ import (
 
 // Uploader is what the Syncer needs from the API client.
 type Uploader interface {
-	Upload(ctx context.Context, data []byte, mtime time.Time, label string) (client.Result, client.Outcome, error)
+	Upload(ctx context.Context, data []byte, mtime time.Time, label, game string) (client.Result, client.Outcome, error)
 }
 
 type Logger interface {
@@ -174,11 +174,7 @@ func (s *Syncer) syncFile(ctx context.Context, f wow.File, force bool) *Event {
 		return nil
 	}
 
-	fi, err := os.Stat(f.Path)
-	if err != nil {
-		return nil
-	}
-
+	fi := f.Info // from the listing this tick; readStable re-checks before reading
 	entry, known := s.State.Get(f.Path)
 	if !force && known && entry.Mtime == fi.ModTime().Unix() && entry.Size == fi.Size() {
 		return nil
@@ -201,7 +197,7 @@ func (s *Syncer) syncFile(ctx context.Context, f wow.File, force bool) *Event {
 		return &Event{File: f, Kind: Unchanged, Message: "content unchanged since the last upload"}
 	}
 
-	res, outcome, err := s.Up.Upload(ctx, data, fi.ModTime(), f.Label)
+	res, outcome, err := s.Up.Upload(ctx, data, fi.ModTime(), f.Label, f.Game)
 
 	switch outcome {
 	case client.OK:

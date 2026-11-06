@@ -1,5 +1,6 @@
-// Package wow finds the one file the uploader is allowed to read:
-// <WoW _retail_>/WTF/Account/<account>/SavedVariables/TradeSkillMaster.lua.
+// Package wow finds the two files the uploader is allowed to read, per WoW account:
+// <WoW _retail_>/WTF/Account/<account>/SavedVariables/TradeSkillMaster.lua (TSM) and
+// .../SavedVariables/WowFlipLedger.lua (the companion addon's own record).
 // It never opens anything else under the WoW folder and never writes there. The one file the
 // uploader may write is the addon's Data.lua, and only internal/addon does that.
 package wow
@@ -16,14 +17,51 @@ import (
 	"strings"
 )
 
-const fileName = "TradeSkillMaster.lua"
+// The only two file names ever read.
+const (
+	tsmFile   = "TradeSkillMaster.lua"
+	addonFile = "WowFlipLedger.lua"
+)
 
-// File is one TradeSkillMaster.lua, with a label that identifies the WoW account without
-// revealing its folder name (which resembles a login id).
+// Games a file can belong to. Forever (_forever_) and Classic (_classic_) installs sit beside
+// _retail_ and are separate economies; the server keeps them apart by this value.
+const (
+	GameRetail  = "retail"
+	GameForever = "forever"
+	GameClassic = "classic"
+)
+
+// siblings are the installs read besides _retail_, each in a folder beside it.
+var siblings = []struct{ game, folder string }{
+	{GameForever, "_forever_"},
+	{GameClassic, "_classic_"},
+}
+
+// GameLabel is the display name of a game ("Forever").
+func GameLabel(game string) string {
+	switch game {
+	case GameForever:
+		return "Forever"
+	case GameClassic:
+		return "Classic"
+	}
+	return "Retail"
+}
+
+// siblingRoot is the install folder beside root (the _retail_ folder).
+func siblingRoot(root, folder string) string {
+	return filepath.Join(filepath.Dir(root), folder)
+}
+
+// File is one data file, with a label that identifies the WoW account without revealing its
+// folder name (which resembles a login id). The addon's file gets a "-addon" suffix so the two
+// of one account stay distinguishable in the log. Info is the Lstat taken when it was found.
 type File struct {
 	Account string
 	Label   string
 	Path    string
+	Game    string
+	Info    os.FileInfo
 }
 
 // DefaultRoots lists the usual install locations for this OS.
@@ -80,27 +118,47 @@ func detectRoot(explicit string, defaults []string) (string, error) {
 	return "", ErrNotFound
 }
 
-// FindFiles returns each account's TradeSkillMaster.lua that exists, sorted by account. The
-// account-wide "SavedVariables" folder is skipped, and so is anything that is not a regular
-// file (a symlink could redirect the read somewhere else).
+// FindFiles returns each account's TradeSkillMaster.lua and WowFlipLedger.lua that exist under
+// root (the _retail_ folder) and under each sibling install beside it, sorted by game then account
+// (TSM first). The account-wide "SavedVariables" folder is skipped, and so is anything that is
+// not a regular file (a symlink could redirect the read somewhere else).
 func FindFiles(root string) ([]File, error) {
+	files, err := findIn(root, GameRetail)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range siblings {
+		if more, err := findIn(siblingRoot(root, s.folder), s.game); err == nil {
+			files = append(files, more...)
+		}
+	}
+	return files, nil
+}
+
+func findIn(root, game string) ([]File, error) {
 	dir := filepath.Join(root, "WTF", "Account")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
 
+	tag := ""
+	if game != GameRetail {
+		tag = "-" + game
+	}
 	var files []File
 	for _, e := range entries {
 		if !e.IsDir() || e.Name() == "SavedVariables" || strings.ContainsAny(e.Name(), `/\`) {
 			continue
 		}
-		p := filepath.Join(dir, e.Name(), "SavedVariables", fileName)
-		if fi, err := os.Lstat(p); err == nil && fi.Mode().IsRegular() {
-			files = append(files, File{Account: e.Name(), Label: Label(e.Name()), Path: p})
+		for _, f := range []struct{ name, suffix string }{{tsmFile, ""}, {addonFile, "-addon"}} {
+			p := filepath.Join(dir, e.Name(), "SavedVariables", f.name)
+			if fi, err := os.Lstat(p); err == nil && fi.Mode().IsRegular() {
+				files = append(files, File{Account: e.Name(), Label: Label(e.Name()) + tag + f.suffix, Path: p, Game: game, Info: fi})
+			}
 		}
 	}
-	sort.Slice(files, func(i, j int) bool { return files[i].Account < files[j].Account })
+	sort.SliceStable(files, func(i, j int) bool { return files[i].Account < files[j].Account })
 	return files, nil
 }
 
@@ -113,4 +171,16 @@ func Label(account string) string {
 func isDir(p string) bool {
 	fi, err := os.Stat(p)
 	return err == nil && fi.IsDir()
+}
+
+// Siblings returns the games (GameForever, GameClassic) whose install sits beside root (the
+// _retail_ folder), with or without data files yet. Their files are sent tagged with that game.
+func Siblings(root string) []string {
+	var games []string
+	for _, s := range siblings {
+		if isDir(filepath.Join(siblingRoot(root, s.folder), "WTF", "Account")) {
+			games = append(games, s.game)
+		}
+	}
+	return games
 }

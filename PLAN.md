@@ -311,6 +311,54 @@ WoW addons cannot make network requests and read files only at login or `/reload
 - [x] Packaging: `scripts/build-uploader.sh` zips the addon (reproducible) and appends it to the published `SHA256SUMS`; `UploaderBuilds::addon()` lists it only if the hash matches; `/download/addon`; step 4 on `/setup`. Public About/Welcome wording corrected.
 - [ ] Checked in game (human step: tooltips, panel, alerts and the Interface number need a WoW client). Not exercised: the built `.exe` against the dev server with a real token.
 
+### Phase 12: Own recorder (no TSM dependency) and CurseForge
+The addon records the user's own AH activity into `WowFlipLedgerDB` (account-wide SavedVariables); the uploader sends that file like it sends TSM's. TSM import stays, as backfill and for users who run it.
+Decisions:
+- **What it records:** commodity buys (hook `C_AuctionHouse.ConfirmCommoditiesPurchase`, quote from `COMMODITY_PRICE_UPDATED`, success on `COMMODITY_PURCHASE_SUCCEEDED`), sales and expiries/cancels from mailbox invoices (collected, so each mail is counted once), and an inventory snapshot per character summed at logout. Sale invoices carry only the item *name*; the id comes from a learned name->id map (filled by our own buys, posts and bags), ambiguous or unknown names stay unresolved and are never uploaded guessed.
+- **File format:** one string per record (`kind|time|realm|item|qty|...`), because WoW's serializer then writes one record per line and the server reads it with a linear line scanner, like `TsmParser`. No character names: per-character snapshots are keyed by a salted hash of the GUID. Records are never sent to the server by the addon (addons have no network); the uploader sends the file.
+- **Buys** from the addon have exact totals, but still land in `tsm_buy_candidates` (pending, accepted in Reconcile) so nothing changes the ledger silently.
+- **TSM + addon overlap:** rows carry `origin` (`tsm` | `addon`). TSM wins where it has data: the span TSM has covered (from its earliest row to the latest file time, or its newest row when the file time is unknown) is kept per user, game and WoW account (`tsm_spans`; TSM's SavedVariables are per account, so TSM on one account must not hide the addon's rows from another; an unknown account, as in manual uploads, matches every account); addon rows inside it are not stored, and a TSM upload that widens it deletes addon rows now inside it. So TSM history is never replaced by a less complete record, and the addon covers the time after TSM stops (or if it was never installed).
+- **Games:** `retail` and `forever` (World of Warcraft: Forever, `_forever_`, product `wowf`, launched 2026-11-04) share the addon. Forever is a separate economy and has no Blizzard price API: it gets its own ledger (a `game` dimension on the data) and in-game price scans later. Until the server has that dimension, the uploader does **not** send Forever files (they would mix into the retail ledger).
+- **Verified on this machine:** `_forever_` exists with TSM installed; TSM's TOC lists `## Interface: 120105, 50504, 20506, 11509` and it runs there, so Forever's number is probably one of those (retail 12.1.5 is `120105`); Forever's build is `1.60.1.70755`. TSM works there through `C_AuctionHouse` and the same mail functions. **Not verified (needs a logged-in Forever client):** `/dump (select(4, GetBuildInfo()))`, `/dump C_AuctionHouse ~= nil`, and every event/mail behaviour below.
+- **CurseForge:** the zip is built by CurseForge's packager from the repo (`.pkgmeta`, `## X-Curse-Project-ID`), and the site keeps serving its own zip from `/download/addon`. Creating the CurseForge project and API token is a human step.
+Checklist:
+- [x] Addon recorder (`Recorder.lua`, `Inventory.lua`), `/wfl recorder`, 46 checks in `addon/tests/recorder.lua` under the Lua 5.1 harness (stubbed WoW API: logic and load errors only).
+- [x] Server: `AddonParser`, `origin` columns, the TSM span (`tsm_spans`), ingest picks the parser by the first line, manual upload and API accept the addon file, site copy and privacy page updated. Tests: `AddonParserTest`, `AddonIngestTest`.
+- [x] Uploader 0.3.0: finds and sends `WowFlipLedger.lua` (retail only; `_forever_` is noticed in `status`, never read), tests.
+- [x] Packaging: TOC fields, `addon/CHANGELOG.md` (checked by the build), `addon/CURSEFORGE.md` (project text, release steps), `scripts/publish-curseforge.sh` (uploads the same zip the site serves; never run). Left to you: create the CurseForge project, pick a license, add the project id and token.
+- [x] In-game check on retail (2026-11-04): addon loads (12.1.5, interface 120105), a commodity buy was recorded with the right total, sale invoices read correctly. Found and fixed: the real file layout (CRLF, no indentation) and sale names with no id (client `GetItemInfoInstant` fallback plus server-side unique-name match). Not yet seen: expired/cancelled mail, bank and warband scanning, the uploader sending the real file.
+- [x] In-game check on Forever, partly (2026-11-05): interface `16001` (added to the TOC; 120105 showed "Incompatible"), client 1.60.1 build 70790, `C_AuctionHouse` present, addon loads. Buys, sales, mail and banks not yet exercised there.
+- [ ] Forever ledger (game dimension, in-game price scan). Split into Phase 13 below.
+
+## Phase 13: Retail / Forever / Combined views
+
+Decisions (2026-11-05):
+- **Switcher:** one global Retail / Forever / Both toggle in the sidebar, stored per user; every screen (dashboard, positions, trades, reconcile, charts) follows it.
+- **Look:** Retail keeps the gold accent. Forever gets one extra hue, scoped to game identity only (chart series, chips, a game badge, tile border). Document it as the one exception to the single-accent rule. Never colour-only: badge text and dash style too.
+- **Combined screen:** per-game split tiles (Retail, Forever, total); realized P/L chart with a series per game plus a total; one positions table with a game chip per row (items are never merged across games); a Retail vs Forever comparison (margin, sell-through, flips per day).
+- **Scope:** two phases.
+
+Phase A, data (nothing to show without it):
+- [x] `game` column (`retail` | `forever`, default `retail`) on `tsm_sales`, `tsm_expired`, `tsm_cancelled`, `tsm_buy_candidates`, `inventory` (unique per user, game, item), `trades` and `uploads`; Forever dedupe keys are prefixed `forever:` (retail keys unchanged); TSM span per game and WoW account (`tsm_spans`, owned by `Support\TsmSpan`; log rows carry `account`). `Support\Game`, builder macro `inGame()` (Eloquent forwards it). The unreleased migrations are one file, `2026_11_05_000001_add_games_and_addon_origin`. Not yet per game: `watchlist_items`, `alert_states` (retail-only features until Forever has prices).
+- [x] Ingest takes the game from `X-Wow-Game` (API) or a `game` form field (manual upload; default retail); an addon file may carry `["game"]` and is refused when it disagrees. Forever never fills the shared item catalog and never matches sale names against it. Left: the addon itself does not write `game` yet (needs the Forever client's `WOW_PROJECT_ID`; unverified).
+- [x] Uploader 0.4.0 reads the same two files under `_forever_` and sends `X-Wow-Game: forever`; `TestSyncChangesOnlyDataLua` still holds. Left: the addon feed and `addon enable` stay retail.
+- [x] `PositionsService`, `ItemDetailService`, `ReconcileService`, `TradesService` take a `$game` (default retail); `ScanService`, the trades list/export and corrections list are retail-only; Forever gets no market stats. Tests: `GameIngestTest`.
+
+Phase B, UI:
+- [x] Switcher in the sidebar (`<x-game-switcher>`, `POST /game`; `users.game_view`, session first so demo/impersonation can switch without saving); `<x-game-badge>`, `<x-game-banner>`; Forever uses Tailwind `teal` (a teal rule on cards under `data-game="forever"`, dashed teal chart line). No tailwind config change.
+- [x] Dashboard, positions, trades (list, add, paste, CSV import, export), corrections, reconcile and the item page follow the switch (`User::activeGame()`); Market, Scan, Calculator stay Retail with a banner on Forever.
+- [x] Combined screen (`CombinedService`, `combined.blade.php`, `combinedChart`): split cards, P/L chart (retail solid gold, Forever dashed teal, total thick), Retail vs Forever table (P/L, positions, units sold, sell-through, flips per day; margin left out, it needs per-sale cost), positions table with game badges. In Both, single-game pages show Retail and say so; `/positions` redirects to the dashboard. Forever rows there are not linked (the item page follows the switch).
+- [x] Tests: `GameViewTest` (switch, read-only switch, per-game dashboard and trades, combined split, shared chart axis). Not checked in a browser yet (CSP/console, dark/light look).
+
+Addendum (2026-11-05): Classic and a games setting.
+- [x] Third game `classic` (`_classic_`; violet, dotted chart line). One Classic game for now; Era or Anniversary would be more entries in `Support\Game`, a span column pair and a sibling folder in the uploader.
+- [x] `users.enabled_games` (Settings, "Games I play"): the switcher, upload picker, combined view and banners only show enabled games; one enabled game hides all of it. Existing users got Retail plus any game they had data in; an upload for a game turns it on; data of a disabled game is kept, only hidden. "Both" is now "All" and needs two or more games.
+- [x] Manual upload has a game picker (hidden with one game); uploader 0.4.0 also reads `_classic_`.
+- [x] Checked in the built-in browser (demo account): no console or CSP errors, light and dark, mobile drawer, settings page. Not checked: Classic data on a real client, and the addon's own `game` field (the addon still does not write it).
+
+Addendum (2026-11-05): undo an upload.
+- [x] `upload_id` on the four ingest tables; `UploadService::undo()` removes the newest successful upload of a game (older rows have no tag; older uploads can't be undone because newer files repeat their history), refuses when its buys were accepted into trades; optional (default on) clear of that game's inventory; the TSM span is always rebuilt from the TSM rows left. Uploads page button, `UploadUndoTest`. Not checked in a browser yet.
+
 ## Open items (need me before the phase that uses them)
 
 - **Brevo sender** (Phase 2, before real signups): verify a sender on `wowledger.joshespi.com` (`.env.example` assumes `noreply@wowledger.joshespi.com`) and create the SMTP key. The DNS record for the hostname itself is also mine to add.
