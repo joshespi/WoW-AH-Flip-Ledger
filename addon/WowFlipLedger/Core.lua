@@ -221,3 +221,56 @@ end
 function ns.print(msg)
     print("|cff66ccff[WFL]|r " .. msg)
 end
+
+-- Saved variables -----------------------------------------------------------------------------
+
+ns.SCHEMA = 1
+
+-- The table defaults were last applied to. WoW replaces the global when it loads the saved file,
+-- so defaults are applied again whenever the table changes, and otherwise only once.
+local ready
+
+function ns.db()
+    local d = WowFlipLedgerDB
+    if d == ready and d ~= nil then
+        return d
+    end
+    if type(d) ~= "table" then
+        d = {}
+        WowFlipLedgerDB = d
+    end
+
+    d.schema = ns.SCHEMA
+    d.events = d.events or {}
+    d.unresolved = d.unresolved or {}
+    d.names = d.names or {}
+    d.seen = d.seen or {}
+    d.salt = d.salt or tostring(math.floor(time() * 7919 + (GetTime and GetTime() or 0) * 1000))
+    d.missed = d.missed or 0
+
+    ready = d
+    return d
+end
+
+-- Events --------------------------------------------------------------------------------------
+
+-- One frame for the whole addon; a second handler for an event runs after the first.
+local frame = CreateFrame("Frame")
+local handlers = {}
+
+function ns.on(event, fn)
+    local prior = handlers[event]
+    handlers[event] = prior and function(...)
+        prior(...)
+        fn(...)
+    end or fn
+    -- An event this client does not have must not break the others.
+    pcall(frame.RegisterEvent, frame, event)
+end
+
+frame:SetScript("OnEvent", function(self, event, ...)
+    local fn = handlers[event]
+    if fn then
+        fn(self, ...)
+    end
+end)

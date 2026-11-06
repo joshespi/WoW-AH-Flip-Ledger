@@ -31,12 +31,12 @@ end
 
 -- Once per feed: a /reload with the same data stays quiet, new data announces again.
 function ns.announce()
-    WowFlipLedgerDB = WowFlipLedgerDB or {}
+    local d = ns.db()
     local feed = ns.feed()
 
     if not feed then
-        if not WowFlipLedgerDB.hinted then
-            WowFlipLedgerDB.hinted = true
+        if not d.hinted then
+            d.hinted = true
             ns.print("No ledger data yet. Run the uploader with 'addon enable', then /reload. /wfl help lists commands.")
         end
         return
@@ -47,15 +47,13 @@ function ns.announce()
         ns.print("Ledger data is " .. ns.ageText(age) .. ". Is the uploader running?")
     end
 
-    if WowFlipLedgerDB.announced ~= feed.generated_at then
-        WowFlipLedgerDB.announced = feed.generated_at
+    if d.announced ~= feed.generated_at then
+        d.announced = feed.generated_at
         ns.printAlerts()
     end
 end
 
-local events = CreateFrame("Frame")
-events:RegisterEvent("PLAYER_LOGIN")
-events:SetScript("OnEvent", function()
+ns.on("PLAYER_LOGIN", function()
     -- Let the chat frame settle first.
     C_Timer.After(5, ns.announce)
 end)
@@ -72,8 +70,10 @@ SlashCmdList["WOWFLIPLEDGER"] = function(msg)
         end
     elseif msg == "status" then
         ns.print((ns.freshness()))
+    elseif msg == "recorder" then
+        ns.print(ns.recorderStatus())
     else
-        ns.print("/wfl opens the panel, /wfl alerts lists alerts, /wfl status shows how old the data is.")
-        ns.print("Data refreshes on /reload; the uploader writes it in the background.")
+        ns.print("/wfl opens the panel, /wfl alerts lists alerts, /wfl status shows how old the data is, /wfl recorder shows what is being recorded.")
+        ns.print("Data refreshes on /reload; the uploader writes it in the background. Your buys and sales are saved at logout or /reload.")
     end
 end

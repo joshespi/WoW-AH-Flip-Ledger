@@ -1,6 +1,8 @@
 #!/bin/sh
 # Renders a sample feed with the uploader's own serializer, then loads the addon against it under
-# Lua 5.1 with stubbed WoW APIs. Needs Docker only. Checks logic and load errors, not the UI in game.
+# Lua 5.1 with stubbed WoW APIs, and drives the recorder with simulated game events. Needs Docker
+# only. Checks logic and load errors, not the UI or real client behaviour in game.
+# Also writes addon/tests/out/WowFlipLedger.lua, the saved variables the recorder produced.
 set -eu
 
 cd "$(dirname "$0")/../.."
@@ -21,4 +23,5 @@ docker run --rm -v "$HERE:/repo" -w /repo alpine:3.20 sh -c '
     for f in addon/WowFlipLedger/*.lua addon/tests/out/Data.lua; do luac5.1 -p "$f" || exit 1; done
     echo "syntax ok"
     lua5.1 addon/tests/run.lua addon/tests/out/Data.lua addon/WowFlipLedger
+    lua5.1 addon/tests/recorder.lua addon/WowFlipLedger addon/tests/out/WowFlipLedger.lua
 '

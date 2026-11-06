@@ -41,8 +41,7 @@ cp uploader/dist/* "$PUBLISH"/
 # The in-game addon, zipped with its folder at the top so unzipping into AddOns just works. Fixed
 # file times and a sorted file list keep the zip reproducible. Its hash joins the published
 # SHA256SUMS, which is where the app lists it from.
-ADDON_VERSION=$(grep '^## Version:' addon/WowFlipLedger/WowFlipLedger.toc | sed 's/^## Version: *//' | tr -d '\r')
-ADDON_ZIP="wowflipledger-addon-$ADDON_VERSION.zip"
+. scripts/addon-version.sh
 HERE=$(pwd -W 2>/dev/null || pwd)
 MSYS_NO_PATHCONV=1 docker run --rm -v "$HERE:/repo" -w /repo alpine:3.20 sh -c '
     set -eu

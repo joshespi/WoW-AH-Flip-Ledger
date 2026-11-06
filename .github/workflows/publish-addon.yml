@@ -1,0 +1,37 @@
+name: Publish addon to CurseForge
+
+# Run by hand from the Actions tab (choose the release type), or push a tag like addon-v0.2.0.
+# Builds the same reproducible zip the site serves, then uploads it with scripts/publish-curseforge.sh.
+# Needs the repository secret CURSEFORGE_TOKEN (a CurseForge API token).
+on:
+  workflow_dispatch:
+    inputs:
+      type:
+        description: Release type
+        type: choice
+        options: [release, beta, alpha]
+        default: release
+  push:
+    tags: ['addon-v*']
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Addon tests
+        run: sh addon/tests/run.sh
+
+      - name: Build the addon zip
+        run: sh scripts/build-uploader.sh
+
+      - name: Upload to CurseForge
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          CURSEFORGE_PROJECT_ID: '1783753'
+          GAME_VERSIONS: '12.1.5'
+        run: sh scripts/publish-curseforge.sh "${{ inputs.type || 'release' }}"

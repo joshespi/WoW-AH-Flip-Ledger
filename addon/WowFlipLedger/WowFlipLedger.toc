@@ -1,12 +1,17 @@
-## Interface: 120007, 120100, 120105
+## Interface: 120007, 120100, 120105, 16001
 ## Title: WoW Flip Ledger
-## Notes: Your WoW Flip Ledger positions, watchlist targets and alerts in game. Data comes from the uploader.
-## Version: 0.1.0
+## Notes: Records your auction house buys, sales and stock for WoW Flip Ledger, and shows your positions, targets and alerts in game.
+## Version: 0.2.0
+## Author: Josh Espinoza
+## X-Curse-Project-ID: 1783753
 ## SavedVariables: WowFlipLedgerDB
 ## Category: Auction & Economy
+## X-Website: https://wowledger.joshespi.com
 
 Data.lua
 Core.lua
+Recorder.lua
+Inventory.lua
 Tooltip.lua
 Panel.lua
 Alerts.lua

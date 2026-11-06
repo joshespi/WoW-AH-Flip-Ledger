@@ -5,20 +5,8 @@
 local DATA = assert(arg[1], "usage: lua run.lua <rendered Data.lua> <addon dir>")
 local ADDON_DIR = assert(arg[2])
 
-local realprint = print
-local failures, checks = 0, 0
-
-local function check(cond, label)
-    checks = checks + 1
-    if not cond then
-        failures = failures + 1
-        realprint("FAIL: " .. label)
-    end
-end
-
-local function eq(got, want, label)
-    check(got == want, label .. " (got " .. tostring(got) .. ", want " .. tostring(want) .. ")")
-end
+local T = dofile((arg[0]:match("^(.*)[/\]") or ".") .. "/harness.lua")
+local check, eq = T.check, T.eq
 
 -- WoW API stubs -------------------------------------------------------------------------------
 
@@ -77,7 +65,7 @@ end
 
 dofile(DATA)
 local ns = {}
-for _, file in ipairs({ "Core.lua", "Tooltip.lua", "Panel.lua", "Alerts.lua" }) do
+for _, file in ipairs({ "Core.lua", "Recorder.lua", "Inventory.lua", "Tooltip.lua", "Panel.lua", "Alerts.lua" }) do
     assert(loadfile(ADDON_DIR .. "/" .. file))("WowFlipLedger", ns)
 end
 
@@ -281,5 +269,4 @@ eq(#printed, 2, "/wfl help")
 SlashCmdList["WOWFLIPLEDGER"]("  ALERTS  ")
 check(true, "commands are trimmed and case-insensitive")
 
-realprint(string.format("%d checks, %d failed", checks, failures))
-os.exit(failures == 0 and 0 or 1)
+T.done()
