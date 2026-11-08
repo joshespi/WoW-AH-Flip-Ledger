@@ -127,6 +127,7 @@ WowFlipLedgerDB = nil
 fire("PLAYER_LOGIN")
 local d = WowFlipLedgerDB
 eq(d.schema, 1, "schema")
+eq(d.interface, 120105, "stamps the client's interface number")
 eq(#d.events, 0, "starts empty")
 
 -- Buys ---------------------------------------------------------------------------------------

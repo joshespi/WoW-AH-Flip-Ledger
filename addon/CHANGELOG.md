@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- Loads in World of Warcraft: Forever (interface 16001). Some 0.2.0 downloads lacked it, so Forever showed the addon as incompatible and recorded nothing. If yours did, install this version in `_forever_\Interface\AddOns`.
+- The saved file now notes which game client wrote it, so the site refuses a Forever or Classic file uploaded as Retail (and the other way round) instead of mixing the ledgers.
+
 ## 0.2.0
 
 - New: the addon now records your own auction house activity, so TradeSkillMaster is no longer needed.

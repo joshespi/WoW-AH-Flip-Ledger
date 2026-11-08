@@ -1,7 +1,7 @@
 ## Interface: 120007, 120100, 120105, 16001
 ## Title: WoW Flip Ledger
 ## Notes: Records your auction house buys, sales and stock for WoW Flip Ledger, and shows your positions, targets and alerts in game.
-## Version: 0.2.0
+## Version: 0.2.1
 ## Author: Josh Espinoza
 ## X-Curse-Project-ID: 1783753
 ## SavedVariables: WowFlipLedgerDB

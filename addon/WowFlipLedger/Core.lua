@@ -247,6 +247,10 @@ function ns.db()
     d.seen = d.seen or {}
     d.salt = d.salt or tostring(math.floor(time() * 7919 + (GetTime and GetTime() or 0) * 1000))
     d.missed = d.missed or 0
+    -- Which client wrote the file (120105 retail, 16001 Forever, 11509 Classic Era): the server
+    -- refuses a file uploaded as another game.
+    local _, _, _, toc = (GetBuildInfo or function() end)()
+    d.interface = tonumber(toc) or d.interface
 
     ready = d
     return d
