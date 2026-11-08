@@ -105,8 +105,14 @@ class DataExportService
                         ['name', $user->name], ['email', $user->email], ['timezone', $user->timezone], ['region', $user->region],
                         ['target_margin_pct', $user->target_margin_pct], ['market_share_pct', $user->market_share_pct],
                         ['stale_minutes', $user->stale_minutes], ['created', $iso($user->created_at)],
+                        ['scoreboard_opt_in', $user->scoreboard_opt_in ? 1 : 0], ['scoreboard_nickname', $user->scoreboard_nickname],
                     ],
                     fn ($r) => $r,
+                ],
+                'activity_days.csv' => [
+                    ['day'],
+                    DB::table('user_activity_days')->ownedBy($user)->orderBy('day')->select('day')->cursor(),
+                    fn ($r) => [substr((string) $r->day, 0, 10)],
                 ],
             ];
 
@@ -152,7 +158,9 @@ class DataExportService
 
     private function readme(): string
     {
-        return <<<'TXT'
+        $activityDays = config('ledger.stats.activity_days');
+
+        return <<<TXT
             WoW Flip Ledger data export
 
             trades.csv           Your buys, in the trades import format (time,item,qty,cost,note);
@@ -168,9 +176,11 @@ class DataExportService
             buy_suggestions.csv  TSM's own buy log rows, kept only as suggestions to reconcile.
             watchlist.csv        Your watchlist and targets (copper per unit).
             uploads.csv          Your upload history.
-            account.csv          Your account settings. Passwords and tokens are never exported.
+            account.csv          Your account settings, including whether you are on the public
+                                 scoreboard and your nickname. Passwords and tokens are never exported.
+            activity_days.csv    The days (UTC) you used the site or uploaded data, kept {$activityDays} days.
 
-            Every file but watchlist.csv and account.csv has a game column (retail, forever
+            Every file but watchlist.csv, account.csv and activity_days.csv has a game column (retail, forever
             or classic): each game is a separate ledger.
             Times are ISO 8601 in your account timezone. 1 gold = 10,000 copper.
             Text starting with = + - or @ is prefixed with an apostrophe so spreadsheets

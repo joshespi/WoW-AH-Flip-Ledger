@@ -34,19 +34,11 @@ class PositionsService
             return new Portfolio([], $this->summary([], $game), null, []);
         }
 
-        $firstBuy = [];
-
-        foreach ($trades as $t) {
-            $firstBuy[$t['item']] = min($firstBuy[$t['item']] ?? PHP_INT_MAX, $t['ts']);
-        }
-
+        $firstBuy = $this->firstBuys($trades);
         $ids = array_keys($firstBuy);
         $newest = new SplMinHeap;
         $events = [];
-        $ledger = $this->ledger->buildFromSales([...$trades, ...$adjustments], $this->sales($user, $game, $firstBuy, $newest),
-            function (int $ts, int $pnl) use (&$events): void {
-                $events[] = [$ts, $pnl];
-            });
+        $ledger = $this->replay($user, $game, $trades, $adjustments, $firstBuy, $newest, $events);
 
         $names = $this->names($ids);
         $inventory = DB::table('inventory')->ownedBy($user)->inGame($game)->pluck('qty', 'item_id')->all();
@@ -65,6 +57,50 @@ class PositionsService
         $summary = $this->summary($rows, $game);
 
         return new Portfolio($rows, $summary, $this->concentration($rows, $summary['stock_cost']), $this->recent($trades, $newest, $names), $events);
+    }
+
+    /**
+     * forUser()'s realizedEvents ([ts, pnl] per sale or write-off) without the market join,
+     * inventory and rows: the same ledger replay, nothing else.
+     *
+     * @return list<array{0: int, 1: int}>
+     */
+    public function realizedEvents(User $user, string $game = Game::RETAIL): array
+    {
+        [$trades, $adjustments] = $this->trades($user, $game);
+        $events = [];
+
+        if ($trades !== []) {
+            $this->replay($user, $game, $trades, $adjustments, $this->firstBuys($trades), new SplMinHeap, $events);
+        }
+
+        return $events;
+    }
+
+    /**
+     * The ledger over the user's trades and sales, collecting realized events into $events.
+     *
+     * @param  array<int, int>  $firstBuy
+     * @param  list<array{0: int, 1: int}>  $events
+     */
+    private function replay(User $user, string $game, array $trades, array $adjustments, array $firstBuy, SplMinHeap $newest, array &$events): array
+    {
+        return $this->ledger->buildFromSales([...$trades, ...$adjustments], $this->sales($user, $game, $firstBuy, $newest),
+            function (int $ts, int $pnl) use (&$events): void {
+                $events[] = [$ts, $pnl];
+            });
+    }
+
+    /** @return array<int, int> item id => first buy time */
+    private function firstBuys(array $trades): array
+    {
+        $first = [];
+
+        foreach ($trades as $t) {
+            $first[$t['item']] = min($first[$t['item']] ?? PHP_INT_MAX, $t['ts']);
+        }
+
+        return $first;
     }
 
     /** Units of one item the ledger says the user holds, by the same rule as forUser(). */

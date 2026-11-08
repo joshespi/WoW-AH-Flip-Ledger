@@ -10,6 +10,7 @@ use DateTimeZone;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -45,6 +46,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'alert_buy_target' => true,
         'alert_sell_target' => true,
         'alert_profit' => false,
+        'scoreboard_opt_in' => false,
     ];
 
     /**
@@ -66,6 +68,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'alert_buy_target' => 'boolean',
             'alert_sell_target' => 'boolean',
             'alert_profit' => 'boolean',
+            'scoreboard_opt_in' => 'boolean',
         ];
     }
 
@@ -81,6 +84,18 @@ class User extends Authenticatable implements MustVerifyEmail
     public function readOnly(): bool
     {
         return $this->is_demo || $this->isBeingImpersonated();
+    }
+
+    /** Accounts that count in public numbers (/stats, /scoreboard): verified and not the demo. */
+    public function scopeCounted(Builder $query): void
+    {
+        $query->where('is_demo', false)->whereNotNull('email_verified_at');
+    }
+
+    /** Counted accounts listed on the scoreboard right now: opted in, with a nickname. */
+    public function scopeOnScoreboard(Builder $query): void
+    {
+        $query->counted()->where('scoreboard_opt_in', true)->whereNotNull('scoreboard_nickname');
     }
 
     /**

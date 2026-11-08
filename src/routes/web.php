@@ -11,8 +11,10 @@ use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\PositionsController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ScoreboardController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SetupController;
+use App\Http\Controllers\StatsController;
 use App\Http\Controllers\TradesController;
 use App\Http\Controllers\TradesImportController;
 use App\Http\Controllers\UploadController;
@@ -23,6 +25,8 @@ Route::get('/', WelcomeController::class);
 Route::view('/about', 'pages.about')->name('about');
 Route::view('/privacy', 'pages.privacy')->name('privacy');
 Route::view('/terms', 'pages.terms')->name('terms');
+Route::get('/stats', StatsController::class)->name('stats');
+Route::get('/scoreboard', ScoreboardController::class)->name('scoreboard');
 Route::get('/alerts/unsubscribe/{user}', [AlertUnsubscribeController::class, 'show'])->middleware('signed')->name('alerts.unsubscribe');
 Route::post('/alerts/unsubscribe/{user}', [AlertUnsubscribeController::class, 'store'])->middleware(['signed', 'throttle:20,60'])->name('alerts.unsubscribe.store');
 Route::post('/demo', DemoController::class)->middleware(['guest', 'throttle:20,60'])->name('demo');
@@ -50,6 +54,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/uploads', [UploadController::class, 'index'])->name('uploads.index');
     Route::post('/uploads', [UploadController::class, 'store'])->middleware('throttle:manual-upload')->name('uploads.store');
     Route::delete('/uploads/{upload}', [UploadController::class, 'destroy'])->name('uploads.destroy');
+
+    Route::patch('/profile/scoreboard', [ProfileController::class, 'updateScoreboard'])->middleware('throttle:10,60')->name('profile.scoreboard');
 
     Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.edit');
     Route::patch('/settings', [SettingsController::class, 'update'])->name('settings.update');

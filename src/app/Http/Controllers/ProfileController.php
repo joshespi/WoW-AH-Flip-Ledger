@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Http\Requests\ScoreboardRequest;
+use App\Services\ScoreboardService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -35,6 +37,16 @@ class ProfileController extends Controller
         $request->user()->save();
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
+    }
+
+    /**
+     * Join or leave the public scoreboard. Joining builds the entries at once; leaving deletes them.
+     */
+    public function updateScoreboard(ScoreboardRequest $request, ScoreboardService $board): RedirectResponse
+    {
+        $board->setMembership($request->user(), $request->validated('scoreboard_opt_in'), $request->validated('scoreboard_nickname'));
+
+        return Redirect::route('profile.edit')->with('status', 'scoreboard-updated');
     }
 
     /**

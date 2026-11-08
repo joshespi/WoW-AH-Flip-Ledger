@@ -54,7 +54,7 @@ class DataExportTest extends TestCase
         $files = $this->unzip(app(DataExportService::class)->build($user));
 
         $this->assertEqualsCanonicalizing(
-            ['trades.csv', 'corrections.csv', 'sales.csv', 'expired.csv', 'cancelled.csv', 'buy_suggestions.csv', 'watchlist.csv', 'uploads.csv', 'account.csv', 'README.txt'],
+            ['trades.csv', 'corrections.csv', 'sales.csv', 'expired.csv', 'cancelled.csv', 'buy_suggestions.csv', 'watchlist.csv', 'uploads.csv', 'account.csv', 'activity_days.csv', 'README.txt'],
             array_keys($files),
         );
         $this->assertCount(DB::table('trades')->where('user_id', $user->id)->count(), $this->rows($files['trades.csv']));

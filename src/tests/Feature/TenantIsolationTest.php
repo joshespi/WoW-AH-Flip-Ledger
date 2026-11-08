@@ -32,6 +32,8 @@ class TenantIsolationTest extends TestCase
         'sanctum/csrf-cookie',
         'about',
         'privacy',
+        'stats',
+        'scoreboard',
         'terms',
         'demo',
         'alerts/unsubscribe/{user}',

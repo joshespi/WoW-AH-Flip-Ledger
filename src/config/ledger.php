@@ -79,12 +79,20 @@ return [
         'max_items_per_email' => 50,
     ],
 
+    'stats' => [
+        // Activity days (for the public /stats counts) are kept this long; Privacy and the export README say so.
+        'activity_days' => 90,
+    ],
+
     'addon' => [
         // The uploader polls every few minutes; this leaves room for retries and restarts.
         'per_token_per_hour' => (int) env('LEDGER_ADDON_FEED_PER_HOUR', 60),
 
         // Open positions in the feed; the rest are dropped and `truncated` is set.
         'max_positions' => 300,
+
+        // The repo's addon/ folder, mounted read-only (docker-compose.yml); addon:package zips it on app start.
+        'source' => env('LEDGER_ADDON_SOURCE', '/var/www/addon'),
     ],
 
     'ingest' => [

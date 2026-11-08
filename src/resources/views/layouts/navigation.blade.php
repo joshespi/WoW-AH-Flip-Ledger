@@ -17,6 +17,10 @@
         [__('Data'), [
             [__('Uploads'), 'uploads.index', 'uploads.*', 'upload'],
         ]],
+        [__('Community'), [
+            [__('Stats'), 'stats', 'stats', 'bars'],
+            [__('Scoreboard'), 'scoreboard', 'scoreboard', 'trophy'],
+        ]],
     ];
 
     if (auth()->user()?->is_admin) {
@@ -32,6 +36,8 @@
         'search' => 'm21 21-4.35-4.35M17 11a6 6 0 1 1-12 0 6 6 0 0 1 12 0z',
         'calc' => 'M7 3h10a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM9 7h6M9 12h.01M12 12h.01M15 12h.01M9 16h.01M12 16h.01M15 16h.01',
         'upload' => 'M12 16V4m0 0L8 8m4-4 4 4M4 20h16',
+        'bars' => 'M5 21V11M12 21V4M19 21v-7',
+        'trophy' => 'M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3',
         'shield' => 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z',
     ];
 @endphp

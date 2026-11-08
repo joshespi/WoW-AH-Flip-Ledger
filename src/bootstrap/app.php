@@ -5,6 +5,7 @@ use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\ForceHttps;
 use App\Http\Middleware\LimitIngestByIp;
 use App\Http\Middleware\ReadOnlySession;
+use App\Http\Middleware\RecordActivity;
 use App\Http\Middleware\RequireClientVersion;
 use App\Http\Middleware\SecurityHeaders;
 use App\Services\Blizzard\BlizzardClient;
@@ -36,6 +37,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Tells the admins when fetching or backups go wrong (idle for what is not set up).
         $schedule->command('health:check')->everyThirtyMinutes()->onOneServer()->withoutOverlapping(20);
         $schedule->command('prices:prune')->dailyAt('03:30')->onOneServer()->withoutOverlapping(60);
+        $schedule->command('scoreboard:build')->hourlyAt(40)->onOneServer()->withoutOverlapping(30);
+        $schedule->command('stats:prune')->dailyAt('03:45')->onOneServer()->withoutOverlapping(10);
     })
     ->withMiddleware(function (Middleware $middleware): void {
         // headers: is explicit because Laravel's default set includes X_FORWARDED_HOST, which
@@ -57,7 +60,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: ['alerts/unsubscribe/*']);
 
         // The demo account and impersonating admins can only read.
-        $middleware->web(append: [ReadOnlySession::class]);
+        // Web requests count as activity; on the API only an upload does (routes/api.php), not the
+        // uploader's background ping and feed polls.
+        $middleware->web(append: [ReadOnlySession::class, RecordActivity::class]);
 
         // After TrustProxies/TrustHosts, so the scheme and host it judges are the real ones.
         $middleware->append(ForceHttps::class);

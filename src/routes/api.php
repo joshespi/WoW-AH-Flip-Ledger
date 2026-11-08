@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AddonFeedController;
 use App\Http\Controllers\Api\IngestController;
 use App\Http\Controllers\Api\PingController;
+use App\Http\Middleware\RecordActivity;
 use Illuminate\Support\Facades\Route;
 
 // Token-only API (no session auth). The per-IP limit is global middleware (LimitIngestByIp) so
@@ -10,7 +11,8 @@ use Illuminate\Support\Facades\Route;
 // (426) goes last so a bad token is still a 401.
 Route::prefix('v1')->middleware(['auth:sanctum', 'abilities:ingest', 'verified', 'throttle:ingest', 'client.version'])->group(function () {
     Route::get('/ping', PingController::class)->name('api.ping');
-    Route::post('/ingest', IngestController::class)->name('api.ingest');
+    // Only an upload counts as activity: the uploader pings and polls whether anyone plays or not.
+    Route::post('/ingest', IngestController::class)->middleware(RecordActivity::class)->name('api.ingest');
 });
 
 // The addon feed polls on a timer, so it has its own per-token budget instead of eating ingest's.

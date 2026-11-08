@@ -35,9 +35,10 @@ const rangeOptions = (text, scales = {}) => ({
 });
 
 // An Alpine component for a chart with range buttons (`d.ranges[key]`): `config(text)` is the
-// Chart.js config, `fill(chart, range)` loads one range into it. Chart.js loads on demand.
-const rangeChart = (d, config, fill) => { let chart = null; return {
-    range: 'month',
+// Chart.js config, `fill(chart, range)` loads one range into it, starting at `initial`.
+// Chart.js loads on demand.
+const rangeChart = (d, config, fill, initial = 'month') => { let chart = null; return {
+    range: initial,
 
     async init() {
         const { default: Chart } = await import('chart.js/auto');
@@ -193,6 +194,26 @@ document.addEventListener('alpine:init', () => {
             chart.data.labels = r.labels;
             [...d.games, 'total'].forEach((k, i) => { chart.data.datasets[i].data = r.cum[k].map(gold); });
         }));
+
+    // Daily counts on /stats (`d.labels` days, `d.series[key] = {label, data}`): whole numbers, so
+    // the ticks are counts, not gold. One series at a time, picked by the buttons.
+    window.Alpine.data('statsChart', (d) => rangeChart({ ranges: d.series }, (text) => ({
+        type: 'bar',
+        data: { labels: d.labels, datasets: [{ label: '', data: [], backgroundColor: GOLD, borderRadius: 2 }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            scales: {
+                x: { grid: { display: false }, ticks: { color: text, maxRotation: 0, autoSkip: true, maxTicksLimit: 8, callback(v) { return String(this.getLabelForValue(v)).slice(5); } } },
+                y: { beginAtZero: true, grid: { color: chartGrid }, ticks: { color: text, precision: 0 } },
+            },
+            plugins: { legend: { display: false } },
+        },
+    }), (chart, s) => {
+        chart.data.datasets[0].label = s.label;
+        chart.data.datasets[0].data = s.data;
+    }, 'active'));
 
     // Price chart for the item page. Chart.js is loaded on demand so other pages don't carry it.
     // `d` is built by ItemController: x is epoch seconds, y copper per unit. The range buttons
