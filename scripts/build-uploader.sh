@@ -16,7 +16,7 @@ rm -rf uploader/dist
 
 # uploader.sh owns the Docker invocation (image, mounts, Windows path handling); the version
 # reaches the inner script as $1.
-scripts/uploader.sh sh -c '
+sh scripts/uploader.sh sh -c '
     set -eu
     VERSION=$1
     go vet ./... && go test -count=1 ./... >/dev/null
