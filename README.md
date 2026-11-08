@@ -137,7 +137,7 @@ docker compose exec app php artisan demo:seed
 docker compose exec app php artisan prices:probe
 ```
 
-Prices are fetched hourly by the `scheduler` container, alerts go out after each refresh, and `health:check` emails admins about failures (below). Re-run `scripts/build-uploader.sh` when you release a new uploader version, and bump `LEDGER_MIN_CLIENT_VERSION` only when old uploaders must be refused.
+Prices are fetched hourly by the `scheduler` container, alerts go out after each refresh, and `health:check` emails admins about failures (below). The in-game addon zip publishes itself: on every start the app zips `addon/` when its TOC version is new (`php artisan addon:package`; a changed addon without a version bump is refused and logged, keeping the old zip). Re-run `scripts/build-uploader.sh` only when you release a new uploader version, and bump `LEDGER_MIN_CLIENT_VERSION` only when old uploaders must be refused.
 
 ### 5. Updating
 
@@ -146,7 +146,7 @@ git pull
 docker compose up -d --build
 ```
 
-The entrypoint reinstalls dependencies, rebuilds assets and migrates. Take a backup first if the release has migrations.
+The entrypoint reinstalls dependencies, rebuilds assets, migrates and publishes a new addon version. Take a backup first if the release has migrations.
 
 ## What is hardened
 
