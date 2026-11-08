@@ -17,7 +17,10 @@ class UploaderBuilds
 
     private const LINE = '/^([0-9a-f]{64}) [ *](wowflipledger-uploader-(\d+\.\d+\.\d+)-(windows|darwin|linux)-(amd64|arm64)(?:\.exe)?)$/D';
 
-    private const ADDON_LINE = '/^([0-9a-f]{64}) [ *](wowflipledger-addon-(\d+\.\d+\.\d+)\.zip)$/D';
+    /** The addon zip's name; group 1 is the version. AddonPackager names and prunes zips by it. */
+    public const ADDON_FILE = 'wowflipledger-addon-(\d+\.\d+\.\d+)\.zip';
+
+    private const ADDON_LINE = '/^([0-9a-f]{64}) [ *]('.self::ADDON_FILE.')$/D';
 
     public function __construct(private ?string $dir = null)
     {
@@ -85,9 +88,7 @@ class UploaderBuilds
      */
     private function verified(string $pattern): \Generator
     {
-        $sums = @file_get_contents($this->dir.'/'.self::SUMS);
-
-        foreach ($sums === false ? [] : preg_split('/\R/', trim($sums)) as $line) {
+        foreach (self::sumsLines($this->dir) as $line) {
             if (! preg_match($pattern, $line, $m)) {
                 continue;
             }
@@ -98,6 +99,19 @@ class UploaderBuilds
                 yield [$m, $path];
             }
         }
+    }
+
+    public static function addonFile(string $version): string
+    {
+        return "wowflipledger-addon-{$version}.zip";
+    }
+
+    /** @return list<string> the lines of $dir/SHA256SUMS; none when it is missing */
+    public static function sumsLines(string $dir): array
+    {
+        $sums = @file_get_contents($dir.'/'.self::SUMS);
+
+        return $sums === false ? [] : preg_split('/\R/', trim($sums));
     }
 
     /**

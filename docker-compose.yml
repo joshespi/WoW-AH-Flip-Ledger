@@ -18,6 +18,8 @@ x-php: &php
     - ./.env:/var/www/html/.env:ro
     # Read-only: the app only reads the status file, never the dumps' contents.
     - ./backups:/backups:ro
+    # Read-only: addon:package zips it into storage/app/uploader on app start.
+    - ./addon:/var/www/addon:ro
   depends_on:
     db:
       condition: service_healthy

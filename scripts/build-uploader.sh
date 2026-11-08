@@ -39,7 +39,8 @@ mkdir -p "$PUBLISH"
 cp uploader/dist/* "$PUBLISH"/
 
 # The in-game addon, zipped with its folder at the top so unzipping into AddOns just works. Fixed
-# file times and a sorted file list keep the zip reproducible. Its hash joins the published
+# file times and modes and a sorted file list keep the zip reproducible; the app's addon:package
+# (AddonPackager, run on app start) builds the same bytes, so keep the two in step. Its hash joins the published
 # SHA256SUMS, which is where the app lists it from.
 . scripts/addon-version.sh
 HERE=$(pwd -W 2>/dev/null || pwd)
@@ -47,6 +48,7 @@ MSYS_NO_PATHCONV=1 docker run --rm -v "$HERE:/repo" -w /repo alpine:3.20 sh -c '
     set -eu
     apk add --no-cache zip >/dev/null
     rm -rf /tmp/addon && mkdir /tmp/addon && cp -r addon/WowFlipLedger /tmp/addon/
+    find /tmp/addon -type f -exec chmod 644 {} +
     find /tmp/addon -exec touch -d "2020-01-01 00:00:00" {} +
     cd /tmp/addon && find WowFlipLedger -type f | sort | zip -X -q "/repo/$0" -@
 ' "$PUBLISH/$ADDON_ZIP"

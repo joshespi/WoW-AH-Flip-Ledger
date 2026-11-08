@@ -32,6 +32,10 @@ npm run build
 echo "[entrypoint] migrate"
 php artisan migrate --force
 
+# Publish the addon zip when addon/ has a new version. Never fatal: a refusal keeps the old zip.
+echo "[entrypoint] addon:package"
+php artisan addon:package || echo "[entrypoint] addon:package refused; the published addon zip is unchanged" >&2
+
 # optimize caches config; prod only. It would freeze .env and could cache the real DB
 # connection over phpunit's forced sqlite one.
 if [ "${APP_ENV}" = "production" ]; then
