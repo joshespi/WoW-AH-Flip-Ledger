@@ -29,17 +29,17 @@ Not affiliated with Blizzard Entertainment or TradeSkillMaster. World of Warcraf
 ## Before the first release (you, once)
 
 1. Create the project on CurseForge (game: World of Warcraft, category: Auction & Economy). Pick a license (the repo has none yet, and CurseForge requires one), add a logo and a screenshot of the `/wfl` panel.
-2. Put the numeric project id in `scripts/publish-curseforge.sh` (or the `CURSEFORGE_PROJECT_ID` variable) and add `## X-Curse-Project-ID: <id>` to `WowFlipLedger.toc`.
+2. Done: project id 1783753 is the default in `scripts/publish-curseforge.sh` and in `WowFlipLedger.toc` (`X-Curse-Project-ID`).
 3. Create an API token at https://www.curseforge.com/account/api-tokens and export it as `CURSEFORGE_TOKEN` when you publish. Never commit it.
 
 ## Each release
 
 1. Bump `## Version:` in `WowFlipLedger.toc` and add a matching `## x.y.z` section to `CHANGELOG.md` (`scripts/build-uploader.sh` refuses to build without it).
 2. Check the `## Interface:` numbers against the live clients (`/dump (select(4, GetBuildInfo()))`).
-3. `addon/tests/run.sh`, then `scripts/build-uploader.sh`. It writes the zip the site serves, `src/storage/app/uploader/wowflipledger-addon-<version>.zip`.
+3. `addon/tests/run.sh`, then `scripts/build-uploader.sh`. It writes the zip the site serves, `src/storage/app/uploader/wowflipledger-addon-<version>.zip`. (On the server the app builds the same bytes by itself on start, `addon:package`, so a deploy alone publishes it.)
 4. Upload that same zip to CurseForge so the site and CurseForge ship identical bytes: `scripts/publish-curseforge.sh` (or upload it in the web form). Then deploy the site so `/setup` offers the new version.
 
 ## Game versions
 
 - Retail: the TOC lists `120007, 120100, 120105`.
-- World of Warcraft: Forever: not verified. TradeSkillMaster's TOC on a Forever install lists `120105, 50504, 20506, 11509`, so its number is likely among those (or retail's). Log in and run `/dump (select(4, GetBuildInfo()))`, then add the number to the TOC and select Forever's game version on the CurseForge file.
+- World of Warcraft: Forever: interface `16001` (in the TOC, confirmed in game 2026-11-05). Select Forever's game version on the CurseForge file if CurseForge lists one.
