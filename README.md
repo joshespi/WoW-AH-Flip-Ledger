@@ -1,8 +1,12 @@
 # WoW Flip Ledger
 
-Track World of Warcraft auction house flips. Sign up, send your TradeSkillMaster data (companion uploader or manual file upload), and see realized P/L, positions and market prices for commodities (US retail).
+Track World of Warcraft auction house flips. Sign up, send your data (companion uploader or manual file upload), and see realized P/L, positions and market prices for commodities (US region).
 
-Built on [TradeSkillMaster](https://www.tradeskillmaster.com): the sales, expirations and cancellations in the ledger come from the data TSM records, and this project would not exist without it. If you trade on the auction house, use TSM.
+- **Data:** your TradeSkillMaster `SavedVariables`, or the site's own in-game addon (`addon/`, no TSM needed), which records your buys, sales, expiries, cancels and stock. Where both cover the same time, TSM wins.
+- **Games:** Retail, Forever and Classic, each a separate ledger, with an All view. Market prices (Blizzard's AH API) are Retail only.
+- **Public pages:** `/stats` (anonymous site-wide counts) and an opt-in `/scoreboard` (nicknames only).
+
+Built on [TradeSkillMaster](https://www.tradeskillmaster.com): TSM's records are the main source of sales, expirations and cancellations, and this project would not exist without it. If you trade on the auction house, use TSM.
 
 Not affiliated with Blizzard Entertainment or TradeSkillMaster.
 
@@ -35,8 +39,9 @@ docker compose exec app ./vendor/bin/pint
 ```
 docker-compose.yml   app (php-fpm), scheduler, nginx, db (MariaDB), backup
 docker/              image, nginx and backup config
-scripts/             setup, db backup and restore, uploader build
+scripts/             setup, db backup and restore, uploader and addon build, CurseForge publish
 src/                 the Laravel app
+addon/               in-game recorder addon (Lua); see addon/CURSEFORGE.md, tests in addon/tests
 legacy/              original Python CLI, kept as a test oracle
 uploader/            companion uploader (Go); see uploader/README.md
 ```
@@ -183,6 +188,8 @@ Do this after setting up backups and now and then after; a restore you have neve
 ## Monitoring
 
 `health:check` runs every 30 minutes and emails every verified admin when the Blizzard price fetch is failing or stale, or backups have stopped. It reports a problem when it starts, repeats every 12 hours while it lasts (`LEDGER_HEALTH_REMINDER_HOURS`), and says when it is fixed. It stays quiet about things that are not set up (no Blizzard credentials, no backup service). The same state is on the admin pages: fetch health and every fetch attempt, uploads and failures, and the backup card.
+
+Other scheduled work (all in `bootstrap/app.php`, run by the `scheduler` container): `prices:fetch` at :05 and :35 (Blizzard updates hourly; the second try catches a late update), `prices:names` every 15 minutes, `alerts:send` at :20 and :50, `prices:prune` daily, `scoreboard:build` hourly (the public scoreboard; opt-in and opt-out apply at once regardless), and `stats:prune` daily (drops activity days older than 90, the window the privacy page promises). `/stats` is cached for 10 minutes.
 
 ## Before you open signup
 

@@ -1,7 +1,7 @@
 <x-public-layout :title="__('Terms')">
     <article class="max-w-2xl space-y-4 text-gray-700 dark:text-gray-300">
         <h1 class="text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">{{ __('Terms') }}</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Last updated 27 October 2026</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Last updated 7 November 2026</p>
 
         <p>By creating an account or using {{ config('app.name') }} you agree to these terms.</p>
 
@@ -17,6 +17,9 @@
 
         <h2 class="pt-4 text-lg font-medium text-gray-900 dark:text-gray-100">Acceptable use</h2>
         <p>Do not attack, overload or probe the service, bypass its limits, scrape it, upload malicious or fabricated files, access anyone else's data, or use it to break the rules of the game or of Blizzard's or TradeSkillMaster's services. We may limit or close accounts that do.</p>
+
+        <h2 class="pt-4 text-lg font-medium text-gray-900 dark:text-gray-100">Scoreboard</h2>
+        <p>Joining the <a class="underline" href="{{ route('scoreboard') }}">scoreboard</a> is optional and makes your nickname and figures public. Your nickname must not be offensive, impersonate anyone (another player, a staff member or the site), or contain personal details such as a real name or contact information. Don't fake your figures with made-up buys or files. We may change or remove a nickname, or take an account off the scoreboard, without notice.</p>
 
         <h2 class="pt-4 text-lg font-medium text-gray-900 dark:text-gray-100">Not affiliated</h2>
         <p>This site is not made by, endorsed by or connected to Blizzard Entertainment or TradeSkillMaster. World of Warcraft is a trademark of Blizzard Entertainment.</p>

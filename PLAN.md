@@ -121,6 +121,21 @@ watchlist_items(user_id, item_id, group_name, target_buy_copper, target_sell_cop
 alert_states(user_id, item_id, kind, last_state, last_sent_at)
 ```
 
+Added since (see the phase checklists for detail):
+```
+-- Phase 13: games and the addon as a second source
+tsm_sales, tsm_expired, tsm_cancelled, tsm_buy_candidates
+              (+ game 'retail'|'forever'|'classic', origin 'tsm'|'addon', upload_id, account)
+trades, uploads (+ game);  inventory (+ game, origin; unique user, game, item)
+users(+ enabled_games, game_view)
+tsm_spans(user_id, game, account, from, to)    -- PK (user_id, game, account); TSM wins inside it
+-- Phase 14: public stats and scoreboard
+users(+ scoreboard_opt_in, scoreboard_nickname unique)
+user_activity_days(user_id, day)               -- PK both; kept 90 days
+scoreboard_entries(user_id, game, period '7d'|'30d'|'all', pnl_copper, sales_copper, units, flips,
+                   computed_at)                -- unique (user_id, game, period); rebuilt hourly
+```
+
 - **Idempotent ingest.** `dedupe_key` = hash of (item, time, qty, price, source) plus an occurrence index among identical rows in the file. A re-upload inserts nothing new, and two genuinely identical sales both survive.
 - **Data minimization.** Don't store buyer or seller names. Store realm only where it's needed.
 - **Raw files are never stored.** Parsed in memory, then dropped. The cost: a failed parse can't be replayed, so log structured diagnostics (section sizes, counts, failing section) instead.
@@ -157,6 +172,8 @@ Dense table-first layout on a dark theme, readable at phone width (tables scroll
 10. **Settings `/settings`**: timezone, target margin, stale minutes, market share, alert preferences, API tokens, export data, delete account.
 11. **Admin `/admin`**: users, uploads and failures, Blizzard fetch health, impersonation.
 12. **Demo**: a seeded read-only demo user, viewable through a session toggle so every screen is reused. Plus About, Privacy and Terms pages with a "not affiliated with Blizzard or TradeSkillMaster" notice.
+13. **Game switch** (Phase 13): the sidebar picks Retail, Forever, Classic or All (two or more enabled games, set in Settings); the dashboard in All is the combined view. Uploads gains a game picker and Undo for the newest upload.
+14. **Stats `/stats`** and **Scoreboard `/scoreboard`** (Phase 14, public): anonymous site-wide counts, and an opt-in board of nicknames by realized P/L, sales or units over 7d / 30d / all, per game. The opt-in box is on Profile.
 
 ## Companion uploader (Go)
 
