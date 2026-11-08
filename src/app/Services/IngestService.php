@@ -36,7 +36,11 @@ class IngestService
     /** Every log table ingest writes, with its time column. Each row carries `upload_id` (see UploadService::undo). */
     public const LOG_TABLES = ['tsm_sales' => 'sold_at', 'tsm_expired' => 'at', 'tsm_cancelled' => 'at', 'tsm_buy_candidates' => 'at'];
 
-    public function __construct(private readonly TsmParser $parser, private readonly AddonParser $addon) {}
+    public function __construct(
+        private readonly TsmParser $parser,
+        private readonly AddonParser $addon,
+        private readonly UploadGameCheck $games,
+    ) {}
 
     /** One writer of a user's uploaded data at a time: ingest and undo both hold it. */
     public static function lock(User $user): Lock
@@ -46,6 +50,7 @@ class IngestService
 
     /**
      * @param  string  $payload  the file as received: plain, or gzipped (detected by magic bytes)
+     * @param  bool  $checkRealms  refuse a file whose realms point at another game (manual uploads; see UploadGameCheck)
      */
     public function ingest(
         User $user,
@@ -55,6 +60,7 @@ class IngestService
         ?string $clientVersion = null,
         ?string $wowAccount = null,
         string $game = Game::RETAIL,
+        bool $checkRealms = false,
     ): Upload {
         $received = time();
         $mtime = $this->plausibleMtime($fileMtime, $received);
@@ -80,6 +86,13 @@ class IngestService
 
         // Up to 48 MB when it was gzipped; nothing needs it past the parse.
         unset($contents);
+
+        if (($problem = $this->games->problem($user, $game, $data, $checkRealms)) !== null) {
+            $upload = $this->failed($base, $problem[0]);
+            $upload->wrongGameConfirmable = $problem[1];
+
+            return $upload;
+        }
 
         $lock = self::lock($user);
 
@@ -244,7 +257,7 @@ class IngestService
         $item = ItemName::numericId(ItemName::baseId($r['itemString'] ?? ''));
         $qty = Bounds::count($r['quantity'] ?? null, Bounds::MAX_QTY);
         $time = Bounds::count($r['time'] ?? null);
-        $realm = substr($r['realm'] ?? '', 0, 64);
+        $realm = Bounds::realm($r['realm'] ?? '');
 
         if ($item === null || ! Bounds::validItemId($item) || $qty === null || $qty < 1 || $realm === ''
             || $time === null || ! Bounds::plausibleTime($time)) {

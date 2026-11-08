@@ -19,6 +19,9 @@ class Upload extends Model
     /** Not stored: the failure was temporary (busy, database error), so the same file may succeed later. */
     public bool $retryable = false;
 
+    /** Not stored: set when refused as another game's file (UploadGameCheck); true when that was only a guess the user may override. */
+    public ?bool $wrongGameConfirmable = null;
+
     protected function casts(): array
     {
         return [

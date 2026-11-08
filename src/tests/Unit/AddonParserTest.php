@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Services\AddonParser;
 use App\Services\TsmParseException;
+use App\Support\Game;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\AddonFile;
 
@@ -144,5 +145,28 @@ WowFlipLedgerDB = {
         $this->assertSame('212000', $data->rows('csvBuys')[0]['total']);
         $this->assertSame('Void-Tempered Hide', $data->rows('csvSales')[0]['itemName']);
         $this->assertSame(self::T + 60, $data->takenAt);
+    }
+
+    public function test_the_interface_stamp_names_the_game_that_wrote_the_file(): void
+    {
+        $parse = fn (?int $interface) => (new AddonParser)->parse(AddonFile::make(interface: $interface))->game;
+
+        $this->assertSame(Game::RETAIL, $parse(120105));
+        $this->assertSame(Game::FOREVER, $parse(16001));
+        $this->assertSame(Game::CLASSIC, $parse(11509));
+        $this->assertSame(Game::CLASSIC, $parse(50504));
+        $this->assertNull($parse(null), 'files from before 0.2.1 say nothing');
+        $this->assertNull($parse(42));
+    }
+
+    public function test_unknown_interface_bands_refuse_nothing(): void
+    {
+        $this->assertSame(Game::FOREVER, Game::fromInterface(16099));
+        $this->assertSame(Game::CLASSIC, Game::fromInterface(15999));
+        $this->assertSame(Game::CLASSIC, Game::fromInterface(20505));
+        // A later Forever patch (1.70 and up) must not be read as Classic.
+        $this->assertNull(Game::fromInterface(16100));
+        $this->assertNull(Game::fromInterface(17001));
+        $this->assertNull(Game::fromInterface(19999));
     }
 }

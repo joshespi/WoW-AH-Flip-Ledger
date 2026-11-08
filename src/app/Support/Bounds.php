@@ -29,6 +29,30 @@ final class Bounds
 
     public const MAX_NOTE = 255;
 
+    public const MAX_REALM = 64;
+
+    /** A log row's realm as stored (bytes, as the column holds it); the realm check compares with this. */
+    public static function realm(string $realm): string
+    {
+        return substr($realm, 0, self::MAX_REALM);
+    }
+
+    /**
+     * A realm compared across sources: TSM stores the display name ("Area 52"), the addon
+     * GetNormalizedRealmName ("Area52"). Drops spaces and dashes, ASCII lowercase; realmKeySql() is
+     * the same in SQL.
+     */
+    public static function realmKey(string $realm): string
+    {
+        return strtolower(str_replace([' ', '-'], '', $realm));
+    }
+
+    /** realmKey() of a column, on SQLite and MariaDB alike. */
+    public static function realmKeySql(string $column): string
+    {
+        return "lower(replace(replace({$column}, ' ', ''), '-', ''))";
+    }
+
     /** Free text for a trade or watchlist note (see text()). */
     public static function note(?string $note): ?string
     {

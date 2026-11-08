@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Support\Bounds;
+use App\Support\Game;
 
 /**
  * Reads WowFlipLedger.lua, the companion addon's own SavedVariables, into the same TsmData shape
@@ -10,8 +11,9 @@ use App\Support\Bounds;
  * with anchored patterns, size, line and row caps.
  *
  * The addon writes one record per string ("kind|time|realm|item|qty|a|b"), which WoW's serializer
- * puts on its own line. Only the `events` and `inv` lists and the `last` time are read;
- * everything else in the file (per-character snapshots, learned names) is skipped.
+ * puts on its own line. Only the `events` and `inv` lists, the `last` time and the client's
+ * `interface` number (which game wrote the file) are read; everything else in the file
+ * (per-character snapshots, learned names) is skipped.
  */
 class AddonParser
 {
@@ -20,6 +22,8 @@ class AddonParser
     // WoW writes no indentation (older clients used tabs) and an optional "-- [n]" after array
     // entries; lines are trimmed and the nesting is tracked by braces instead.
     private const LAST = '/^\["last"\] = (\d{1,12}),$/D';
+
+    private const INTERFACE = '/^\["interface"\] = (\d{1,7}),$/D';
 
     private const ENTRY = '/^"([^"\\\\]{1,200})",(?: -- \[\d+\])?$/D';
 
@@ -54,6 +58,7 @@ class AddonParser
         $csv = [];
         $inventory = [];
         $last = null;
+        $interface = null;
         $mode = null;
         $depth = 0;
         $rows = 0;
@@ -94,6 +99,8 @@ class AddonParser
                     $mode = 'inv';
                 } elseif (preg_match(self::LAST, $line, $m)) {
                     $last = (int) $m[1];
+                } elseif (preg_match(self::INTERFACE, $line, $m)) {
+                    $interface = (int) $m[1];
                 }
             }
 
@@ -105,7 +112,12 @@ class AddonParser
         }
 
         // When the addon last saved (logout or /reload): the inventory snapshot is as of then.
-        return new TsmData([], $csv, $inventory, origin: TsmData::ORIGIN_ADDON, takenAt: $last !== null && Bounds::plausibleTime($last) ? $last : null);
+        return new TsmData(
+            [], $csv, $inventory,
+            origin: TsmData::ORIGIN_ADDON,
+            takenAt: $last !== null && Bounds::plausibleTime($last) ? $last : null,
+            game: $interface === null ? null : Game::fromInterface($interface),
+        );
     }
 
     /**

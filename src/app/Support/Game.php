@@ -91,6 +91,22 @@ final class Game
         return $game === self::RETAIL;
     }
 
+    /**
+     * The game a client's interface number (GetBuildInfo's 4th value) belongs to: six digits
+     * retail, 160xx Forever (client 1.60), 10xxx-15xxx and 2xxxx-9xxxx the Classic flavours.
+     * 16xxx-19xxx outside 160xx is null (a later Forever patch is likely there): an unknown
+     * number never refuses a file, the realm guess decides instead.
+     */
+    public static function fromInterface(int $interface): ?string
+    {
+        return match (true) {
+            $interface >= 100000 && $interface < 1000000 => self::RETAIL,
+            $interface >= 16000 && $interface < 16100 => self::FOREVER,
+            $interface >= 10000 && $interface < 16000, $interface >= 20000 && $interface < 100000 => self::CLASSIC,
+            default => null,
+        };
+    }
+
     /** Prefix that keeps a non-retail row's dedupe key apart from an identical retail row's. */
     public static function keyPrefix(string $game): string
     {

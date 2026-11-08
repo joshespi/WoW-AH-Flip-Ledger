@@ -33,7 +33,8 @@ class UploadUndoTest extends TestCase
     private function upload(User $user, array $sales, string $game = 'retail'): Upload
     {
         $file = UploadedFile::fake()->createWithContent('TradeSkillMaster.lua', TsmFile::make(sales: $sales));
-        $this->actingAs($user)->post('/uploads', ['file' => $file, 'game' => $game])->assertSessionHas('status', 'upload-ok');
+        // These tests misfile files on purpose, so they confirm past UploadGameCheck.
+        $this->actingAs($user)->post('/uploads', ['file' => $file, 'game' => $game, 'game_confirmed' => '1'])->assertSessionHas('status', 'upload-ok');
 
         return Upload::ownedBy($user)->where('game', $game)->newest()->firstOrFail();
     }

@@ -41,6 +41,7 @@ class UploadController extends Controller
             // File.lastModified from the browser, in milliseconds.
             'file_mtime' => ['nullable', 'integer', 'min:0'],
             'game' => ['nullable', Rule::in(Game::GAMES)],
+            'game_confirmed' => ['nullable', 'boolean'],
         ]);
 
         $ms = $request->input('file_mtime');
@@ -51,7 +52,14 @@ class UploadController extends Controller
             'manual',
             $ms === null ? null : intdiv((int) $ms, 1000),
             game: $request->input('game') ?? Game::RETAIL,
+            checkRealms: ! $request->boolean('game_confirmed'),
         );
+
+        if ($upload->wrongGameConfirmable !== null) {
+            // A guess from the realms can be confirmed ("Upload anyway"); an addon file's own stamp cannot.
+            return back()->withInput($request->only('game'))->withErrors(['game' => $upload->error])
+                ->with('game_check', $upload->wrongGameConfirmable);
+        }
 
         if ($upload->failed()) {
             return back()->withErrors(['file' => $upload->error]);

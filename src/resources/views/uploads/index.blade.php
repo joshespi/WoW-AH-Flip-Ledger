@@ -41,11 +41,22 @@
                             </label>
                         @endforeach
                     </div>
-                    <x-input-error class="mt-2" :messages="$errors->get('game')" />
                 </fieldset>
             @else
                 <input type="hidden" name="game" value="{{ $user->activeGame() }}">
             @endif
+
+            @error('game')
+                <div>
+                    <x-input-error :messages="$errors->get('game')" />
+                    @if (session('game_check'))
+                        <label class="mt-2 inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                            <input type="checkbox" name="game_confirmed" value="1">
+                            {{ __('Upload anyway (choose the file again)') }}
+                        </label>
+                    @endif
+                </div>
+            @enderror
 
             <x-primary-button>{{ __('Upload') }}</x-primary-button>
         </form>
