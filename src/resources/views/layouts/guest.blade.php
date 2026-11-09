@@ -13,5 +13,6 @@
         </div>
 
         <x-legal-links class="relative mt-6" />
+        <x-site-footer class="relative mt-2 justify-center" />
     </div>
 </x-shell>

@@ -25,6 +25,11 @@ return [
     // Shown on About, Privacy and Terms when set.
     'contact_email' => env('LEDGER_CONTACT_EMAIL'),
 
+    // Footer on every page. Bump LEDGER_VERSION at deploy.
+    // `?:` not env()'s default: the shipped .env sets these empty, and env() returns '' for that.
+    'version' => env('LEDGER_VERSION') ?: 'dev',
+    'issues_url' => env('LEDGER_ISSUES_URL') ?: 'https://github.com/joshespi/WoW-AH-Flip-Ledger/issues',
+
     // Uploaders older than this are told to update (HTTP 426). Raise it when the ingest
     // contract changes in a way old clients can't satisfy.
     'min_client_version' => env('LEDGER_MIN_CLIENT_VERSION', '0.0.0'),

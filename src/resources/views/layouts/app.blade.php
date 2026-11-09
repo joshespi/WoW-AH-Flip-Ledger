@@ -2,7 +2,7 @@
     <div class="min-h-screen">
         @include('layouts.navigation')
 
-        <div class="lg:ps-64" @auth @unless (auth()->user()->viewsAll()) data-game="{{ auth()->user()->activeGame() }}" @endunless @endauth>
+        <div class="flex min-h-screen flex-col lg:ps-64" @auth @unless (auth()->user()->viewsAll()) data-game="{{ auth()->user()->activeGame() }}" @endunless @endauth>
             @if (auth()->user()?->isBeingImpersonated())
                 <x-session-banner tone="red" :action="route('impersonate.stop')" :button="__('Stop viewing as this user')">
                     {{ __('Viewing as :name (:email), read-only. This is logged.', ['name' => auth()->user()->name, 'email' => auth()->user()->email]) }}
@@ -35,11 +35,15 @@
             @endif
 
             <!-- Page Content: every page sits in the same container -->
-            <main class="py-6">
+            <main class="grow py-6">
                 <div class="space-y-6 px-4 sm:px-6 lg:px-8">
                     {{ $slot }}
                 </div>
             </main>
+
+            <footer class="px-4 pb-6 sm:px-6 lg:px-8">
+                <x-site-footer privacy />
+            </footer>
         </div>
     </div>
 </x-shell>
