@@ -73,7 +73,7 @@ class CorrectHoldings extends Component
     public function render(): View
     {
         $corrections = Trade::ownedBy(auth()->user())->inGame(auth()->user()->activeGame())->where('item_id', $this->itemId)->whereIn('side', Trade::CORRECTIONS)
-            ->orderByDesc('traded_at')->orderByDesc('id')->limit(20)->get(['id', 'side', 'traded_at', 'qty', 'note']);
+            ->orderByDesc('traded_at')->orderByDesc('id')->limit(20)->get(['id', 'side', 'traded_at', 'qty', 'cost_copper', 'note']);
 
         return view('livewire.correct-holdings', ['corrections' => $corrections, 'user' => auth()->user()]);
     }

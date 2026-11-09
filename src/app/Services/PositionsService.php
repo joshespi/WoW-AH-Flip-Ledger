@@ -276,12 +276,13 @@ class PositionsService
         foreach (DB::table('trades')->ownedBy($user)->inGame($game)->whereIn('side', [Trade::SIDE_BUY, ...Trade::CORRECTIONS])
             ->when($itemId !== null, fn ($q) => $q->where('item_id', $itemId))
             ->get(['side', 'item_id', 'traded_at', 'qty', 'cost_copper']) as $r) {
-            $row = ['ts' => Utc::ts($r->traded_at), 'item' => (int) $r->item_id, 'qty' => (int) $r->qty];
+            // LedgerService reads a correction's cost only as its proceeds.
+            $row = ['ts' => Utc::ts($r->traded_at), 'item' => (int) $r->item_id, 'qty' => (int) $r->qty, 'cost' => (int) $r->cost_copper];
 
             if ($r->side !== Trade::SIDE_BUY) {
-                $adjustments[] = $row + ['cost' => 0, 'correction' => $r->side];
+                $adjustments[] = $row + ['correction' => $r->side];
             } else {
-                $buys[] = $row + ['cost' => (int) $r->cost_copper];
+                $buys[] = $row;
             }
         }
 

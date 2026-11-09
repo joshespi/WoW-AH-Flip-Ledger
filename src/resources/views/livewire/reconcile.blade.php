@@ -7,6 +7,14 @@
         <p class="text-sm text-gray-600 dark:text-gray-400">
             {{ __('Your addon or TSM logged these auction buys. TSM often double-counts commodity lots, so they are only suggestions. Accept the ones that are real, correct a quantity or cost first if needed, and ignore the rest. Buys you already recorded within :min minutes are not listed.', ['min' => intdiv(\App\Services\ReconcileService::WINDOW, 60)]) }}
         </p>
+        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            {{ __('Bought to sell to a vendor? Use Vendored: it adds the buy, then sells it to the vendor at the price you enter, and the profit lands in your realized P/L.') }}
+        </p>
+        @if ($vendored['units'] > 0)
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                {{ __('Vendored so far: :n units for', ['n' => number_format($vendored['units'])]) }} <x-money :copper="$vendored['proceeds']" />
+            </p>
+        @endif
 
         @if ($rows === [])
             <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">{{ __('Nothing to reconcile.') }}</p>
@@ -18,9 +26,11 @@
                 <button type="button" wire:click="selectAll(true)" class="underline text-gray-600 dark:text-gray-400">{{ __('Select all except likely doubles') }}</button>
                 @if ($selected !== [])
                     <button type="button" wire:click="clearSelection" class="underline text-gray-600 dark:text-gray-400">{{ __('Clear') }}</button>
+                    @php($bulk = 'acceptSelected,ignoreSelected,vendorSelected')
                     <span class="flex gap-2 sm:ms-auto">
-                        <x-primary-button type="button" wire:click="acceptSelected" wire:loading.attr="disabled" wire:target="acceptSelected,ignoreSelected" wire:confirm="{{ __('Add the selected buys to your ledger?') }}">{{ __('Accept selected') }}</x-primary-button>
-                        <x-secondary-button type="button" wire:click="ignoreSelected" wire:loading.attr="disabled" wire:target="acceptSelected,ignoreSelected" wire:confirm="{{ __('Ignore the selected suggestions? They will not come back.') }}">{{ __('Ignore selected') }}</x-secondary-button>
+                        <x-primary-button type="button" wire:click="acceptSelected" wire:loading.attr="disabled" wire:target="{{ $bulk }}" wire:confirm="{{ __('Add the selected buys to your ledger?') }}">{{ __('Accept selected') }}</x-primary-button>
+                        <x-secondary-button type="button" wire:click="vendorSelected" wire:loading.attr="disabled" wire:target="{{ $bulk }}" wire:confirm="{{ __('Add the selected buys and sell them to a vendor at each item\'s last vendor price? Items never vendored before are skipped.') }}" title="{{ __('Uses each item\'s last vendor price.') }}">{{ __('Vendored selected') }}</x-secondary-button>
+                        <x-secondary-button type="button" wire:click="ignoreSelected" wire:loading.attr="disabled" wire:target="{{ $bulk }}" wire:confirm="{{ __('Ignore the selected suggestions? They will not come back.') }}">{{ __('Ignore selected') }}</x-secondary-button>
                     </span>
                 @endif
             </div>
@@ -51,7 +61,12 @@
                                     <td class="num"><x-money :copper="$r['qty'] > 0 ? (int) round($r['cost'] / $r['qty']) : null" /></td>
                                     <td class="num"><input type="text" wire:model="cost" aria-label="{{ __('Total cost') }}" class="w-40 field text-sm text-end"></td>
                                     <td class="whitespace-nowrap text-end">
-                                        <button type="button" wire:click="saveEdited" class="text-sm underline text-gray-600 dark:text-gray-400">{{ __('Save and accept') }}</button>
+                                        @if ($vendoring)
+                                            <label class="block text-xs text-gray-500 dark:text-gray-400">{{ __('Vendor paid, each') }}
+                                                <input type="text" wire:model="vendorEach" placeholder="1g 20s" class="ms-2 w-32 field text-sm text-end">
+                                            </label>
+                                        @endif
+                                        <button type="button" wire:click="saveEdited" class="text-sm underline text-gray-600 dark:text-gray-400">{{ $vendoring ? __('Save and vendor') : __('Save and accept') }}</button>
                                         <button type="button" wire:click="cancel" class="ms-3 text-sm underline text-gray-600 dark:text-gray-400">{{ __('Cancel') }}</button>
                                     </td>
                                 @else
@@ -67,6 +82,7 @@
                                     <td class="num"><x-money :copper="$r['cost']" /></td>
                                     <td class="whitespace-nowrap text-end">
                                         <button type="button" wire:click="accept({{ $r['id'] }})" class="text-sm underline text-gray-600 dark:text-gray-400">{{ __('Accept') }}</button>
+                                        <button type="button" wire:click="edit({{ $r['id'] }}, true)" class="ms-3 text-sm underline text-gray-600 dark:text-gray-400" title="{{ __('Add the buy and sell all of it to a vendor.') }}">{{ __('Vendored') }}</button>
                                         <button type="button" wire:click="edit({{ $r['id'] }})" class="ms-3 text-sm underline text-gray-600 dark:text-gray-400">{{ __('Edit') }}</button>
                                         <button type="button" wire:click="ignore({{ $r['id'] }})" class="ms-3 text-sm underline text-gray-600 dark:text-gray-400">{{ __('Ignore') }}</button>
                                     </td>

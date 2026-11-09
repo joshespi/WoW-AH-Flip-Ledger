@@ -44,7 +44,7 @@ class ItemDetailService
         $trades = DB::table('trades')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->where('side', Trade::SIDE_BUY)
             ->orderBy('traded_at')->orderBy('id')->limit(self::MAX_EVENTS)->get(['traded_at', 'qty', 'cost_copper']);
         $corrections = DB::table('trades')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->whereIn('side', Trade::CORRECTIONS)
-            ->orderBy('traded_at')->orderBy('id')->limit(self::MAX_EVENTS)->get(['side', 'traded_at', 'qty']);
+            ->orderBy('traded_at')->orderBy('id')->limit(self::MAX_EVENTS)->get(['side', 'traded_at', 'qty', 'cost_copper']);
         $sales = DB::table('tsm_sales')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->where('source', TsmData::SOURCE_AUCTION)
             ->orderBy('sold_at')->orderBy('id')->limit(self::MAX_EVENTS)->get(['sold_at', 'qty', 'unit_price_copper']);
         $expired = DB::table('tsm_expired')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->orderBy('at')->limit(self::MAX_EVENTS)->get(['at', 'qty']);
@@ -64,9 +64,9 @@ class ItemDetailService
             $events[] = ['ts' => Utc::ts($t->traded_at), 'order' => 0, 'kind' => 'buy', 'qty' => (int) $t->qty, 'total' => (int) $t->cost_copper];
         }
 
-        // Kind is the side ('adjust' or 'writeoff'); same order as the ledger's.
+        // Kind is the side; same order as the ledger's. Only a vendor sale has a total: the gold received.
         foreach ($corrections as $t) {
-            $events[] = ['ts' => Utc::ts($t->traded_at), 'order' => $t->side === Trade::SIDE_WRITEOFF ? 4 : 3, 'kind' => $t->side, 'qty' => (int) $t->qty, 'total' => null];
+            $events[] = ['ts' => Utc::ts($t->traded_at), 'order' => 3 + Trade::correctionRank($t->side), 'kind' => $t->side, 'qty' => (int) $t->qty, 'total' => Trade::proceeds($t->side, (int) $t->cost_copper)];
         }
 
         foreach ($sales as $s) {
@@ -146,9 +146,9 @@ class ItemDetailService
                 } else {
                     [$m, $removed] = LedgerService::take($held, $cost, $e['qty']);
 
-                    if ($e['kind'] === Trade::SIDE_WRITEOFF) {
-                        $row['pnl'] = -$removed;
-                        $realized -= $removed;
+                    if (Trade::booksPnl($e['kind'])) {
+                        $row['pnl'] = Num::mulDiv($e['total'] ?? 0, $m, $e['qty']) - $removed;
+                        $realized += $row['pnl'];
                     }
 
                     $cost -= $removed;

@@ -22,6 +22,11 @@ class Reconcile extends Component
 
     public string $time = '';
 
+    /** Whether the candidate being edited is also sold to a vendor, at $vendorEach a unit. */
+    public bool $vendoring = false;
+
+    public string $vendorEach = '';
+
     /** @var list<int|string> Candidate ids ticked for a bulk action. */
     public array $selected = [];
 
@@ -32,7 +37,7 @@ class Reconcile extends Component
         }
     }
 
-    public function edit(int $id, ReconcileService $reconcile): void
+    public function edit(int $id, ReconcileService $reconcile, bool $vendor = false): void
     {
         $user = auth()->user();
         $c = $reconcile->findPending($user, $id);
@@ -46,11 +51,18 @@ class Reconcile extends Component
         $this->qty = (string) $c->qty;
         $this->cost = Money::fmt((int) $c->cost_copper);
         $this->time = $user->inputTime($c->at);
+        $this->vendoring = $vendor;
+        $this->vendorEach = '';
+
+        // Start from what the vendor paid last time for this item.
+        if ($vendor && ($last = $reconcile->lastVendorUnit($user, (int) $c->item_id, $c->game)) !== null) {
+            $this->vendorEach = Money::fmt($last);
+        }
     }
 
     public function cancel(): void
     {
-        $this->reset('editing', 'qty', 'cost', 'time');
+        $this->reset('editing', 'qty', 'cost', 'time', 'vendoring', 'vendorEach');
         $this->resetErrorBag();
     }
 
@@ -58,14 +70,21 @@ class Reconcile extends Component
     {
         $id = (int) $this->editing;
         $user = auth()->user();
+        $vendoring = $this->vendoring;
 
-        $saved = $this->attempt('row'.$id, fn () => $reconcile->accept(
-            $user, $id, Bounds::quantityInput($this->qty), Money::parseGold($this->cost), $user->parseInputTime($this->time),
-        ));
+        $saved = $this->attempt('row'.$id, function () use ($reconcile, $user, $id, $vendoring) {
+            $qty = Bounds::quantityInput($this->qty);
+            $cost = Money::parseGold($this->cost);
+            $ts = $user->parseInputTime($this->time);
+
+            return $vendoring
+                ? $reconcile->acceptVendored($user, $id, Money::parseGold($this->vendorEach), $qty, $cost, $ts)
+                : $reconcile->accept($user, $id, $qty, $cost, $ts);
+        });
 
         if ($saved) {
             $this->cancel();
-            $this->message = __('Buy added.');
+            $this->message = $vendoring ? __('Buy added and vendored.') : __('Buy added.');
         }
     }
 
@@ -84,18 +103,27 @@ class Reconcile extends Component
 
     public function acceptSelected(ReconcileService $reconcile): void
     {
-        $result = ['accepted' => 0, 'skipped' => 0];
+        $n = 0;
         $ids = $this->selectedIds();
 
-        if ($ids === [] || ! $this->attempt('bulk', function () use ($reconcile, $ids, &$result) {
-            $result = $reconcile->acceptMany(auth()->user(), $ids);
+        if ($ids !== [] && $this->attempt('bulk', function () use ($reconcile, $ids, &$n) {
+            $n = $reconcile->acceptMany(auth()->user(), $ids);
         })) {
-            return;
+            $this->bulkDone(count($ids), $n, ':n buy added.|:n buys added.', ':n skipped (implausible values or already handled).');
         }
+    }
 
-        $this->reset('selected', 'editing');
-        $this->message = trans_choice(':n buy added.|:n buys added.', $result['accepted'], ['n' => $result['accepted']])
-            .($result['skipped'] > 0 ? ' '.__(':n skipped (implausible values or already handled).', ['n' => $result['skipped']]) : '');
+    public function vendorSelected(ReconcileService $reconcile): void
+    {
+        $n = 0;
+        $ids = $this->selectedIds();
+
+        if ($ids !== [] && $this->attempt('bulk', function () use ($reconcile, $ids, &$n) {
+            $n = $reconcile->acceptVendoredMany(auth()->user(), $ids);
+        })) {
+            $this->bulkDone(count($ids), $n, ':n buy added and vendored.|:n buys added and vendored.',
+                ':n skipped (no earlier vendor price for the item, or already handled). Use Vendored on a row to set one.');
+        }
     }
 
     public function ignoreSelected(ReconcileService $reconcile): void
@@ -103,14 +131,19 @@ class Reconcile extends Component
         $n = 0;
         $ids = $this->selectedIds();
 
-        if ($ids === [] || ! $this->attempt('bulk', function () use ($reconcile, $ids, &$n) {
+        if ($ids !== [] && $this->attempt('bulk', function () use ($reconcile, $ids, &$n) {
             $n = $reconcile->ignoreMany(auth()->user(), $ids);
         })) {
-            return;
+            $this->bulkDone(count($ids), $n, ':n suggestion ignored.|:n suggestions ignored.');
         }
+    }
 
+    /** After a bulk action on $ticked ids: clears the selection and says what was done and, if given, skipped. */
+    private function bulkDone(int $ticked, int $done, string $doneText, ?string $skippedText = null): void
+    {
         $this->reset('selected', 'editing');
-        $this->message = trans_choice(':n suggestion ignored.|:n suggestions ignored.', $n, ['n' => $n]);
+        $this->message = trans_choice($doneText, $done, ['n' => $done])
+            .($skippedText !== null && $ticked > $done ? ' '.__($skippedText, ['n' => $ticked - $done]) : '');
     }
 
     public function selectAll(ReconcileService $reconcile, bool $skipDoubles = false): void
@@ -145,6 +178,6 @@ class Reconcile extends Component
         // Rows that were handled elsewhere drop out of the selection.
         $this->selected = array_values(array_intersect(array_map('intval', $this->selected), $shown));
 
-        return view('livewire.reconcile', ['rows' => $rows, 'user' => $user]);
+        return view('livewire.reconcile', ['rows' => $rows, 'user' => $user, 'vendored' => $reconcile->vendoredTotals($user, $user->activeGame())]);
     }
 }

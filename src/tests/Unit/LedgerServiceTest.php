@@ -139,6 +139,25 @@ class LedgerServiceTest extends TestCase
         $this->assertSame(100, $out[1]['bq']);
     }
 
+    public function test_a_vendor_sale_books_proceeds_minus_average_cost(): void
+    {
+        $trades = [
+            ['ts' => 100, 'item' => 1, 'qty' => 100, 'cost' => 100_000],
+            ['ts' => 300, 'item' => 1, 'qty' => 30, 'cost' => 45_000, 'correction' => 'vendor'],   // 1,500 each vs 1,000 cost
+            ['ts' => 400, 'item' => 1, 'qty' => 140, 'cost' => 210_000, 'correction' => 'vendor'], // 70 held: only their share of the gold counts
+        ];
+        $seen = [];
+
+        $out = (new LedgerService)->buildFromSales($trades, [], function (int $ts, int $pnl) use (&$seen): void {
+            $seen[] = [$ts, $pnl];
+        })[1];
+
+        $this->assertSame(0, $out['inv']);
+        $this->assertSame(0, $out['cost']);
+        $this->assertSame(15_000 + 35_000, $out['pnl']);
+        $this->assertSame([[300, 15_000], [400, 35_000]], $seen);
+    }
+
     public function test_a_write_off_removes_units_at_average_cost_as_a_loss(): void
     {
         $trades = [

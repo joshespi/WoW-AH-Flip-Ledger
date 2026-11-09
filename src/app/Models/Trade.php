@@ -19,12 +19,41 @@ class Trade extends Model
     /** Removes units at average cost and books that cost as a realized loss (vendored, used, lost). */
     public const SIDE_WRITEOFF = 'writeoff';
 
-    public const CORRECTIONS = [self::SIDE_ADJUST, self::SIDE_WRITEOFF];
+    /** Sold to a vendor: removes units at average cost; `cost_copper` is the gold received (total), so P/L = proceeds - cost. */
+    public const SIDE_VENDOR = 'vendor';
+
+    /** Every side that removes stock, in replay order at the same time (after buys and sales). */
+    public const CORRECTIONS = [self::SIDE_ADJUST, self::SIDE_WRITEOFF, self::SIDE_VENDOR];
+
+    /** What the Correct holdings form books (no proceeds); a vendor sale goes through TradesService::vendor(). */
+    public const HOLDING_CORRECTIONS = [self::SIDE_ADJUST, self::SIDE_WRITEOFF];
+
+    /** A correction's place in CORRECTIONS: its replay order in LedgerService and ItemDetailService. */
+    public static function correctionRank(string $side): int
+    {
+        return (int) array_search($side, self::CORRECTIONS, true);
+    }
+
+    /** Whether a correction books realized P/L (proceeds, if any, minus the removed cost); an adjust does not. */
+    public static function booksPnl(string $side): bool
+    {
+        return $side !== self::SIDE_ADJUST;
+    }
+
+    /** Gold a correction brought in, or null when its side has none (adjust and writeoff store 0). */
+    public static function proceeds(string $side, int $costCopper): ?int
+    {
+        return $side === self::SIDE_VENDOR ? $costCopper : null;
+    }
 
     /** How a correction reads on screen; static because list pages read rows, not models. */
     public static function correctionLabel(string $side): string
     {
-        return $side === self::SIDE_WRITEOFF ? __('Written off') : __('Corrected');
+        return match ($side) {
+            self::SIDE_WRITEOFF => __('Written off'),
+            self::SIDE_VENDOR => __('Vendored'),
+            default => __('Corrected'),
+        };
     }
 
     protected function casts(): array

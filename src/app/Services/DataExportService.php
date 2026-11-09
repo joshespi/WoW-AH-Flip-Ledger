@@ -64,11 +64,11 @@ class DataExportService
                     fn ($r) => [...self::tradeFields($user, $r), $r->item_name, $r->source, $r->game],
                 ],
                 'corrections.csv' => [
-                    ['time', 'item', 'qty_removed', 'kind', 'note', 'item_name', 'game'],
+                    ['time', 'item', 'qty_removed', 'kind', 'note', 'item_name', 'game', 'proceeds_copper'],
                     DB::table('trades')->leftJoin('items', 'items.id', '=', 'trades.item_id')
                         ->ownedBy($user, 'trades.user_id')->whereIn('trades.side', Trade::CORRECTIONS)->orderBy('trades.traded_at')->orderBy('trades.id')
-                        ->select('trades.traded_at', 'trades.item_id', 'trades.qty', 'trades.side', 'trades.note', $name, 'trades.game')->cursor(),
-                    fn ($r) => [$iso($r->traded_at), 'i:'.$r->item_id, $r->qty, $r->side, $r->note, $r->item_name, $r->game],
+                        ->select('trades.traded_at', 'trades.item_id', 'trades.qty', 'trades.side', 'trades.note', $name, 'trades.game', 'trades.cost_copper')->cursor(),
+                    fn ($r) => [$iso($r->traded_at), 'i:'.$r->item_id, $r->qty, $r->side, $r->note, $r->item_name, $r->game, Trade::proceeds($r->side, (int) $r->cost_copper)],
                 ],
                 'sales.csv' => [
                     ['time', 'item', 'item_name', 'qty', 'unit_price_after_cut_copper', 'realm', 'source', 'game'],
@@ -168,7 +168,8 @@ class DataExportService
                                  The import loads into the game you have selected, so split
                                  the file by its game column first if you play more than one.
             corrections.csv      Stock you removed from a position: kind "adjust" (the ledger was
-                                 wrong, no profit or loss) or "writeoff" (booked as a loss).
+                                 wrong, no profit or loss), "writeoff" (booked as a loss) or
+                                 "vendor" (sold to a vendor; proceeds_copper is the total received).
             sales.csv            Auction sales read from your TradeSkillMaster data. Prices are
                                  copper per unit, after the 5% auction house cut.
             expired.csv          Expired auctions.

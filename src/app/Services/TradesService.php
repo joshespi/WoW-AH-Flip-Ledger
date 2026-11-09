@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\Bounds;
 use App\Support\Game;
 use App\Support\ItemName;
+use App\Support\Money;
 use App\Support\Utc;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -62,14 +63,33 @@ class TradesService
     }
 
     /**
+     * Sells all of $buy to a vendor at $unitProceeds copper each, at the buy's time: removed at
+     * average cost, the difference is realized P/L (see LedgerService). It takes the buy's
+     * tsm_ref, so delete() of the buy takes this with it.
+     *
+     * @throws InvalidArgumentException
+     */
+    public function vendor(User $user, Trade $buy, int $unitProceeds): Trade
+    {
+        // MAX_PRICE x MAX_QTY fits in an int, so the total can't overflow; create() bounds it.
+        if ($unitProceeds < 0 || $unitProceeds > Bounds::MAX_PRICE) {
+            throw new InvalidArgumentException('Enter what the vendor paid for each, at most '.number_format(Bounds::MAX_PRICE / Money::COPPER_PER_GOLD).' gold.');
+        }
+
+        return $this->create($user, Trade::SIDE_VENDOR, (int) $buy->item_id, (int) $buy->qty, $unitProceeds * (int) $buy->qty,
+            Utc::ts($buy->getRawOriginal('traded_at')), null, 'manual', $buy->tsm_ref, $buy->game);
+    }
+
+    /**
      * Brings the ledger's held quantity down to $held now, by one correction ($side, one of
-     * Trade::CORRECTIONS) for the difference. Stock can only be removed here; more stock is a buy.
+     * Trade::HOLDING_CORRECTIONS) for the difference. Stock can only be removed here; more stock is
+     * a buy, and a vendor sale goes through vendor().
      *
      * @throws InvalidArgumentException
      */
     public function correctHeld(User $user, int $itemId, int $held, string $side, ?string $note = null, string $game = Game::RETAIL): Trade
     {
-        if (! in_array($side, Trade::CORRECTIONS, true)) {
+        if (! in_array($side, Trade::HOLDING_CORRECTIONS, true)) {
             throw new InvalidArgumentException('Pick what happened to the rest.');
         }
 
@@ -91,25 +111,51 @@ class TradesService
         Trade::ownedBy($user)->whereIn('side', Trade::CORRECTIONS)->findOrFail($id)->delete();
     }
 
-    /** @throws InvalidArgumentException */
+    /**
+     * A vendored buy's vendor sale follows it (item, qty, time; same price each), so it never
+     * sells stock the buy no longer brings in.
+     *
+     * @throws InvalidArgumentException
+     */
     public function update(User $user, int $id, int $itemId, int $qty, int $cost, int $ts, ?string $note): Trade
     {
         $attributes = $this->attributes($itemId, $qty, $cost, $ts, $note);
 
-        $trade = Trade::ownedBy($user)->findOrFail($id);
+        return DB::transaction(function () use ($user, $id, $attributes, $itemId, $qty, $ts) {
+            $trade = Trade::ownedBy($user)->findOrFail($id);
 
-        if ($trade->side !== Trade::SIDE_BUY) {
-            throw new InvalidArgumentException('Only buys can be edited.');
-        }
+            if ($trade->side !== Trade::SIDE_BUY) {
+                throw new InvalidArgumentException('Only buys can be edited.');
+            }
 
-        $trade->update($attributes);
+            if (($vendor = $this->vendorOf($user, $trade)) !== null) {
+                // vendor() stored unit x qty, so this division is exact.
+                $unit = intdiv((int) $vendor->cost_copper, max(1, (int) $vendor->qty));
+                $vendor->update($this->attributes($itemId, $qty, $unit * $qty, $ts, $vendor->note));
+            }
 
-        return $trade;
+            $trade->update($attributes);
+
+            return $trade;
+        });
     }
 
+    /** A buy takes the vendor sale booked with it: left alone it would sell other stock. */
     public function delete(User $user, int $id): void
     {
-        Trade::ownedBy($user)->findOrFail($id)->delete();
+        DB::transaction(function () use ($user, $id) {
+            $trade = Trade::ownedBy($user)->findOrFail($id);
+            $this->vendorOf($user, $trade)?->delete();
+            $trade->delete();
+        });
+    }
+
+    /** The vendor sale booked with a reconciled buy (same tsm_ref), if any. */
+    private function vendorOf(User $user, Trade $trade): ?Trade
+    {
+        return $trade->side === Trade::SIDE_BUY && $trade->tsm_ref !== null
+            ? Trade::ownedBy($user)->inGame($trade->game)->where('side', Trade::SIDE_VENDOR)->where('tsm_ref', $trade->tsm_ref)->first()
+            : null;
     }
 
     /**

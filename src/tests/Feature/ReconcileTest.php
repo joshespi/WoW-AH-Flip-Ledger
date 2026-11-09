@@ -3,10 +3,13 @@
 namespace Tests\Feature;
 
 use App\Livewire\Reconcile;
+use App\Livewire\Trades;
 use App\Models\Trade;
 use App\Models\User;
+use App\Services\PositionsService;
 use App\Services\ReconcileService;
 use App\Services\TradesService;
+use App\Support\Money;
 use App\Support\Utc;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -136,6 +139,154 @@ class ReconcileTest extends TestCase
 
         $t = Trade::sole();
         $this->assertSame([100, 10_000, '2026-10-12 16:00:00'], [$t->qty, $t->cost_copper, $t->traded_at->format('Y-m-d H:i:s')]);
+    }
+
+    public function test_corrections_do_not_count_as_recorded_buys(): void
+    {
+        $user = $this->user();
+        $this->buy($user, 10, self::T - 5000);
+        app(TradesService::class)->adjust($user, 100, 50, self::T);   // same qty and time, but not a buy
+        $this->candidate($user, 'same', 50);
+        $this->candidate($user, 'twice', 100);
+
+        $rows = app(ReconcileService::class)->pending($user);
+
+        $this->assertSame([false, false], array_column($rows, 'double'));
+        $this->assertCount(2, $rows);
+    }
+
+    public function test_vendored_adds_the_buy_and_books_the_vendor_proceeds(): void
+    {
+        $user = $this->user();
+        $id = $this->candidate($user, 'a', 50, 5000);
+
+        Livewire::actingAs($user)->test(Reconcile::class)
+            ->call('edit', $id, true)->assertSet('vendorEach', '')
+            ->set('vendorEach', '2s')->call('saveEdited')->assertHasNoErrors()->assertSet('editing', null)
+            ->assertSee('Buy added and vendored.')->assertSee('Vendored so far');
+
+        $v = Trade::where('side', 'vendor')->sole();
+        $this->assertSame([100, 50, 10_000, '2026-10-12 16:51:00'], [$v->item_id, $v->qty, $v->cost_copper, $v->traded_at->format('Y-m-d H:i:s')]);
+        $this->assertSame('accepted', DB::table('tsm_buy_candidates')->value('status'));
+
+        $p = app(PositionsService::class)->forUser($user);
+        $this->assertSame(5000, $p->summary['realized']);
+        $this->assertSame(0, $p->positions[0]->held);
+        $this->assertSame(['units' => 50, 'proceeds' => 10_000], app(ReconcileService::class)->vendoredTotals($user));
+
+        // The next vendoring of this item starts from the same price.
+        $next = $this->candidate($user, 'b', 10, 900, self::T + 3600);
+        Livewire::actingAs($user)->test(Reconcile::class)->call('edit', $next, true)->assertSet('vendorEach', Money::fmt(200));
+    }
+
+    public function test_vendored_selected_uses_each_items_last_price_and_skips_unknown_ones(): void
+    {
+        $user = $this->user();
+        $this->seedItem(200, 'Other');
+        $first = $this->candidate($user, 'a', 10, 1000);
+        Livewire::actingAs($user)->test(Reconcile::class)->call('edit', $first, true)->set('vendorEach', '2s')->call('saveEdited');
+
+        $known = $this->candidate($user, 'b', 20, 1000, self::T + 3600);
+        $unknown = $this->candidate($user, 'c', 5, 500, self::T + 7200, 200);
+
+        Livewire::actingAs($user)->test(Reconcile::class)
+            ->set('selected', [$known, $unknown])->call('vendorSelected')->assertHasNoErrors()
+            ->assertSee('1 buy added and vendored.')->assertSee('1 skipped')->assertSet('selected', []);
+
+        $this->assertSame(4000, Trade::where('side', 'vendor')->orderByDesc('id')->value('cost_copper'));
+        $this->assertSame(2, Trade::where('side', 'vendor')->count());
+        $this->assertSame('pending', DB::table('tsm_buy_candidates')->where('id', $unknown)->value('status'));
+    }
+
+    public function test_vendoring_without_a_price_changes_nothing(): void
+    {
+        $user = $this->user();
+        $id = $this->candidate($user, 'a', 50);
+
+        Livewire::actingAs($user)->test(Reconcile::class)
+            ->call('edit', $id, true)->call('saveEdited')->assertHasErrors('row'.$id);
+
+        $this->assertSame(0, Trade::count());
+        $this->assertSame('pending', DB::table('tsm_buy_candidates')->value('status'));
+    }
+
+    public function test_a_vendor_total_past_the_cost_limit_is_a_form_error(): void
+    {
+        $user = $this->user();
+        $id = $this->candidate($user, 'a', 10_000_000);
+
+        Livewire::actingAs($user)->test(Reconcile::class)
+            ->call('edit', $id, true)->set('vendorEach', '999999999999g')->call('saveEdited')->assertHasErrors('row'.$id);
+
+        $this->assertSame(0, Trade::count());
+        $this->assertSame('pending', DB::table('tsm_buy_candidates')->value('status'));
+    }
+
+    public function test_deleting_a_vendored_buy_deletes_its_vendor_sale_only(): void
+    {
+        $user = $this->user();
+        $reconcile = app(ReconcileService::class);
+        $first = $reconcile->acceptVendored($user, $this->candidate($user, 'a', 10), 200);
+        $reconcile->acceptVendored($user, $this->candidate($user, 'b', 10), 200);
+
+        $buy = Trade::where('side', 'buy')->where('tsm_ref', $first->tsm_ref)->sole();
+        app(TradesService::class)->delete($user, $buy->id);
+
+        $this->assertSame(1, Trade::where('side', 'buy')->count());
+        $this->assertSame([sha1('b')], Trade::where('side', 'vendor')->pluck('tsm_ref')->all());
+    }
+
+    public function test_editing_a_vendored_buy_moves_its_vendor_sale_with_it(): void
+    {
+        $user = $this->user();
+        $this->seedItem(200, 'Other');
+        $buy = app(ReconcileService::class)->acceptVendored($user, $this->candidate($user, 'a', 10), 200);
+        $buy = Trade::where('side', 'buy')->where('tsm_ref', $buy->tsm_ref)->sole();
+        $this->buy($user, 30, self::T - 3600); // other stock the vendor sale must not eat
+
+        app(TradesService::class)->update($user, $buy->id, 200, 4, 2000, self::T + 60, null);
+
+        $v = Trade::where('side', 'vendor')->sole();
+        $this->assertSame([200, 4, 800, self::T + 60], [$v->item_id, $v->qty, $v->cost_copper, $v->traded_at->getTimestamp()]);
+        $this->assertSame(30, app(PositionsService::class)->held($user, 100));
+        $this->assertSame(0, app(PositionsService::class)->held($user, 200));
+    }
+
+    public function test_editing_a_vendored_buy_past_the_cost_limit_changes_nothing(): void
+    {
+        $user = $this->user();
+        app(ReconcileService::class)->acceptVendored($user, $this->candidate($user, 'a', 10), 1_000_000_000);
+        $buy = Trade::where('side', 'buy')->sole();
+
+        try {
+            app(TradesService::class)->update($user, $buy->id, 100, 10_000_000, 5000, self::T, null);
+            $this->fail('Expected the vendor total to be refused.');
+        } catch (\InvalidArgumentException) {
+        }
+
+        $this->assertSame([10, 10], Trade::orderBy('id')->pluck('qty')->all());
+    }
+
+    public function test_the_delete_warning_mentions_a_vendor_sale_only_when_there_is_one(): void
+    {
+        $user = $this->user();
+        $reconcile = app(ReconcileService::class);
+        $reconcile->acceptVendored($user, $this->candidate($user, 'a', 10), 200);
+
+        $warning = 'A vendor sale booked with it is deleted too.';
+        Livewire::actingAs($user)->test(Trades::class)->assertSee($warning);
+
+        Trade::where('side', 'vendor')->delete();
+        Livewire::actingAs($user)->test(Trades::class)->assertDontSee($warning);
+    }
+
+    public function test_a_vendor_sale_can_not_be_added_through_correct_held(): void
+    {
+        $user = $this->user();
+        $this->buy($user, 10, self::T);
+
+        $this->expectException(\InvalidArgumentException::class);
+        app(TradesService::class)->correctHeld($user, 100, 0, 'vendor');
     }
 
     public function test_bad_edit_keeps_the_candidate_pending(): void

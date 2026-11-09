@@ -169,6 +169,9 @@ class Trades extends Component
                 ->when($id !== null && Bounds::validItemId($id), fn ($w) => $w->orWhere('trades.item_id', $id))))
             ->orderByDesc('trades.traded_at')->orderByDesc('trades.id')
             ->select('trades.id', 'trades.item_id', 'trades.traded_at', 'trades.qty', 'trades.cost_copper', 'trades.note', 'trades.source', 'trades.side', 'items.name')
+            // A reconciled buy with a vendor sale (same tsm_ref), so the delete warning can say so.
+            ->selectSub(DB::table('trades as v')->whereColumn('v.user_id', 'trades.user_id')->whereColumn('v.game', 'trades.game')
+                ->whereColumn('v.tsm_ref', 'trades.tsm_ref')->where('v.side', Trade::SIDE_VENDOR)->selectRaw('count(*)'), 'vendored')
             ->paginate(self::PER_PAGE);
 
         return view('livewire.trades', ['rows' => $rows, 'user' => $user]);

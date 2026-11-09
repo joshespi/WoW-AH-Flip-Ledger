@@ -80,7 +80,8 @@ class ReconcileService
 
         $trades += array_fill_keys($new, []);
 
-        foreach (DB::table('trades')->ownedBy($user)->inGame($game)->whereIn('item_id', $new)
+        // Buys only: a correction (a vendor sale shares its buy's qty and time) is not a recorded buy.
+        foreach (DB::table('trades')->ownedBy($user)->inGame($game)->whereIn('item_id', $new)->where('side', Trade::SIDE_BUY)
             ->select('item_id', 'traded_at', 'qty', 'cost_copper', 'source')->cursor() as $t) {
             $trades[(int) $t->item_id][] = [Utc::ts($t->traded_at), (int) $t->qty, (int) $t->cost_copper / max(1, (int) $t->qty), $t->source];
         }
@@ -171,32 +172,90 @@ class ReconcileService
     }
 
     /**
+     * Accepts the candidate as a buy, then books the same quantity as sold to a vendor at
+     * $unitProceeds copper each, at the buy's time. All or nothing.
+     *
+     * @throws InvalidArgumentException when the values are implausible or it was already handled
+     */
+    public function acceptVendored(User $user, int $id, int $unitProceeds, ?int $qty = null, ?int $cost = null, ?int $ts = null): Trade
+    {
+        return DB::transaction(fn () => app(TradesService::class)->vendor($user, $this->accept($user, $id, $qty, $cost, $ts), $unitProceeds));
+    }
+
+    /**
+     * Vendors each candidate at its item's last vendor price. One with no earlier vendoring, an
+     * implausible value or already handled is skipped without stopping the rest.
+     *
+     * @param  list<int>  $ids
+     * @return int how many were vendored
+     */
+    public function acceptVendoredMany(User $user, array $ids): int
+    {
+        return $this->eachSkipping(array_unique($ids), function (int $id) use ($user): bool {
+            $c = $this->findPending($user, $id);
+            $unit = $c === null ? null : $this->lastVendorUnit($user, (int) $c->item_id, $c->game);
+
+            return $unit !== null && $this->acceptVendored($user, $id, $unit);
+        });
+    }
+
+    /** What the vendor paid per unit the last time the user vendored this item, or null. */
+    public function lastVendorUnit(User $user, int $itemId, string $game = Game::RETAIL): ?int
+    {
+        $t = Trade::ownedBy($user)->inGame($game)->where('item_id', $itemId)->where('side', Trade::SIDE_VENDOR)
+            ->orderByDesc('traded_at')->orderByDesc('id')->first(['qty', 'cost_copper']);
+
+        return $t === null ? null : intdiv((int) $t->cost_copper, max(1, (int) $t->qty));
+    }
+
+    /**
+     * Totals of everything vendored in a game.
+     *
+     * @return array{units: int, proceeds: int}
+     */
+    public function vendoredTotals(User $user, string $game = Game::RETAIL): array
+    {
+        $r = DB::table('trades')->ownedBy($user)->inGame($game)->where('side', Trade::SIDE_VENDOR)
+            ->selectRaw('coalesce(sum(qty), 0) as units, coalesce(sum(cost_copper), 0) as proceeds')->first();
+
+        return ['units' => (int) $r->units, 'proceeds' => (int) $r->proceeds];
+    }
+
+    /**
      * Accepts each candidate with its TSM values. One that is implausible or already handled is
      * skipped without stopping the rest.
      *
      * @param  list<int>  $ids
-     * @return array{accepted: int, skipped: int}
+     * @return int how many were accepted
      */
-    public function acceptMany(User $user, array $ids): array
+    public function acceptMany(User $user, array $ids): int
     {
-        $ids = array_unique($ids);
+        return $this->eachSkipping(array_unique($ids), fn (int $id): bool => (bool) $this->accept($user, $id));
+    }
 
-        // One commit for the batch; each accept() is a savepoint, so a skipped row rolls back alone.
-        $accepted = DB::transaction(function () use ($user, $ids) {
+    /**
+     * Runs $one for each id in one commit; each accept() inside is a savepoint, so a skipped row
+     * rolls back alone. An id counts when $one returns true; false or an InvalidArgumentException
+     * skips it.
+     *
+     * @param  list<int>  $ids
+     * @param  callable(int): bool  $one
+     * @return int ids done
+     */
+    private function eachSkipping(array $ids, callable $one): int
+    {
+        return DB::transaction(function () use ($ids, $one) {
             $n = 0;
 
             foreach ($ids as $id) {
                 try {
-                    $this->accept($user, $id);
-                    $n++;
+                    $one($id) && $n++;
                 } catch (InvalidArgumentException) {
                 }
             }
 
             return $n;
         });
-
-        return ['accepted' => $accepted, 'skipped' => count($ids) - $accepted];
     }
 
     /**

@@ -76,7 +76,12 @@
                                 @foreach ($corrections as $c)
                                     <tr wire:key="c{{ $c->id }}">
                                         <td class="whitespace-nowrap">{{ $user->local($c->traded_at)->format('Y-m-d H:i') }}</td>
-                                        <td>{{ \App\Models\Trade::correctionLabel($c->side) }}</td>
+                                        <td>
+                                            {{ \App\Models\Trade::correctionLabel($c->side) }}
+                                            @if (($proceeds = \App\Models\Trade::proceeds($c->side, (int) $c->cost_copper)) !== null)
+                                                <span class="ms-1 text-gray-600 dark:text-gray-400">{{ __('for') }} <x-money :copper="$proceeds" /></span>
+                                            @endif
+                                        </td>
                                         <td class="num">{{ number_format($c->qty) }}</td>
                                         <td class="text-gray-600 dark:text-gray-400">{{ $c->note }}</td>
                                         <td class="text-end">

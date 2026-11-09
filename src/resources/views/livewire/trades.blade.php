@@ -108,16 +108,20 @@
                                     <td class="num"><x-money :copper="$t->cost_copper" /></td>
                                     <td class="num"><x-money :copper="$t->qty > 0 ? $t->cost_copper / $t->qty : null" /></td>
                                 @else
-                                    {{-- A correction removes stock at average cost; it has no price of its own. --}}
+                                    {{-- A correction removes stock at average cost; only a vendor sale has a price: the gold received. --}}
+                                    @php($proceeds = \App\Models\Trade::proceeds($t->side, (int) $t->cost_copper))
                                     <td class="num">−{{ number_format($t->qty) }}</td>
-                                    <td colspan="2" class="text-end text-xs text-gray-500 dark:text-gray-400">{{ \App\Models\Trade::correctionLabel($t->side) }}</td>
+                                    @if ($proceeds !== null)
+                                        <td class="num"><x-money :copper="$proceeds" /></td>
+                                    @endif
+                                    <td @if ($proceeds === null) colspan="2" @endif class="text-end text-xs text-gray-500 dark:text-gray-400">{{ \App\Models\Trade::correctionLabel($t->side) }}</td>
                                 @endif
                                 <td class="text-gray-600 dark:text-gray-400">{{ $t->note }}</td>
                                 <td class="whitespace-nowrap text-end">
                                     @if ($buy)
                                         <button type="button" wire:click="edit({{ $t->id }})" class="text-sm underline text-gray-600 dark:text-gray-400">{{ __('Edit') }}</button>
                                     @endif
-                                    <button type="button" wire:click="delete({{ $t->id }})" wire:confirm="{{ $buy ? __('Delete this buy?') : __('Undo this correction?') }}"
+                                    <button type="button" wire:click="delete({{ $t->id }})" wire:confirm="{{ ! $buy ? __('Undo this correction?') : ((int) $t->vendored > 0 ? __('Delete this buy? A vendor sale booked with it is deleted too.') : __('Delete this buy?')) }}"
                                             class="ms-3 text-sm underline text-red-600 dark:text-red-400">{{ __('Delete') }}</button>
                                 </td>
                             </tr>

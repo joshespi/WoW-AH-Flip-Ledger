@@ -59,7 +59,8 @@ class LedgerService
      *
      * A trade with `correction` set (a Trade::CORRECTIONS side) removes qty units at the average
      * cost with no revenue: with no P/L for `adjust` (stock the log counted but the user never
-     * held), or as a realized loss for `writeoff` (stock vendored, used or lost). It counts only
+     * held), or as a realized loss for `writeoff` (stock used or lost). `vendor` also carries the
+     * gold received in `cost` and books proceeds minus the removed cost. It counts only
      * from the item's first buy onward, like a sale, and sorts after buys and sales at the same time.
      *
      * @param  list<array{ts: int, item: int|string, qty: int, cost: int, correction?: string}>  $trades
@@ -86,7 +87,7 @@ class LedgerService
 
         foreach ($corrections as $t) {
             if (isset($first[$t['item']]) && $t['ts'] >= $first[$t['item']]) {
-                $events[$t['item']][] = [$t['ts'], $t['correction'] === Trade::SIDE_WRITEOFF ? 3 : 2, $t['qty'], 0];
+                $events[$t['item']][] = [$t['ts'], 2 + Trade::correctionRank($t['correction']), $t['qty'], Trade::proceeds($t['correction'], $t['cost']) ?? 0];
             }
         }
 
@@ -124,7 +125,7 @@ class LedgerService
     }
 
     /**
-     * @param  list<array{int, int, int, int}>  $events  [ts, side (0 buy, 1 sell, 2 adjust, 3 write-off), qty, total copper]
+     * @param  list<array{int, int, int, int}>  $events  [ts, side (0 buy, 1 sell, 2 + Trade::correctionRank()), qty, total copper (a correction's proceeds)]
      * @param  callable(int, int): void  $onPnl
      * @return array{bq: int, bc: int, sq: int, sr: int, pnl: int, oq: int, orev: int, inv: int, cost: int}
      */
@@ -144,9 +145,11 @@ class LedgerService
 
             if ($side >= 2) {
                 [$m, $removed] = self::take($a['inv'], $a['cost'], $q);
-                if ($side === 3) {
-                    $a['pnl'] -= $removed;
-                    $removed !== 0 && $onPnl($ts, -$removed);
+                if (Trade::booksPnl(Trade::CORRECTIONS[$side - 2])) {
+                    // Proceeds (none for a write-off) count for the units actually held, like a sale's revenue.
+                    $gain = Num::mulDiv($c, $m, $q) - $removed;
+                    $a['pnl'] += $gain;
+                    $gain !== 0 && $onPnl($ts, $gain);
                 }
 
                 $a['cost'] -= $removed;
