@@ -17,15 +17,15 @@
         @endif
 
         @if ($rows === [])
-            <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">{{ __('Nothing to reconcile.') }}</p>
+            <p class="empty">{{ __('Nothing to reconcile.') }}</p>
         @else
             <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
                 <span class="text-gray-600 dark:text-gray-400" aria-live="polite">{{ __(':n selected', ['n' => count($selected)]) }}</span>
-                <button type="button" wire:click="selectAll" class="underline text-gray-600 dark:text-gray-400">{{ __('Select all') }}</button>
-                <span class="text-xs text-gray-500 dark:text-gray-400">{{ __('Shift-click to select a range.') }}</span>
-                <button type="button" wire:click="selectAll(true)" class="underline text-gray-600 dark:text-gray-400">{{ __('Select all except likely doubles') }}</button>
+                <button type="button" wire:click="selectAll" class="link">{{ __('Select all') }}</button>
+                <span class="note">{{ __('Shift-click to select a range.') }}</span>
+                <button type="button" wire:click="selectAll(true)" class="link">{{ __('Select all except likely doubles') }}</button>
                 @if ($selected !== [])
-                    <button type="button" wire:click="clearSelection" class="underline text-gray-600 dark:text-gray-400">{{ __('Clear') }}</button>
+                    <button type="button" wire:click="clearSelection" class="link">{{ __('Clear') }}</button>
                     @php($bulk = 'acceptSelected,ignoreSelected,vendorSelected')
                     <span class="flex gap-2 sm:ms-auto">
                         <x-primary-button type="button" wire:click="acceptSelected" wire:loading.attr="disabled" wire:target="{{ $bulk }}" wire:confirm="{{ __('Add the selected buys to your ledger?') }}">{{ __('Accept selected') }}</x-primary-button>
@@ -62,15 +62,15 @@
                                     <td class="num"><input type="text" wire:model="cost" aria-label="{{ __('Total cost') }}" class="w-40 field text-sm text-end"></td>
                                     <td class="whitespace-nowrap text-end">
                                         @if ($vendoring)
-                                            <label class="block text-xs text-gray-500 dark:text-gray-400">{{ __('Vendor paid, each') }}
+                                            <label class="block note">{{ __('Vendor paid, each') }}
                                                 <input type="text" wire:model="vendorEach" placeholder="1g 20s" class="ms-2 w-32 field text-sm text-end">
                                             </label>
                                         @endif
-                                        <button type="button" wire:click="saveEdited" class="text-sm underline text-gray-600 dark:text-gray-400">{{ $vendoring ? __('Save and vendor') : __('Save and accept') }}</button>
-                                        <button type="button" wire:click="cancel" class="ms-3 text-sm underline text-gray-600 dark:text-gray-400">{{ __('Cancel') }}</button>
+                                        <button type="button" wire:click="saveEdited" class="link text-sm">{{ $vendoring ? __('Save and vendor') : __('Save and accept') }}</button>
+                                        <button type="button" wire:click="cancel" class="ms-3 link text-sm">{{ __('Cancel') }}</button>
                                     </td>
                                 @else
-                                    <td class="whitespace-nowrap">{{ $user->local($r['at'])->format('Y-m-d H:i') }}</td>
+                                    <td><x-time :at="$r['at']" /></td>
                                     <td>
                                         <x-item-link :id="$r['item_id']" :name="$r['name']" />
                                         @if ($r['double'])
@@ -81,10 +81,10 @@
                                     <td class="num"><x-money :copper="$r['qty'] > 0 ? (int) round($r['cost'] / $r['qty']) : null" /></td>
                                     <td class="num"><x-money :copper="$r['cost']" /></td>
                                     <td class="whitespace-nowrap text-end">
-                                        <button type="button" wire:click="accept({{ $r['id'] }})" class="text-sm underline text-gray-600 dark:text-gray-400">{{ __('Accept') }}</button>
-                                        <button type="button" wire:click="edit({{ $r['id'] }}, true)" class="ms-3 text-sm underline text-gray-600 dark:text-gray-400" title="{{ __('Add the buy and sell all of it to a vendor.') }}">{{ __('Vendored') }}</button>
-                                        <button type="button" wire:click="edit({{ $r['id'] }})" class="ms-3 text-sm underline text-gray-600 dark:text-gray-400">{{ __('Edit') }}</button>
-                                        <button type="button" wire:click="ignore({{ $r['id'] }})" class="ms-3 text-sm underline text-gray-600 dark:text-gray-400">{{ __('Ignore') }}</button>
+                                        <button type="button" wire:click="accept({{ $r['id'] }})" class="link text-sm">{{ __('Accept') }}</button>
+                                        <button type="button" wire:click="edit({{ $r['id'] }}, true)" class="ms-3 link text-sm" title="{{ __('Add the buy and sell all of it to a vendor.') }}">{{ __('Vendored') }}</button>
+                                        <button type="button" wire:click="edit({{ $r['id'] }})" class="ms-3 link text-sm">{{ __('Edit') }}</button>
+                                        <button type="button" wire:click="ignore({{ $r['id'] }})" class="ms-3 link text-sm">{{ __('Ignore') }}</button>
                                     </td>
                                 @endif
                             </tr>
@@ -97,7 +97,7 @@
             </div>
 
             @if (count($rows) >= \App\Services\ReconcileService::LIMIT)
-                <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{{ __('Showing the newest :n. Handle these to see more.', ['n' => \App\Services\ReconcileService::LIMIT]) }}</p>
+                <p class="mt-3 note">{{ __('Showing the newest :n. Handle these to see more.', ['n' => \App\Services\ReconcileService::LIMIT]) }}</p>
             @endif
         @endif
     </div>

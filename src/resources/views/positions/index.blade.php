@@ -1,15 +1,11 @@
 <x-app-layout :title="__('Positions')">
-    <x-slot name="header">
-        <div class="flex items-baseline justify-between gap-4">
-            <h2 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">{{ __('Positions') }}</h2>
-
+    <x-slot name="actions">
             @if ($closedCount > 0 || $showClosed)
                 <a href="{{ $showClosed ? route('positions.index') : route('positions.index', ['closed' => 1]) }}"
-                   class="text-sm underline text-gray-600 dark:text-gray-400">
+                   class="link text-sm">
                     {{ $showClosed ? __('Hide closed positions') : trans_choice('Show :n closed position|Show :n closed positions', $closedCount, ['n' => $closedCount]) }}
                 </a>
             @endif
-        </div>
     </x-slot>
 
     @php
@@ -40,7 +36,7 @@
 
     @if ($portfolio->isEmpty())
         <div class="card p-6 sm:p-8">
-            <p class="text-sm text-gray-600 dark:text-gray-400">{{ __('No positions yet. Import your trades to start the ledger.') }}</p>
+            <p class="empty">{{ __('No positions yet. Import your trades to start the ledger.') }}</p>
             <x-primary-button :href="route('trades.import.create')" class="mt-4">{{ __('Import your trades') }}</x-primary-button>
         </div>
     @else
@@ -81,16 +77,16 @@
                                 <td data-v="{{ $p->recent }}" class="num"><x-money :copper="$p->recent" /></td>
                                 <td data-v="{{ $p->typical }}" class="num"><x-money :copper="$p->typical" /></td>
                                 <td data-v="{{ $p->hist60 }}" class="num"><x-money :copper="$p->hist60" /></td>
-                                <td data-v="{{ $p->floorVsTypical }}" class="num">{{ $p->floorVsTypical === null ? '—' : number_format($p->floorVsTypical, 2) }}</td>
-                                <td data-v="{{ $p->soldPerDay }}" class="num">{{ $p->soldPerDay === null ? '—' : number_format($p->soldPerDay) }}</td>
-                                <td data-v="{{ $p->daysToSell }}" class="num">{{ $p->daysToSell === null ? '—' : number_format($p->daysToSell, 1) }}</td>
+                                <td data-v="{{ $p->floorVsTypical }}" class="num"><x-num :value="$p->floorVsTypical" :decimals="2" /></td>
+                                <td data-v="{{ $p->soldPerDay }}" class="num"><x-num :value="$p->soldPerDay" /></td>
+                                <td data-v="{{ $p->daysToSell }}" class="num"><x-num :value="$p->daysToSell" :decimals="1" /></td>
                                 <td data-v="{{ $p->valueAtFloor }}" class="num"><x-money :copper="$p->valueAtFloor" /></td>
                                 <td data-v="{{ $p->unrealized }}" class="num"><x-money :copper="$p->unrealized" pnl /></td>
                                 <td data-v="{{ $p->hasRealized() ? $p->realized : '' }}" class="num"><x-money :copper="$p->hasRealized() ? $p->realized : null" pnl /></td>
                                 <td data-v="{{ $p->status }}"><x-position-status :position="$p" /></td>
                                 <td class="whitespace-nowrap text-end">
                                     @if ($p->held > 0)
-                                        <a href="{{ route('items.show', $p->itemId) }}#correct" class="text-sm underline text-gray-600 dark:text-gray-400"
+                                        <a href="{{ route('items.show', $p->itemId) }}#correct" class="link text-sm"
                                            title="{{ __('Set what you hold, for stock the ledger counts but you no longer have.') }}">{{ __('Correct') }}</a>
                                     @endif
                                 </td>
@@ -100,7 +96,7 @@
                 </table>
             </div>
 
-            <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+            <p class="mt-4 note">
                 {{ __('Floor, cost and profit are exact. Recent, typical, 60-day average, sold per day and what is built on them are our own estimates from hourly snapshots of the Blizzard auction house, not TSM\'s numbers, and appear once an item has :days days of history.', ['days' => \App\Support\MarketStats::minDays()]) }}
                 {{ __('Click a column heading to sort.') }}
             </p>

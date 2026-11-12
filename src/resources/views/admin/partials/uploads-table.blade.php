@@ -1,5 +1,3 @@
-@php($me = auth()->user())
-
 <div class="mt-3 overflow-x-auto">
     <table class="data-table">
         <caption class="sr-only">{{ __('Uploads, newest first.') }}</caption>
@@ -17,7 +15,7 @@
         <tbody>
             @foreach ($uploads as $u)
                 <tr>
-                    <td class="whitespace-nowrap">{{ $me->local($u->received_at)->format('Y-m-d H:i') }}</td>
+                    <td><x-time :at="$u->received_at" /></td>
                     <td>{{ $u->email }}</td>
                     <td>{{ $u->source }}</td>
                     <td><span class="{{ $u->status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400' }}">{{ $u->status }}</span></td>

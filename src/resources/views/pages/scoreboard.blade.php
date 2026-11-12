@@ -7,7 +7,6 @@
             ['period', __('Period'), \App\Services\ScoreboardService::periodLabels(), $period],
         ]);
         $link = fn (array $q) => route('scoreboard', array_merge(['game' => $game, 'period' => $period, 'metric' => $metric], $q));
-        $tab = fn (bool $on) => 'rounded-md border px-3 py-1.5 text-sm '.($on ? 'border-indigo-500 ring-1 ring-indigo-500 text-gray-900 dark:text-gray-100' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400');
         $cols = [
             [__('Rank'), 'num'],
             [__('Player'), 'text'],
@@ -20,7 +19,7 @@
 
     <div class="space-y-6">
         <div>
-            <h1 class="text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">{{ __('Scoreboard') }}</h1>
+            <h1 class="page-title">{{ __('Scoreboard') }}</h1>
             <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
                 {{ __('Players who chose to be listed, under a nickname they picked. Everyone else is not shown.') }}
                 <a class="underline" href="{{ route('privacy') }}#scoreboard">{{ __('Privacy') }}</a>
@@ -31,7 +30,7 @@
             @foreach ($groups as [$param, $aria, $options, $current])
                 <div class="flex flex-wrap gap-2" role="group" aria-label="{{ $aria }}">
                     @foreach ($options as $key => $label)
-                        <a href="{{ $link([$param => $key]) }}" class="{{ $tab($key === $current) }}" @if ($key === $current) aria-current="page" @endif>{{ $label }}</a>
+                        <a href="{{ $link([$param => $key]) }}" class="seg" @if ($key === $current) aria-current="page" @endif>{{ $label }}</a>
                     @endforeach
                 </div>
             @endforeach
@@ -39,7 +38,7 @@
 
         <div class="card p-4 sm:p-6">
             @if ($rows === [])
-                <p class="text-sm text-gray-600 dark:text-gray-400">{{ __('Nobody is listed here yet.') }}</p>
+                <p class="empty">{{ __('Nobody is listed here yet.') }}</p>
             @else
                 <div class="max-h-[75vh] overflow-auto" x-data="sortableTable">
                     <table class="data-table data-table-sticky">
@@ -69,7 +68,7 @@
             @endif
         </div>
 
-        <div class="space-y-1 text-xs text-gray-500 dark:text-gray-400">
+        <div class="space-y-1 note">
             @if ($updated)
                 <p>{{ __('Updated :time', ['time' => $updated->format('Y-m-d H:i T')]) }}. {{ __('Refreshed hourly.') }}</p>
             @endif

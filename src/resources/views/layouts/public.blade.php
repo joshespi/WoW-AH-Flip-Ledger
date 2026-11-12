@@ -21,7 +21,7 @@
             {{ $slot }}
         </main>
 
-        <footer class="max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 text-xs text-gray-500 dark:text-gray-400 space-y-2">
+        <footer class="max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 note space-y-2">
             <x-legal-links class="flex-wrap gap-y-1" />
             <x-site-footer />
             <p>{!! __('Built on data from :tsm.', ['tsm' => '<a class="underline" href="https://www.tradeskillmaster.com" rel="noopener noreferrer" target="_blank">TradeSkillMaster</a>']) !!}</p>

@@ -11,7 +11,7 @@
             @csrf
             @method('delete')
 
-            <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">
+            <h2 class="card-title">
                 {{ __('Are you sure you want to delete your account?') }}
             </h2>
 

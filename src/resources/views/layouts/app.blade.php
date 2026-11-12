@@ -23,18 +23,21 @@
                 <x-game-banner :games="$games" />
             @endauth
 
-            <!-- Page Heading: the header slot, else the page title -->
+            {{-- Page heading: the header slot, else the title (or a `heading` slot) with an optional `actions` slot --}}
             @if (isset($header) || filled($title))
                 <header class="px-4 pt-8 sm:px-6 lg:px-8">
                     @isset($header)
                         {{ $header }}
                     @else
-                        <h1 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">{{ $title }}</h1>
+                        <div class="card-head">
+                            <h1 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">{{ $heading ?? $title }}</h1>
+                            {{ $actions ?? '' }}
+                        </div>
                     @endisset
                 </header>
             @endif
 
-            <!-- Page Content: every page sits in the same container -->
+            {{-- Page Content: every page sits in the same container --}}
             <main class="grow py-6">
                 <div class="space-y-6 px-4 sm:px-6 lg:px-8">
                     {{ $slot }}

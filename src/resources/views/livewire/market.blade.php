@@ -54,15 +54,15 @@
                             <tr @class(['bg-green-50 dark:bg-green-900/20' => $r['at_buy'], 'bg-amber-50 dark:bg-amber-900/20' => $r['at_sell'] && ! $r['at_buy']])>
                                 <td>
                                     <x-item-link :id="$r['item_id']" :name="$r['name']" />
-                                    @if ($r['notes'])<div class="text-xs text-gray-500 dark:text-gray-400">{{ $r['notes'] }}</div>@endif
+                                    @if ($r['notes'])<div class="note">{{ $r['notes'] }}</div>@endif
                                 </td>
                                 <td class="num"><x-money :copper="$r['floor']" /></td>
                                 <td class="num"><x-money :copper="$r['buy']" /></td>
                                 <td class="num"><x-money :copper="$r['sell']" /></td>
                                 <td class="num">@if ($r['ready'])<x-money :copper="$r['recent']" />@else<x-collecting :days="$r['days']" />@endif</td>
                                 <td class="num">@if ($r['ready'])<x-money :copper="$r['typical']" />@else<x-collecting :days="$r['days']" />@endif</td>
-                                <td class="num">{{ $r['sold'] === null ? '—' : number_format($r['sold']) }}</td>
-                                <td class="whitespace-nowrap">
+                                <td class="num"><x-num :value="$r['sold']" /></td>
+                                <td>
                                     @if ($r['at_buy'])<x-chip type="At buy target" tone="green" />@endif
                                     @if ($r['at_sell'])<x-chip type="At sell target" tone="amber" />@endif
                                     @if ($r['knife'])<x-chip type="Falling knife" title="{{ __('Cheap versus typical, and still dropping.') }}" tone="red" />@endif
@@ -70,8 +70,8 @@
                                 <td class="whitespace-nowrap text-end text-sm">
                                     <button type="button" wire:click="move({{ $r['id'] }}, -1)" aria-label="{{ __('Move up') }}" class="inline-flex h-8 w-8 items-center justify-center rounded text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">↑</button>
                                     <button type="button" wire:click="move({{ $r['id'] }}, 1)" aria-label="{{ __('Move down') }}" class="inline-flex h-8 w-8 items-center justify-center rounded text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">↓</button>
-                                    <button type="button" wire:click="edit({{ $r['id'] }})" class="ms-2 inline-flex h-8 items-center px-1 underline text-gray-600 dark:text-gray-400">{{ __('Edit') }}</button>
-                                    <button type="button" wire:click="remove({{ $r['id'] }})" wire:confirm="{{ __('Remove from watchlist?') }}" class="ms-1 inline-flex h-8 items-center px-1 underline text-red-600 dark:text-red-400">{{ __('Remove') }}</button>
+                                    <button type="button" wire:click="edit({{ $r['id'] }})" class="ms-2 inline-flex h-8 items-center px-1 link">{{ __('Edit') }}</button>
+                                    <button type="button" wire:click="remove({{ $r['id'] }})" wire:confirm="{{ __('Remove from watchlist?') }}" class="ms-1 inline-flex h-8 items-center px-1 link-danger">{{ __('Remove') }}</button>
                                 </td>
                             </tr>
                             @if ($editing === $r['id'])

@@ -11,9 +11,9 @@
 
         <div class="mt-6 flex items-baseline justify-between gap-4">
             <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ __('Format') }}</h4>
-            <a href="{{ route('trades.import.template') }}" class="text-sm underline text-gray-600 dark:text-gray-400">{{ __('Download a template') }}</a>
+            <a href="{{ route('trades.import.template') }}" class="link text-sm">{{ __('Download a template') }}</a>
         </div>
-        <pre class="mt-2 overflow-x-auto rounded-md bg-gray-100 dark:bg-gray-900 p-3 text-xs text-gray-800 dark:text-gray-200">{{ \App\Services\TradesImportService::TEMPLATE }}</pre>
+        <pre class="mt-2 overflow-x-auto code-block text-gray-800 dark:text-gray-200">{{ \App\Services\TradesImportService::TEMPLATE }}</pre>
         <ul class="mt-3 list-disc ps-5 space-y-1 text-sm text-gray-600 dark:text-gray-400">
             <li>{{ __('time: ISO date and time. Without an offset it is read in your timezone (:tz).', ['tz' => auth()->user()->timezone]) }}</li>
             <li>{{ __('item: i:ID, or an exact item name that matches one item (names are known once you have uploaded TSM data or prices have been fetched).') }}</li>
@@ -27,7 +27,7 @@
             <div>
                 <x-input-label for="csv" :value="__('CSV file')" />
                 <input id="csv" name="csv" type="file" accept=".csv,text/csv,text/plain"
-                       class="mt-1 block w-full text-sm text-gray-700 dark:text-gray-300">
+                       class="field-file">
                 <x-input-error class="mt-2" :messages="$errors->get('csv')" />
             </div>
 

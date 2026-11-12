@@ -15,7 +15,7 @@
                         @foreach ($this->suggestions as $s)
                             <li wire:key="s{{ $s['id'] }}">
                                 <button type="button" wire:click="pick({{ $s['id'] }})"
-                                        class="block w-full px-3 py-2 text-start hover:bg-gray-100 dark:hover:bg-gray-700">{{ $s['name'] }} <span class="text-gray-400">#{{ $s['id'] }}</span></button>
+                                        class="block w-full px-3 py-2 text-start hover:bg-gray-100 dark:hover:bg-gray-700">{{ $s['name'] }} <span class="text-gray-400 dark:text-gray-500">#{{ $s['id'] }}</span></button>
                             </li>
                         @endforeach
                     </ul>
@@ -30,7 +30,7 @@
                 <x-input-label for="cost" :value="__('Total cost')" />
                 <input id="cost" type="text" wire:model.live.debounce.250ms="cost" placeholder="2,730g 82s"
                        class="mt-1 block w-full field text-sm">
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <p class="mt-1 note">
                     @if ($this->unitCopper !== null)
                         {{ __('Per unit:') }} <x-money :copper="$this->unitCopper" />
                     @else
@@ -74,14 +74,14 @@
             <input type="search" wire:model.live.debounce.300ms="search" placeholder="{{ __('Filter by item') }}" aria-label="{{ __('Filter by item') }}"
                    class="w-full sm:w-64 field text-sm">
             <div class="flex gap-4 text-sm">
-                <a href="{{ route('reconcile.index') }}" class="underline text-gray-600 dark:text-gray-400">{{ __('Reconcile with TSM') }}</a>
-                <a href="{{ route('trades.import.create') }}" class="underline text-gray-600 dark:text-gray-400">{{ __('Import CSV') }}</a>
-                <a href="{{ route('trades.export') }}" class="underline text-gray-600 dark:text-gray-400">{{ __('Export CSV') }}</a>
+                <a href="{{ route('reconcile.index') }}" class="link">{{ __('Reconcile with TSM') }}</a>
+                <a href="{{ route('trades.import.create') }}" class="link">{{ __('Import CSV') }}</a>
+                <a href="{{ route('trades.export') }}" class="link">{{ __('Export CSV') }}</a>
             </div>
         </div>
 
         @if ($rows->isEmpty())
-            <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">{{ $search !== '' ? __('No buys match that filter.') : __('No buys yet. Add one above, paste from chat, or import a CSV.') }}</p>
+            <p class="empty">{{ $search !== '' ? __('No buys match that filter.') : __('No buys yet. Add one above, paste from chat, or import a CSV.') }}</p>
         @else
             <div class="mt-4 overflow-x-auto">
                 <table class="data-table">
@@ -100,7 +100,7 @@
                     <tbody>
                         @foreach ($rows as $t)
                             <tr wire:key="t{{ $t->id }}" @class(['bg-indigo-50 dark:bg-indigo-950/30' => $editing === $t->id])>
-                                <td class="whitespace-nowrap">{{ $user->local($t->traded_at)->format('Y-m-d H:i') }}</td>
+                                <td><x-time :at="$t->traded_at" /></td>
                                 <td><x-item-link :id="$t->item_id" :name="$t->name" /></td>
                                 @php($buy = $t->side === \App\Models\Trade::SIDE_BUY)
                                 @if ($buy)
@@ -114,15 +114,15 @@
                                     @if ($proceeds !== null)
                                         <td class="num"><x-money :copper="$proceeds" /></td>
                                     @endif
-                                    <td @if ($proceeds === null) colspan="2" @endif class="text-end text-xs text-gray-500 dark:text-gray-400">{{ \App\Models\Trade::correctionLabel($t->side) }}</td>
+                                    <td @if ($proceeds === null) colspan="2" @endif class="text-end note">{{ \App\Models\Trade::correctionLabel($t->side) }}</td>
                                 @endif
                                 <td class="text-gray-600 dark:text-gray-400">{{ $t->note }}</td>
                                 <td class="whitespace-nowrap text-end">
                                     @if ($buy)
-                                        <button type="button" wire:click="edit({{ $t->id }})" class="text-sm underline text-gray-600 dark:text-gray-400">{{ __('Edit') }}</button>
+                                        <button type="button" wire:click="edit({{ $t->id }})" class="link text-sm">{{ __('Edit') }}</button>
                                     @endif
                                     <button type="button" wire:click="delete({{ $t->id }})" wire:confirm="{{ ! $buy ? __('Undo this correction?') : ((int) $t->vendored > 0 ? __('Delete this buy? A vendor sale booked with it is deleted too.') : __('Delete this buy?')) }}"
-                                            class="ms-3 text-sm underline text-red-600 dark:text-red-400">{{ __('Delete') }}</button>
+                                            class="ms-3 link-danger text-sm">{{ __('Delete') }}</button>
                                 </td>
                             </tr>
                         @endforeach

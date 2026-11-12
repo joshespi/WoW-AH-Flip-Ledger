@@ -14,7 +14,7 @@
 
     <div class="space-y-6">
         <div>
-            <h1 class="text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">{{ __('Stats') }}</h1>
+            <h1 class="page-title">{{ __('Stats') }}</h1>
             <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
                 {{ __('Anonymous totals across all players. No names, items or gold amounts.') }}
                 <a class="underline" href="{{ route('privacy') }}#stats">{{ __('How we count') }}</a>
@@ -29,12 +29,11 @@
         </div>
 
         <div class="card p-4 sm:p-6 text-gray-600 dark:text-gray-300" x-data="statsChart(@js($chart))">
-            <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ __('Last 30 days (UTC)') }}</h2>
+            <h2 class="card-title">{{ __('Last 30 days (UTC)') }}</h2>
             <div class="mt-3 flex flex-wrap gap-2" role="group" aria-label="{{ __('Chart series') }}">
                 @foreach ($chart['series'] as $key => $s)
                     <button type="button" @click="select('{{ $key }}')" :aria-pressed="range === '{{ $key }}'"
-                            :class="range === '{{ $key }}' ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-200 dark:border-gray-700'"
-                            class="rounded-md border px-3 py-2 text-sm">
+                            class="seg py-2">
                         {{ $s['label'] }}
                         <span class="ms-1 font-mono text-gray-500 dark:text-gray-400">{{ number_format(array_sum($s['data'])) }}</span>
                     </button>
@@ -72,7 +71,7 @@
             </details>
         </div>
 
-        <p class="text-xs text-gray-500 dark:text-gray-400">
+        <p class="note">
             @if ($stats['tracked_since'])
                 {{ __('Active users are tracked since :date.', ['date' => $stats['tracked_since']]) }}
             @endif

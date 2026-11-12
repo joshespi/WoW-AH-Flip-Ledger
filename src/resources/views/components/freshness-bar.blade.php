@@ -13,10 +13,7 @@
                 <span class="tabular-nums">{{ $when($f->tsmSavedAt) }}</span>
                 <span>({{ $f->ago($f->tsmSavedAt) }})</span>
                 @if ($f->tsmStale())
-                    <span class="ms-1 inline-flex items-center rounded bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 font-medium text-amber-800 dark:text-amber-300"
-                          title="{{ __('The game writes this file only on /reload or logout. Do that in game, then upload again.') }}">
-                        {{ __('Stale: /reload in game, then upload') }}
-                    </span>
+                    <x-chip :type="__('Stale: /reload in game, then upload')" tone="amber" class="ms-1 !text-[11px]" title="{{ __('The game writes this file only on /reload or logout. Do that in game, then upload again.') }}" />
                 @endif
             @endif
         </span>
@@ -30,10 +27,7 @@
                 <span>({{ $f->ago($f->pricesAt) }})</span>
             @endif
             @if ($f->pricesStale())
-                <span class="ms-1 inline-flex items-center rounded bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 font-medium text-amber-800 dark:text-amber-300"
-                      title="{{ __('Prices refresh hourly from the Blizzard auction house. Until the next successful fetch, the numbers shown are the last good ones.') }}">
-                    {{ $f->lastFetchFailed ? __('Price fetch failing') : __('Prices stale') }}
-                </span>
+                <x-chip :type="$f->lastFetchFailed ? __('Price fetch failing') : __('Prices stale')" tone="amber" class="ms-1 !text-[11px]" title="{{ __('Prices refresh hourly from the Blizzard auction house. Until the next successful fetch, the numbers shown are the last good ones.') }}" />
             @endif
         </span>
 

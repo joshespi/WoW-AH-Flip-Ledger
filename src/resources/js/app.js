@@ -13,36 +13,41 @@ const goldLabel = (v) => v.toLocaleString(undefined, { maximumFractionDigits: Ma
 const chartLegend = (text) => ({ position: 'bottom', labels: { color: text, usePointStyle: true, boxWidth: 8 } });
 const saleGreen = 'rgba(34, 197, 94, 0.75)';
 const GOLD = '#e5b64a';
+// Neutral reference lines, from the app's gray scale (tailwind.config.js gray-400 / gray-500).
+const REF = '#9a9eab';
+const REF_DIM = '#737886';
+const chartBase = { responsive: true, maintainAspectRatio: false, animation: false };
+const goldAxis = (text, extra = {}) => ({ grid: { color: chartGrid }, ticks: { color: text, callback: goldLabel }, ...extra });
+const goldTip = (c) => `${c.dataset.label}: ${goldLabel(c.parsed.y)}`;
+// Chart.js loads on demand, so pages without a chart don't carry it. Axis text takes the element's colour.
+const loadChart = async (el) => [(await import('chart.js/auto')).default, getComputedStyle(el).color];
 const line = (label, color, extra = {}) => ({
     label, data: [], borderColor: color, backgroundColor: color, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: 0, ...extra,
 });
 
 // Options of a chart over RealizedRangesService buckets; `scales` adds axes (or overrides x/y).
 const rangeOptions = (text, scales = {}) => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
+    ...chartBase,
     interaction: { mode: 'index', intersect: false },
     scales: {
         x: { grid: { display: false }, ticks: { color: text, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
-        y: { grid: { color: chartGrid }, ticks: { color: text, callback: goldLabel } },
+        y: goldAxis(text),
         ...scales,
     },
     plugins: {
         legend: chartLegend(text),
-        tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${goldLabel(c.parsed.y)}` } },
+        tooltip: { callbacks: { label: goldTip } },
     },
 });
 
 // An Alpine component for a chart with range buttons (`d.ranges[key]`): `config(text)` is the
 // Chart.js config, `fill(chart, range)` loads one range into it, starting at `initial`.
-// Chart.js loads on demand.
 const rangeChart = (d, config, fill, initial = 'month') => { let chart = null; return {
     range: initial,
 
     async init() {
-        const { default: Chart } = await import('chart.js/auto');
-        chart = new Chart(this.$refs.canvas, config(getComputedStyle(this.$el).color));
+        const [Chart, text] = await loadChart(this.$el);
+        chart = new Chart(this.$refs.canvas, config(text));
         this.show();
     },
 
@@ -165,7 +170,7 @@ document.addEventListener('alpine:init', () => {
                     { type: 'line', yAxisID: 'y1', ...line(d.labels.total, GOLD) },
                 ],
             },
-            options: rangeOptions(text, { y1: { position: 'right', grid: { display: false }, ticks: { color: text, callback: goldLabel } } }),
+            options: rangeOptions(text, { y1: goldAxis(text, { position: 'right', grid: { display: false } }) }),
         }),
         (chart, r) => {
             const [bars, total] = chart.data.datasets;
@@ -201,9 +206,7 @@ document.addEventListener('alpine:init', () => {
         type: 'bar',
         data: { labels: d.labels, datasets: [{ label: '', data: [], backgroundColor: GOLD, borderRadius: 2 }] },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
+            ...chartBase,
             scales: {
                 x: { grid: { display: false }, ticks: { color: text, maxRotation: 0, autoSkip: true, maxTicksLimit: 8, callback(v) { return String(this.getLabelForValue(v)).slice(5); } } },
                 y: { beginAtZero: true, grid: { color: chartGrid }, ticks: { color: text, precision: 0 } },
@@ -215,7 +218,7 @@ document.addEventListener('alpine:init', () => {
         chart.data.datasets[0].data = s.data;
     }, 'active'));
 
-    // Price chart for the item page. Chart.js is loaded on demand so other pages don't carry it.
+    // Price chart for the item page.
     // `d` is built by ItemController: x is epoch seconds, y copper per unit. The range buttons
     // only move the x window; Chart.js refits the y axis to what is visible.
     window.Alpine.data('itemChart', (d) => { let chart = null; return {
@@ -223,8 +226,7 @@ document.addEventListener('alpine:init', () => {
         ranges: [7, 30, 90],
 
         async init() {
-            const { default: Chart } = await import('chart.js/auto');
-            const text = getComputedStyle(this.$el).color;
+            const [Chart, text] = await loadChart(this.$el);
             const now = Date.now();
             const pts = (rows, y) => rows.map((r) => ({ x: r.ts * 1000, y: gold(y(r)), q: r.qty }));
             const series = (label, data, color, extra = {}) => line(label, color, { data, hitRadius: 8, ...extra });
@@ -249,11 +251,11 @@ document.addEventListener('alpine:init', () => {
             const sets = [
                 series(d.labels.median, pts(d.daily, (r) => r.median), GOLD, { borderWidth: 2.5 }),
                 series(d.labels.ma, ma, '#fde68a', { borderWidth: 1.5, borderDash: [3, 3] }),
-                series(d.labels.min, pts(d.daily, (r) => r.min), '#94a3b8', { borderWidth: 1, hidden: true }),
+                series(d.labels.min, pts(d.daily, (r) => r.min), REF, { borderWidth: 1, hidden: true }),
             ];
 
-            if (d.typical) sets.push(series(d.labels.typical, flat(d.typical), '#94a3b8', { borderDash: [6, 4], borderWidth: 1, ...ref }));
-            if (d.hist60) sets.push(series(d.labels.hist60, flat(d.hist60), '#64748b', { borderDash: [2, 4], borderWidth: 1, ...ref }));
+            if (d.typical) sets.push(series(d.labels.typical, flat(d.typical), REF, { borderDash: [6, 4], borderWidth: 1, ...ref }));
+            if (d.hist60) sets.push(series(d.labels.hist60, flat(d.hist60), REF_DIM, { borderDash: [2, 4], borderWidth: 1, ...ref }));
             if (avg.length) sets.push(series(d.labels.avg, avg, '#38bdf8', { stepped: 'after', borderWidth: 1.5, borderDash: [4, 3], ...ref }));
 
             sets.push({ type: 'scatter', label: d.labels.buys, data: pts(d.buys, (r) => r.unit), backgroundColor: '#38bdf8', borderColor: '#0c4a6e', pointRadius: radius, pointHoverRadius: 10, pointStyle: 'triangle' });
@@ -263,10 +265,8 @@ document.addEventListener('alpine:init', () => {
                 type: 'line',
                 data: { datasets: sets },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    ...chartBase,
                     parsing: false,
-                    animation: false,
                     interaction: { mode: 'nearest', intersect: true },
                     scales: {
                         x: {
@@ -276,14 +276,14 @@ document.addEventListener('alpine:init', () => {
                             grid: { color: chartGrid },
                             ticks: { color: text, maxTicksLimit: 8, callback: (v) => new Date(v).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) },
                         },
-                        y: { grace: '8%', grid: { color: chartGrid }, ticks: { color: text, callback: goldLabel } },
+                        y: goldAxis(text, { grace: '8%' }),
                     },
                     plugins: {
                         legend: chartLegend(text),
                         tooltip: {
                             callbacks: {
                                 title: (items) => new Date(items[0].parsed.x).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
-                                label: (c) => `${c.dataset.label}: ${goldLabel(c.parsed.y)}` + (c.raw?.q ? ` × ${c.raw.q.toLocaleString()}` : ''),
+                                label: (c) => goldTip(c) + (c.raw?.q ? ` × ${c.raw.q.toLocaleString()}` : ''),
                             },
                         },
                     },

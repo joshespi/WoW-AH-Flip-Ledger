@@ -8,10 +8,10 @@
         <div class="mt-4 flex flex-wrap gap-1" role="group" aria-label="{{ __('Ranking') }}">
             @foreach ($modes as $key => $label)
                 <button type="button" wire:click="$set('mode', '{{ $key }}')" aria-pressed="{{ $activeMode === $key ? 'true' : 'false' }}"
-                        class="{{ $activeMode === $key ? 'btn-primary' : 'btn-secondary' }} !px-3 !py-1 text-xs">{{ $label }}</button>
+                        class="seg py-1 text-xs">{{ $label }}</button>
             @endforeach
         </div>
-        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        <p class="mt-2 note">
             @switch($activeMode)
                 @case('margin') {{ __('Typical price after the AH cut, minus the floor, per unit. Biggest first.') }} @break
                 @case('volume') {{ __('Items at or under typical that sell the most units per day.') }} @break
@@ -24,19 +24,19 @@
                 <x-input-label for="s-disc" :value="__('Min % under typical')" />
                 <input id="s-disc" type="text" inputmode="decimal" wire:model.live.debounce.400ms="minDiscount" placeholder="e.g. 25"
                        class="mt-1 block w-32 field text-sm">
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('Floor at least this far below typical') }}</p>
+                <p class="mt-1 note">{{ __('Floor at least this far below typical') }}</p>
             </div>
             <div>
                 <x-input-label for="s-sold" :value="__('Min sold / day')" />
                 <input id="s-sold" type="text" inputmode="numeric" wire:model.live.debounce.400ms="minSold" placeholder="e.g. 20"
                        class="mt-1 block w-32 field text-sm">
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('Skip slow sellers') }}</p>
+                <p class="mt-1 note">{{ __('Skip slow sellers') }}</p>
             </div>
             <div>
                 <x-input-label for="s-id" :value="__('Min item ID')" />
                 <input id="s-id" type="text" inputmode="numeric" wire:model.live.debounce.400ms="minItemId"
                        class="mt-1 block w-32 field text-sm">
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('Higher IDs are newer items') }}</p>
+                <p class="mt-1 note">{{ __('Higher IDs are newer items') }}</p>
             </div>
             <div>
                 <x-input-label for="s-top" :value="__('Show top')" />
@@ -53,7 +53,7 @@
                 <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ __('Still collecting price history.') }}</p>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ __(':have of :need days collected. Scan compares today\'s price with each item\'s own history, so it starts ranking items once they have :need days of data. Until then, the item pages still show the price chart so far.', ['have' => $days, 'need' => \App\Support\MarketStats::minDays()]) }}</p>
             @else
-                <p class="text-sm text-gray-600 dark:text-gray-400">{{ __('Nothing matches. Try clearing the filters above, or pick a different ranking.') }}</p>
+                <p class="empty">{{ __('Nothing matches. Try clearing the filters above, or pick a different ranking.') }}</p>
             @endif
         @else
             <div class="overflow-x-auto">
@@ -74,21 +74,21 @@
                     <tbody>
                         @foreach ($rows as $r)
                             <tr wire:key="s{{ $r['item_id'] }}">
-                                <td><x-item-link :id="$r['item_id']" :name="$r['name']" /> <span class="text-xs text-gray-400">#{{ $r['item_id'] }}</span></td>
+                                <td><x-item-link :id="$r['item_id']" :name="$r['name']" /> <span class="text-xs text-gray-400 dark:text-gray-500">#{{ $r['item_id'] }}</span></td>
                                 <td class="num"><x-money :copper="$r['floor']" /></td>
                                 <td class="num"><x-money :copper="$r['recent']" /></td>
                                 <td class="num"><x-money :copper="$r['typical']" /></td>
                                 <td class="num">{{ number_format($r['ratio'], 2) }}</td>
                                 <td class="num"><x-money :copper="$r['margin']" pnl /></td>
                                 <td class="num"><x-pct :value="$r['roi']" /></td>
-                                <td class="num">{{ $r['sold'] === null ? '—' : number_format($r['sold']) }}</td>
+                                <td class="num"><x-num :value="$r['sold']" /></td>
                                 <td><x-sparkline :values="$r['spark']" /></td>
                                 <td>@if ($r['knife'])<x-chip type="Falling knife" title="{{ __('Cheap versus typical, and still dropping.') }}" tone="red" />@endif</td>
                                 <td class="text-end text-sm whitespace-nowrap">
                                     @if ($r['watched'])
                                         <span class="text-gray-500 dark:text-gray-400">{{ __('Watching') }}</span>
                                     @else
-                                        <button type="button" wire:click="add({{ $r['item_id'] }})" class="underline text-gray-600 dark:text-gray-400">{{ __('Watch') }}</button>
+                                        <button type="button" wire:click="add({{ $r['item_id'] }})" class="link">{{ __('Watch') }}</button>
                                     @endif
                                 </td>
                             </tr>

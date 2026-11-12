@@ -19,22 +19,22 @@
             @endif
         </div>
         @if ($demo)
-            <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{{ __('The demo shows sample data, read-only. No account needed.') }}</p>
+            <p class="mt-3 note">{{ __('The demo shows sample data, read-only. No account needed.') }}</p>
         @endif
     @endguest
 
     <div class="card mt-12 overflow-hidden" aria-hidden="true">
         <div class="flex items-center justify-between border-b border-gray-200 px-4 py-2.5 dark:border-gray-800">
             <span class="eyebrow">{{ __('Sample positions') }}</span>
-            <span class="font-mono text-[11px] text-gray-500">{{ __('example data') }}</span>
+            <span class="font-mono text-[11px] text-gray-500 dark:text-gray-400">{{ __('example data') }}</span>
         </div>
         <div class="overflow-x-auto">
             <table class="data-table">
-                <thead><tr><th>{{ __('Item') }}</th><th class="num">{{ __('Held') }}</th><th class="num">{{ __('Break-even') }}</th><th class="num">{{ __('Floor') }}</th><th class="num">{{ __('vs break-even') }}</th></tr></thead>
+                <thead><tr><th scope="col">{{ __('Item') }}</th><th scope="col" class="num">{{ __('Held') }}</th><th scope="col" class="num">{{ __('Break-even') }}</th><th scope="col" class="num">{{ __('Floor') }}</th><th scope="col" class="num">{{ __('vs break-even') }}</th></tr></thead>
                 <tbody>
-                    <tr><td>Silvergrace Ore</td><td class="num">4,200</td><td class="num"><span class="text-indigo-300">38g</span> <span class="text-gray-400">52s</span></td><td class="num"><span class="text-indigo-300">44g</span> <span class="text-gray-400">10s</span></td><td class="num text-green-600 dark:text-green-400">+15.8%</td></tr>
-                    <tr><td>Mycobloom</td><td class="num">1,150</td><td class="num"><span class="text-indigo-300">61g</span> <span class="text-gray-400">05s</span></td><td class="num"><span class="text-indigo-300">57g</span> <span class="text-gray-400">90s</span></td><td class="num text-red-600 dark:text-red-400">−5.2%</td></tr>
-                    <tr><td>Luredrop</td><td class="num">860</td><td class="num"><span class="text-indigo-300">12g</span> <span class="text-gray-400">33s</span></td><td class="num"><span class="text-indigo-300">13g</span> <span class="text-gray-400">47s</span></td><td class="num text-green-600 dark:text-green-400">+9.2%</td></tr>
+                    @foreach ([['Silvergrace Ore', '4,200', 385200, 441000, 0.158], ['Mycobloom', '1,150', 610500, 579000, -0.052], ['Luredrop', '860', 123300, 134700, 0.092]] as [$item, $held, $breakEven, $floor, $vs])
+                        <tr><td>{{ $item }}</td><td class="num">{{ $held }}</td><td class="num"><x-money :copper="$breakEven" /></td><td class="num"><x-money :copper="$floor" /></td><td class="num"><x-pct :value="$vs" /></td></tr>
+                    @endforeach
                 </tbody>
             </table>
         </div>

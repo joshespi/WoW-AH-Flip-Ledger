@@ -11,7 +11,7 @@
 
     @if ($empty)
         <div class="card p-6 sm:p-8">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ __('None of your ledgers has data yet') }}</h3>
+            <h3 class="card-title">{{ __('None of your ledgers has data yet') }}</h3>
             <p class="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-400">{{ __('Switch to one of your games in the sidebar to add buys, then come back here to see them together.') }}</p>
         </div>
     @else
@@ -24,29 +24,28 @@
                         @if ($key !== 'total')<x-game-badge :game="$key" />@endif
                     </div>
                     <p class="mt-2 font-mono text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-50"><x-money :copper="$summary[$key]['realized']" pnl /></p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('Realized P/L, net of the AH cut') }}</p>
+                    <p class="note">{{ __('Realized P/L, net of the AH cut') }}</p>
                     <dl class="mt-3 space-y-1 text-sm">
-                        <div class="flex flex-wrap justify-between gap-x-3"><dt class="text-gray-500 dark:text-gray-400">{{ __('Stock at cost') }}</dt><dd class="font-mono text-end"><x-money :copper="$summary[$key]['stock_cost']" /></dd></div>
-                        <div class="flex flex-wrap justify-between gap-x-3"><dt class="text-gray-500 dark:text-gray-400">{{ __('Stock at floor') }}</dt><dd class="font-mono text-end"><x-money :copper="$summary[$key]['stock_at_floor']" /></dd></div>
-                        <div class="flex flex-wrap justify-between gap-x-3"><dt class="text-gray-500 dark:text-gray-400">{{ __('Unrealized P/L') }}</dt><dd class="font-mono text-end"><x-money :copper="$summary[$key]['unrealized']" pnl /></dd></div>
+                        <div class="flex flex-wrap justify-between gap-x-3"><dt class="dl-label">{{ __('Stock at cost') }}</dt><dd class="font-mono text-end"><x-money :copper="$summary[$key]['stock_cost']" /></dd></div>
+                        <div class="flex flex-wrap justify-between gap-x-3"><dt class="dl-label">{{ __('Stock at floor') }}</dt><dd class="font-mono text-end"><x-money :copper="$summary[$key]['stock_at_floor']" /></dd></div>
+                        <div class="flex flex-wrap justify-between gap-x-3"><dt class="dl-label">{{ __('Unrealized P/L') }}</dt><dd class="font-mono text-end"><x-money :copper="$summary[$key]['unrealized']" pnl /></dd></div>
                     </dl>
                 </div>
             @endforeach
         </div>
-        <p class="-mt-3 text-xs text-gray-500 dark:text-gray-400">{{ __('Only Retail has a price feed, so floor value and unrealized P/L are blank for the other games, and the Total for those two rows counts Retail only.') }}</p>
+        <p class="-mt-3 note">{{ __('Only Retail has a price feed, so floor value and unrealized P/L are blank for the other games, and the Total for those two rows counts Retail only.') }}</p>
 
         <div class="card p-4 sm:p-6 text-gray-600 dark:text-gray-300"
              x-data="combinedChart(@js(['ranges' => $ranges, 'labels' => $names, 'games' => $games, 'styles' => $styles]))">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ __('Realized over time, by game') }}</h3>
+            <h3 class="card-title">{{ __('Realized over time, by game') }}</h3>
             <div class="mt-3 grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-2" role="group" aria-label="{{ __('Chart range') }}">
                 @foreach (\App\Services\RealizedRangesService::labels() as $key => [$name])
                     <button type="button" @click="select('{{ $key }}')" :aria-pressed="range === '{{ $key }}'"
-                            :class="range === '{{ $key }}' ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-200 dark:border-gray-700'"
-                            class="rounded-md border px-3 py-2 text-start">
+                            class="seg block py-2 text-start">
                         <span class="eyebrow block">{{ $name }}</span>
                         <span class="mt-1 block font-mono text-base font-semibold"><x-money :copper="$ranges[$key]['pnl']['total']" pnl /></span>
                         @foreach ($games as $g)
-                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ $names[$g] }} <x-money :copper="$ranges[$key]['pnl'][$g]" pnl /></span>
+                            <span class="block note">{{ $names[$g] }} <x-money :copper="$ranges[$key]['pnl'][$g]" pnl /></span>
                         @endforeach
                     </button>
                 @endforeach
@@ -54,11 +53,11 @@
             <div class="mt-4 h-72 sm:h-80" role="img" aria-label="{{ __('Chart of running realized profit and loss for each game and in total') }}">
                 <canvas x-ref="canvas"></canvas>
             </div>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Retail is the solid gold line, Forever the dashed teal line, Classic the dotted violet line, the total the thick grey line. Running totals, in your timezone.') }}</p>
+            <p class="mt-2 note">{{ __('Retail is the solid gold line, Forever the dashed teal line, Classic the dotted violet line, the total the thick grey line. Running totals, in your timezone.') }}</p>
         </div>
 
         <div class="card p-4 sm:p-6">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ __('Games side by side') }}</h3>
+            <h3 class="card-title">{{ __('Games side by side') }}</h3>
             <div class="mt-3 overflow-x-auto">
                 <table class="data-table">
                     <caption class="sr-only">{{ __('Your games side by side') }}</caption>
@@ -70,7 +69,7 @@
                         <tr><td>{{ __('Open positions') }}</td>@foreach ($games as $g)<td class="num">{{ number_format($compare[$g]['open']) }}</td>@endforeach</tr>
                         <tr><td>{{ __('Closed positions') }}</td>@foreach ($games as $g)<td class="num">{{ number_format($compare[$g]['closed']) }}</td>@endforeach</tr>
                         <tr><td>{{ __('Units sold') }}</td>@foreach ($games as $g)<td class="num">{{ number_format($compare[$g]['sold']) }}</td>@endforeach</tr>
-                        <tr><td title="{{ __('Units sold out of units sold plus units still held.') }}">{{ __('Sell-through') }}</td>@foreach ($games as $g)<td class="num">{{ $compare[$g]['sell_through'] === null ? '—' : number_format($compare[$g]['sell_through'] * 100, 0).'%' }}</td>@endforeach</tr>
+                        <tr><td title="{{ __('Units sold out of units sold plus units still held.') }}">{{ __('Sell-through') }}</td>@foreach ($games as $g)<td class="num"><x-num :value="$compare[$g]['sell_through'] === null ? null : $compare[$g]['sell_through'] * 100" suffix="%" /></td>@endforeach</tr>
                         <tr><td title="{{ __('Sales that booked profit or loss, per day, over the last 30 days.') }}">{{ __('Flips per day (30d)') }}</td>@foreach ($games as $g)<td class="num">{{ number_format($compare[$g]['flips_per_day'], 1) }}</td>@endforeach</tr>
                     </tbody>
                 </table>
@@ -78,9 +77,9 @@
         </div>
 
         <div class="card p-4 sm:p-6">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ __('Open positions, all games') }}</h3>
+            <h3 class="card-title">{{ __('Open positions, all games') }}</h3>
             @if ($data['rows'] === [])
-                <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">{{ __('Nothing held right now.') }}</p>
+                <p class="empty">{{ __('Nothing held right now.') }}</p>
             @else
                 @php
                     $cols = [[__('Game'), 'text'], [__('Item'), 'text'], [__('Held'), 'num'], [__('Avg cost'), 'num'], [__('Break-even'), 'num'], [__('Floor'), 'num'], [__('Value'), 'num'], [__('Status'), 'text']];
@@ -113,7 +112,7 @@
                     </table>
                 </div>
                 @if (count($data['rows']) > $rows)
-                    <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{{ __('Showing the :n largest of :total.', ['n' => $rows, 'total' => count($data['rows'])]) }}</p>
+                    <p class="mt-3 note">{{ __('Showing the :n largest of :total.', ['n' => $rows, 'total' => count($data['rows'])]) }}</p>
                 @endif
             @endif
         </div>

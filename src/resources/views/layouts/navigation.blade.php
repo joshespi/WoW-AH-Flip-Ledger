@@ -43,7 +43,7 @@
 @endphp
 
 <div x-data="{ open: false }" @keydown.escape.window="open = false">
-    <!-- Mobile top bar -->
+    {{-- Mobile top bar --}}
     <div class="dark lg:hidden sticky top-0 z-30 flex h-14 items-center justify-between border-b border-gray-800 bg-gray-900 px-4">
         <a href="{{ route('dashboard') }}" class="flex items-center gap-2 font-semibold text-gray-100">
             <x-application-logo class="h-7 w-7 rounded-md" />
@@ -56,7 +56,7 @@
 
     <div x-show="open" x-cloak x-transition.opacity @click="open = false" class="fixed inset-0 z-40 bg-black/60 lg:hidden"></div>
 
-    <!-- Sidebar: always dark, whatever the page theme -->
+    {{-- Sidebar: always dark, whatever the page theme --}}
     <aside class="dark fixed inset-y-0 left-0 z-50 flex w-64 -translate-x-full flex-col border-e border-gray-800 bg-gray-900 transition-transform duration-200 lg:translate-x-0"
            :class="{ 'translate-x-0': open }" aria-label="{{ __('Main') }}">
         <div class="flex h-16 shrink-0 items-center justify-between px-5">

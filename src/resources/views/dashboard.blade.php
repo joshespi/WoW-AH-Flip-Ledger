@@ -6,7 +6,7 @@
 
     @if ($portfolio->isEmpty())
         <div class="card p-6 sm:p-8">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ __('Your ledger is empty') }}</h3>
+            <h3 class="card-title">{{ __('Your ledger is empty') }}</h3>
             <p class="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
                 {{ __('Profit and loss need two things: your buys (the ledger takes them from you, because TSM\'s own buy log double-counts commodity lots) and your sales (taken from your TSM data).') }}
             </p>
@@ -45,37 +45,36 @@
 
         <div class="card p-4 sm:p-6 text-gray-600 dark:text-gray-300"
              x-data="realizedChart(@js(['ranges' => $ranges, 'labels' => ['bucket' => __('Realized P/L'), 'total' => __('Running total')]]))">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ __('Realized over time') }}</h3>
+            <h3 class="card-title">{{ __('Realized over time') }}</h3>
             <div class="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2" role="group" aria-label="{{ __('Chart range') }}">
                 @foreach (\App\Services\RealizedRangesService::labels() as $key => [$name, $prevName])
                     <button type="button" @click="select('{{ $key }}')" :aria-pressed="range === '{{ $key }}'"
-                            :class="range === '{{ $key }}' ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-200 dark:border-gray-700'"
-                            class="rounded-md border px-3 py-2 text-start">
+                            class="seg block py-2 text-start">
                         <span class="eyebrow block">{{ $name }}</span>
                         <span class="mt-1 block font-mono text-base font-semibold"><x-money :copper="$ranges[$key]['pnl']" pnl /></span>
                         @if ($ranges[$key]['prev'] !== null)
-                            <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{{ $prevName }}: <x-money :copper="$ranges[$key]['prev']" pnl /></span>
+                            <span class="mt-0.5 block note">{{ $prevName }}: <x-money :copper="$ranges[$key]['prev']" pnl /></span>
                         @endif
                     </button>
                 @endforeach
             </div>
             @if ((int) $ranges['all']['pnl'] === 0)
-                <p class="mt-3 text-sm text-gray-600 dark:text-gray-400">{{ __('No realized profit yet. The chart fills in as your sales are matched against your buys.') }}</p>
+                <p class="empty">{{ __('No realized profit yet. The chart fills in as your sales are matched against your buys.') }}</p>
             @endif
             <div class="mt-4 h-72 sm:h-80" role="img" aria-label="{{ __('Chart of realized profit and loss over the selected range') }}">
                 <canvas x-ref="canvas"></canvas>
             </div>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Profit is booked when a sale is recorded, net of the AH cut, in your timezone. Weeks start on Monday.') }}</p>
+            <p class="mt-2 note">{{ __('Profit is booked when a sale is recorded, net of the AH cut, in your timezone. Weeks start on Monday.') }}</p>
         </div>
 
         <div class="card p-4 sm:p-6">
-            <div class="flex items-baseline justify-between gap-4">
-                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ __('Positions') }}</h3>
-                <a href="{{ route('positions.index') }}" class="text-sm underline text-gray-600 dark:text-gray-400">{{ __('All positions') }}</a>
+            <div class="card-head">
+                <h3 class="card-title">{{ __('Positions') }}</h3>
+                <a href="{{ route('positions.index') }}" class="link text-sm">{{ __('All positions') }}</a>
             </div>
 
             @if ($open === [])
-                <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">{{ __('Nothing held right now.') }}</p>
+                <p class="empty">{{ __('Nothing held right now.') }}</p>
             @else
                 @php
                     $posCols = [
@@ -96,7 +95,7 @@
                         <tbody x-ref="body">
                             @foreach (array_slice($open, 0, $rows) as $p)
                                 <tr>
-                                    <td data-v="{{ $p->name }}" class="text-gray-900 dark:text-gray-100"><x-item-link :id="$p->itemId" :name="$p->name" /></td>
+                                    <td data-v="{{ $p->name }}"><x-item-link :id="$p->itemId" :name="$p->name" /></td>
                                     <td data-v="{{ $p->held }}" class="num">{{ number_format($p->held) }}</td>
                                     <td data-v="{{ $p->avgCost }}" class="num"><x-money :copper="$p->avgCost" /></td>
                                     <td data-v="{{ $p->breakEven }}" class="num"><x-money :copper="$p->breakEven" /></td>
@@ -110,28 +109,28 @@
                     </table>
                 </div>
                 @if (count($open) > $rows)
-                    <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{{ __('Showing the :n largest of :total.', ['n' => $rows, 'total' => count($open)]) }}</p>
+                    <p class="mt-3 note">{{ __('Showing the :n largest of :total.', ['n' => $rows, 'total' => count($open)]) }}</p>
                 @endif
             @endif
         </div>
 
         <div class="card p-4 sm:p-6">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ __('Recent activity') }}</h3>
+            <h3 class="card-title">{{ __('Recent activity') }}</h3>
 
             @if ($portfolio->recent === [])
-                <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">{{ __('No buys or sales yet.') }}</p>
+                <p class="empty">{{ __('No buys or sales yet.') }}</p>
             @else
                 <div class="mt-3 overflow-x-auto">
                     <table class="data-table">
                         <caption class="sr-only">{{ __('Your latest buys and sales, newest first') }}</caption>
                         <thead>
                             <tr>
-                                <th>{{ __('When') }}</th>
-                                <th>{{ __('Type') }}</th>
-                                <th>{{ __('Item') }}</th>
-                                <th class="num">{{ __('Qty') }}</th>
-                                <th class="num">{{ __('Unit') }}</th>
-                                <th class="num">{{ __('Total') }}</th>
+                                <th scope="col">{{ __('When') }}</th>
+                                <th scope="col">{{ __('Type') }}</th>
+                                <th scope="col">{{ __('Item') }}</th>
+                                <th scope="col" class="num">{{ __('Qty') }}</th>
+                                <th scope="col" class="num">{{ __('Unit') }}</th>
+                                <th scope="col" class="num">{{ __('Total') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -145,7 +144,7 @@
                                             <span class="text-gray-700 dark:text-gray-300">{{ __('Buy') }}</span>
                                         @endif
                                     </td>
-                                    <td class="text-gray-900 dark:text-gray-100"><x-item-link :id="$e['item_id']" :name="$e['name']" /></td>
+                                    <td><x-item-link :id="$e['item_id']" :name="$e['name']" /></td>
                                     <td class="num">{{ number_format($e['qty']) }}</td>
                                     <td class="num"><x-money :copper="$e['unit']" /></td>
                                     <td class="num"><x-money :copper="$e['total']" /></td>

@@ -57,6 +57,74 @@
         @apply rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:shadow-card;
     }
 
+    /* Card heading: one scale everywhere (<x-section> uses it too). */
+    .card-title {
+        @apply text-base font-semibold tracking-tight text-gray-900 dark:text-gray-50;
+    }
+
+    /* A card heading with a link or chip on the right. */
+    .card-head {
+        @apply flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2;
+    }
+
+    /* Public page heading. */
+    .page-title {
+        @apply text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100;
+    }
+
+    /* Inline text links and link-like buttons. */
+    .link {
+        @apply text-gray-600 underline hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100;
+    }
+
+    .link-danger {
+        @apply text-red-600 underline hover:text-red-500 dark:text-red-400 dark:hover:text-red-300;
+    }
+
+    /* Footnote under a table, chart or field. */
+    .note {
+        @apply text-xs text-gray-500 dark:text-gray-400;
+    }
+
+    /* "Nothing here yet" line inside a card. */
+    .empty {
+        @apply mt-3 text-sm text-gray-600 dark:text-gray-400;
+    }
+
+    /* Label of a label/value pair (<dt>). */
+    .dl-label {
+        @apply text-gray-500 dark:text-gray-400;
+    }
+
+    /* Toggle buttons and tabs: the chosen one carries aria-pressed="true" or aria-current. The dark
+       border comes from the base layer, so the chosen state can override it. */
+    .seg {
+        @apply rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-600 transition hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100;
+    }
+
+    .seg[aria-pressed='true'],
+    .seg[aria-current] {
+        @apply border-indigo-500 text-gray-900 ring-1 ring-indigo-500 dark:border-indigo-500 dark:text-gray-100;
+    }
+
+    /* Preformatted sample (commands, CSV); darker than the card it sits in. */
+    .code-block {
+        @apply rounded-md bg-gray-100 p-3 text-xs dark:bg-gray-950;
+    }
+
+    .field-file {
+        @apply mt-1 block w-full text-sm text-gray-700 dark:text-gray-300;
+    }
+
+    /* Long-form text pages (about, privacy, terms). */
+    .legal {
+        @apply max-w-2xl space-y-4 text-gray-700 dark:text-gray-300;
+    }
+
+    .legal h2 {
+        @apply pt-4 text-lg font-medium text-gray-900 dark:text-gray-100;
+    }
+
     /* Small uppercase label above a figure or table. */
     .eyebrow {
         @apply text-[11px] font-medium uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400;

@@ -23,7 +23,7 @@
             <div>
                 <x-input-label for="file" :value="__('WowFlipLedger.lua or TradeSkillMaster.lua')" />
                 <input id="file" name="file" type="file" required accept=".lua,.gz"
-                       class="mt-1 block w-full text-sm text-gray-700 dark:text-gray-300"
+                       class="field-file"
                        @change="$refs.mtime.value = $event.target.files[0]?.lastModified ?? ''">
                 <x-input-error class="mt-2" :messages="$errors->get('file')" />
                 <x-input-error class="mt-2" :messages="$errors->get('file_mtime')" />
@@ -37,7 +37,7 @@
                         @foreach ($user->enabledGames() as $value)
                             <label class="inline-flex items-center gap-2">
                                 <input type="radio" name="game" value="{{ $value }}" @checked(old('game', $user->activeGame()) === $value)>
-                                {{ \App\Support\Game::label($value) }} <span class="text-gray-500">({{ \App\Support\Game::FOLDERS[$value] }})</span>
+                                {{ \App\Support\Game::label($value) }} <span class="text-gray-500 dark:text-gray-400">({{ \App\Support\Game::FOLDERS[$value] }})</span>
                             </label>
                         @endforeach
                     </div>
@@ -70,10 +70,11 @@
     <x-section :title="__('Recent uploads')" width="max-w-none"
                :description="__('Uploaded to the wrong game? The newest upload of each game can be undone, which removes the rows it added. Older uploads cannot, because newer files repeat their history.')">
         @if ($uploads->isEmpty())
-            <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">{{ __('Nothing uploaded yet.') }}</p>
+            <p class="empty">{{ __('Nothing uploaded yet.') }}</p>
         @else
             <div class="mt-4 overflow-x-auto">
                 <table class="data-table">
+                    <caption class="sr-only">{{ __('Your uploads, newest first.') }}</caption>
                     <thead>
                         <tr>
                             <th scope="col">{{ __('Received') }}</th>
@@ -88,8 +89,8 @@
                     <tbody>
                         @foreach ($uploads as $upload)
                             <tr class="align-top">
-                                <td>{{ $user->local($upload->received_at)->format('Y-m-d H:i') }}</td>
-                                <td>{{ $user->local($upload->file_mtime)?->format('Y-m-d H:i') ?? '—' }}</td>
+                                <td><x-time :at="$upload->received_at" /></td>
+                                <td><x-time :at="$upload->file_mtime" /></td>
                                 @if ($user->playsSeveral())<td><x-game-badge :game="$upload->game" /></td>@endif
                                 <td>{{ $upload->source }}{{ $upload->client_version ? ' '.$upload->client_version : '' }}</td>
                                 <td class="whitespace-normal">

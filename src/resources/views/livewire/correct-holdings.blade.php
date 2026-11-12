@@ -19,7 +19,7 @@
                         <div>
                             <x-input-label for="c-held" :value="__('Set held to')" />
                             <input id="c-held" type="text" inputmode="numeric" wire:model="held" class="mt-1 block w-32 field text-sm num">
-                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            <p class="mt-1 note">
                                 {{ __('Ledger: :n', ['n' => number_format($ledgerHeld)]) }}
                                 @if ($tsmStock !== null)
                                     · {{ __('TSM stock: :n', ['n' => number_format($tsmStock)]) }}
@@ -39,12 +39,12 @@
                             <label class="flex items-start gap-2">
                                 <input type="radio" wire:model="reason" value="{{ \App\Models\Trade::SIDE_ADJUST }}" class="mt-0.5">
                                 <span><span class="text-gray-900 dark:text-gray-100">{{ __('The ledger was wrong') }}</span>
-                                    <span class="block text-xs text-gray-500 dark:text-gray-400">{{ __('I never had them, or a sale was missed. Removes them at average cost with no profit or loss.') }}</span></span>
+                                    <span class="block note">{{ __('I never had them, or a sale was missed. Removes them at average cost with no profit or loss.') }}</span></span>
                             </label>
                             <label class="flex items-start gap-2">
                                 <input type="radio" wire:model="reason" value="{{ \App\Models\Trade::SIDE_WRITEOFF }}" class="mt-0.5">
                                 <span><span class="text-gray-900 dark:text-gray-100">{{ __('Written off') }}</span>
-                                    <span class="block text-xs text-gray-500 dark:text-gray-400">{{ __('Vendored, used or lost. Their average cost is booked as a realized loss.') }}</span></span>
+                                    <span class="block note">{{ __('Vendored, used or lost. Their average cost is booked as a realized loss.') }}</span></span>
                             </label>
                         </div>
                     </fieldset>
@@ -75,7 +75,7 @@
                             <tbody>
                                 @foreach ($corrections as $c)
                                     <tr wire:key="c{{ $c->id }}">
-                                        <td class="whitespace-nowrap">{{ $user->local($c->traded_at)->format('Y-m-d H:i') }}</td>
+                                        <td><x-time :at="$c->traded_at" /></td>
                                         <td>
                                             {{ \App\Models\Trade::correctionLabel($c->side) }}
                                             @if (($proceeds = \App\Models\Trade::proceeds($c->side, (int) $c->cost_copper)) !== null)
@@ -87,7 +87,7 @@
                                         <td class="text-end">
                                             <button type="button" wire:click="undo({{ $c->id }})" wire:confirm="{{ __('Undo this correction?') }}"
                                                     wire:loading.attr="disabled" wire:target="undo"
-                                                    class="text-sm underline text-red-600 dark:text-red-400">{{ __('Undo') }}</button>
+                                                    class="link-danger text-sm">{{ __('Undo') }}</button>
                                         </td>
                                     </tr>
                                 @endforeach

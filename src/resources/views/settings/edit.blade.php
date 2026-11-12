@@ -61,7 +61,7 @@
                     <x-text-input :id="$name" :name="$name" type="number" :step="$step" :min="$min" :max="$max" class="mt-1 block w-full"
                                   :value="old($name, $user->{$name})" />
                     @if ($hint)
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $hint }}</p>
+                        <p class="mt-1 note">{{ $hint }}</p>
                     @endif
                     <x-input-error class="mt-2" :messages="$errors->get($name)" />
                 </div>
@@ -69,7 +69,7 @@
 
             <fieldset class="space-y-3">
                 <legend class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ __('Price alert emails') }}</legend>
-                <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('Off by default. When on, you get one email after a price refresh listing what changed, and never more than one email per item and rule in :h hours.', ['h' => config('ledger.alerts.cooldown_hours')]) }}</p>
+                <p class="note">{{ __('Off by default. When on, you get one email after a price refresh listing what changed, and never more than one email per item and rule in :h hours.', ['h' => config('ledger.alerts.cooldown_hours')]) }}</p>
                 @foreach ([
                     'alerts_enabled' => [__('Send me price alerts'), null],
                     'alert_buy_target' => [__('A watchlist item reaches its buy target'), __('Floor at or under the target you set on the Market page.')],
@@ -82,7 +82,7 @@
                             <input type="checkbox" name="{{ $field }}" value="1" @checked(old($field, $user->{$field})) class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500">
                             {{ $label }}
                         </label>
-                        @if ($hint)<p class="ms-6 text-xs text-gray-500 dark:text-gray-400">{{ $hint }}</p>@endif
+                        @if ($hint)<p class="ms-6 note">{{ $hint }}</p>@endif
                     </div>
                 @endforeach
             </fieldset>
@@ -98,7 +98,7 @@
                :description="__('Download everything this site holds about you as a zip of CSV files: trades, sales, expirations, cancellations, watchlist, uploads and account settings. Passwords and tokens are not included.')">
         <div class="mt-4 flex flex-wrap items-center gap-4">
             <x-primary-button :href="route('settings.export')">{{ __('Download my data') }}</x-primary-button>
-            <a href="{{ route('profile.edit') }}" class="text-sm underline text-red-600 dark:text-red-400">{{ __('Delete my account') }}</a>
+            <a href="{{ route('profile.edit') }}" class="link-danger text-sm">{{ __('Delete my account') }}</a>
         </div>
     </x-section>
 

@@ -19,7 +19,7 @@
             <div class="flex items-center gap-4">
                 <x-primary-button>{{ __('Save') }}</x-primary-button>
                 <x-saved :when="session('status') === 'scoreboard-updated'" />
-                <a href="{{ route('scoreboard') }}" class="text-sm underline text-gray-600 dark:text-gray-400">{{ __('View the scoreboard') }}</a>
+                <a href="{{ route('scoreboard') }}" class="link text-sm">{{ __('View the scoreboard') }}</a>
             </div>
         </form>
     @else
