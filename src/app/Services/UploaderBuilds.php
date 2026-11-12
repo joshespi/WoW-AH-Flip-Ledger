@@ -40,14 +40,9 @@ class UploaderBuilds
             $byVersion[$version]["$os-$arch"] = ['file' => $file, 'sha256' => $sha, 'size' => (int) filesize($path), 'os' => $os, 'arch' => $arch];
         }
 
-        if ($byVersion === []) {
-            return null;
-        }
+        $version = self::newest($byVersion);
 
-        uksort($byVersion, 'version_compare');
-        $version = (string) array_key_last($byVersion);
-
-        return ['version' => $version, 'builds' => $byVersion[$version]];
+        return $version === null ? null : ['version' => $version, 'builds' => $byVersion[$version]];
     }
 
     /**
@@ -65,13 +60,18 @@ class UploaderBuilds
             $found[$version] = ['version' => $version, 'file' => $file, 'sha256' => $sha, 'size' => (int) filesize($path)];
         }
 
-        if ($found === []) {
-            return null;
-        }
+        $version = self::newest($found);
 
-        uksort($found, 'version_compare');
+        return $version === null ? null : $found[$version];
+    }
 
-        return $found[array_key_last($found)];
+    /** The highest version among the keys, or null when there are none. */
+    private static function newest(array $byVersion): ?string
+    {
+        $versions = array_map('strval', array_keys($byVersion));
+        usort($versions, 'version_compare');
+
+        return $versions === [] ? null : end($versions);
     }
 
     public function addonPath(): ?string

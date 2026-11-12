@@ -5,9 +5,10 @@ namespace App\Services;
 use App\Models\Trade;
 use App\Models\User;
 use App\Support\Game;
+use App\Support\Holding;
 use App\Support\ItemName;
 use App\Support\MarketStats;
-use App\Support\Num;
+use App\Support\Money;
 use App\Support\Utc;
 use Illuminate\Support\Facades\DB;
 
@@ -109,7 +110,7 @@ class ItemDetailService
 
         foreach ($events as $e) {
             if ($e['kind'] === $kind) {
-                $points[] = ['ts' => $e['ts'], 'unit' => intdiv($e['total'], max(1, $e['qty'])), 'qty' => $e['qty']];
+                $points[] = ['ts' => $e['ts'], 'unit' => Money::unit($e['total'], $e['qty']), 'qty' => $e['qty']];
             }
         }
 
@@ -131,54 +132,39 @@ class ItemDetailService
             }
         }
 
-        $held = $cost = $realized = $own = 0;
+        $h = new Holding;
+        $realized = $own = 0;
         $timeline = $steps = [];
 
         foreach ($events as $e) {
-            $row = $e + ['unit' => $e['total'] === null ? null : intdiv($e['total'], max(1, $e['qty'])), 'pnl' => null, 'tracked' => true];
+            $row = $e + ['unit' => $e['total'] === null ? null : Money::unit($e['total'], $e['qty']), 'pnl' => null, 'tracked' => true];
+            $moves = $e['kind'] === 'buy' || $e['kind'] === 'sale' || in_array($e['kind'], Trade::CORRECTIONS, true);
 
             if ($e['kind'] === 'buy') {
-                $held += $e['qty'];
-                $cost += $e['total'];
-            } elseif (in_array($e['kind'], Trade::CORRECTIONS, true)) {
-                if ($first === null || $e['ts'] < $first) {
-                    $row['tracked'] = false;
-                } else {
-                    [$m, $removed] = LedgerService::take($held, $cost, $e['qty']);
-
-                    if (Trade::booksPnl($e['kind'])) {
-                        $row['pnl'] = Num::mulDiv($e['total'] ?? 0, $m, $e['qty']) - $removed;
-                        $realized += $row['pnl'];
-                    }
-
-                    $cost -= $removed;
-                    $held -= $m;
-                }
+                $h->buy($e['qty'], $e['total']);
+            } elseif ($moves && ($first === null || $e['ts'] < $first)) {
+                $row['tracked'] = false;
             } elseif ($e['kind'] === 'sale') {
-                if ($first === null || $e['ts'] < $first) {
-                    $row['tracked'] = false;
-                } else {
-                    [$m, $cogs] = LedgerService::take($held, $cost, $e['qty']);
-                    $rev = Num::mulDiv($e['total'], $m, $e['qty']);
+                [$m, $rev, $cogs] = $h->sell($e['qty'], $e['total']);
 
-                    $row['pnl'] = $rev - $cogs;
-                    $realized += $rev - $cogs;
-                    $own += $e['qty'] - $m;
-                    $held -= $m;
-                    $cost -= $cogs;
-                }
+                $row['pnl'] = $rev - $cogs;
+                $own += $e['qty'] - $m;
+            } elseif ($moves) {
+                $row['pnl'] = $h->correct($e['kind'], $e['qty'], $e['total'] ?? 0);
             }
 
-            if (in_array($e['kind'], ['buy', 'sale', ...Trade::CORRECTIONS], true) && $row['tracked']) {
-                $steps[] = ['ts' => $e['ts'], 'held' => $held, 'avg' => $held > 0 ? $cost / $held : null];
-                $row['held'] = $held;
-                $row['avg'] = $held > 0 ? $cost / $held : null;
+            $realized += $row['pnl'] ?? 0;
+
+            if ($moves && $row['tracked']) {
+                $steps[] = ['ts' => $e['ts'], 'held' => $h->held, 'avg' => $h->avg()];
+                $row['held'] = $h->held;
+                $row['avg'] = $h->avg();
             }
 
             $timeline[] = $row;
         }
 
-        return [$timeline, $steps, ['held' => $held, 'avg' => $held > 0 ? $cost / $held : null, 'realized' => $realized, 'own_qty' => $own]];
+        return [$timeline, $steps, ['held' => $h->held, 'avg' => $h->avg(), 'realized' => $realized, 'own_qty' => $own]];
     }
 
     /** Market numbers; derived ones are null until the item has enough history. */
@@ -213,7 +199,7 @@ class ItemDetailService
         $out = [];
 
         if ($newest !== null) {
-            $from = Utc::day(Utc::ts($newest) - (self::CHART_DAYS - 1) * 86400);
+            $from = Utc::day(Utc::daysAgo(self::CHART_DAYS - 1, Utc::ts($newest)));
 
             foreach (DB::table('price_daily')->where('region', $region)->where('item_id', $itemId)->where('day', '>=', $from)
                 ->orderBy('day')->get(['day', 'floor_median', 'floor_min']) as $d) {

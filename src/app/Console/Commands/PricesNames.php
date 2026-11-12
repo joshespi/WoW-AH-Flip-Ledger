@@ -8,7 +8,7 @@ use App\Services\ItemNameFetcher;
 
 class PricesNames extends PricesCommand
 {
-    protected $signature = 'prices:names {--region= : Region code (default: BLIZZARD_REGION)} {--limit= : Items to look up this run (default: ledger.prices.names_per_run)}';
+    protected $signature = 'prices:names '.self::REGION_OPTION.' {--limit= : Items to look up this run (default: ledger.prices.names_per_run)}';
 
     protected $description = 'Look up names for commodities from the Blizzard item API (paced; each item is looked up once)';
 

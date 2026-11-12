@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use App\Support\Game;
+use App\Support\Utc;
 
 /**
  * The Both screen: each game's portfolio side by side plus a total. Games are never merged row
@@ -75,7 +76,7 @@ class CombinedService
             $held += $r->held;
         }
 
-        $since = $now - self::FLIP_DAYS * 86400;
+        $since = Utc::daysAgo(self::FLIP_DAYS, $now);
         $flips = count(array_filter($p->realizedEvents, fn (array $e) => $e[0] >= $since && $e[0] <= $now));
 
         return [

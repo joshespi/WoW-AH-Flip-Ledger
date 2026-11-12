@@ -8,7 +8,7 @@ use App\Services\PriceStatsService;
 
 class PricesRollup extends PricesCommand
 {
-    protected $signature = 'prices:rollup {--region= : Region code (default: BLIZZARD_REGION)} {--days=2 : How many UTC days back to roll up, including today} {--stats : Also recompute item stats}';
+    protected $signature = 'prices:rollup '.self::REGION_OPTION.' {--days=2 : How many UTC days back to roll up, including today} {--stats : Also recompute item stats}';
 
     protected $description = 'Roll hourly price snapshots up into daily rows (safe to re-run)';
 

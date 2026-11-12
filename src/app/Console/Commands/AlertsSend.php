@@ -21,7 +21,7 @@ class AlertsSend extends Command
 
         foreach (array_keys(config('ledger.regions')) as $region) {
             // Only a refresh that brought new prices counts; 'unchanged' and 'failed' runs do not.
-            $run = FetchRun::where('region', $region)->where('status', FetchRun::STATUS_OK)->latest('started_at')->latest('id')->first();
+            $run = FetchRun::latestOk($region);
             $marker = "alerts:last-run:{$region}";
 
             if ($run === null) {
@@ -37,7 +37,7 @@ class AlertsSend extends Command
                     continue;
                 }
 
-                if (($run->finished_at ?? $run->started_at)->lt(now()->subHours((int) config('ledger.prices.stale_hours')))) {
+                if (now()->getTimestamp() - ($run->finished_at ?? $run->started_at)->getTimestamp() > FetchRun::staleAfter()) {
                     $this->warn("{$region}: the newest prices are stale, not alerting on them.");
 
                     continue;
@@ -47,7 +47,7 @@ class AlertsSend extends Command
             $sent = $users = 0;
             $regionFailed = false;
 
-            User::where('region', $region)->where('alerts_enabled', true)->where('is_demo', false)->whereNotNull('email_verified_at')
+            User::real()->verified()->where('region', $region)->where('alerts_enabled', true)
                 ->chunkById(100, function ($chunk) use ($alerts, &$sent, &$users, &$regionFailed) {
                     foreach ($chunk as $user) {
                         $users++;

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\TradesImportService;
+use App\Support\Csv;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -24,7 +25,7 @@ class TradesImportController extends Controller
         return response()->streamDownload(
             fn () => print (TradesImportService::TEMPLATE."\n"),
             'trades-template.csv',
-            ['Content-Type' => 'text/csv; charset=UTF-8'],
+            Csv::HEADERS,
         );
     }
 

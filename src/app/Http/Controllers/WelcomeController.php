@@ -9,6 +9,6 @@ class WelcomeController extends Controller
 {
     public function __invoke(): View
     {
-        return view('welcome', ['demo' => User::where('is_demo', true)->exists()]);
+        return view('welcome', ['demo' => User::demo()->exists()]);
     }
 }

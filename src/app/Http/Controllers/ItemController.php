@@ -34,6 +34,6 @@ class ItemController extends Controller
             ],
         ];
 
-        return view('items.show', ['d' => $data, 'chart' => $chart, 'user' => $request->user()]);
+        return view('items.show', ['d' => $data, 'chart' => $chart]);
     }
 }

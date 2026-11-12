@@ -84,7 +84,7 @@ class PriceStatsService
     private function recent(string $region, int $anchor): array
     {
         $rows = DB::table('price_snapshots')->where('region', $region)
-            ->where('taken_at', '>', Utc::sql($anchor - 86400))
+            ->where('taken_at', '>', Utc::sql(Utc::daysAgo(1, $anchor)))
             ->where('taken_at', '<=', Utc::sql($anchor))
             ->orderBy('item_id')->select('item_id', 'floor')->cursor();
 
@@ -102,8 +102,8 @@ class PriceStatsService
      */
     private function daily(string $region, int $anchor): array
     {
-        $first60 = Utc::day($anchor - 59 * 86400);
-        $first30 = Utc::day($anchor - 29 * 86400);
+        $first60 = Utc::day(Utc::daysAgo(59, $anchor));
+        $first30 = Utc::day(Utc::daysAgo(29, $anchor));
         $last = Utc::day($anchor);
 
         $typical = $hist60 = $days = [];
@@ -129,7 +129,7 @@ class PriceStatsService
     private function sold(string $region, int $anchor): array
     {
         $window = (int) config('ledger.prices.sold_window_days');
-        $from = $anchor - $window * 86400;
+        $from = Utc::daysAgo($window, $anchor);
 
         $first = DB::table('price_snapshots')->where('region', $region)
             ->where('taken_at', '>', Utc::sql($from))->min('taken_at');
@@ -139,7 +139,7 @@ class PriceStatsService
         }
 
         // Days actually covered, at least one, so a single hour of data isn't scaled up 24x.
-        $span = max(1.0, ($anchor - Utc::ts($first)) / 86400);
+        $span = max(1.0, ($anchor - Utc::ts($first)) / Utc::DAY);
 
         // Each snapshot's drop from the one before it for the same item (the first has none), summed
         // per item in the database instead of streaming every row of the window through PHP.

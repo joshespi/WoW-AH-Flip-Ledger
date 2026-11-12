@@ -6,6 +6,7 @@ use App\Models\Trade;
 use App\Models\User;
 use App\Support\Bulk;
 use App\Support\Game;
+use App\Support\Money;
 use App\Support\Utc;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -109,7 +110,7 @@ class ReconcileService
                 }
 
                 $matched = $matched || $q === $qty
-                    || ($source === 'csv' && abs($tradeUnit - $unit) <= $unit * self::CSV_PRICE_TOLERANCE);
+                    || ($source === Trade::SOURCE_CSV && abs($tradeUnit - $unit) <= $unit * self::CSV_PRICE_TOLERANCE);
                 $double = $double || $q * 2 === $qty;
             }
 
@@ -162,7 +163,7 @@ class ReconcileService
 
             $trade = app(TradesService::class)->add(
                 $user, (int) $c->item_id, $qty ?? (int) $c->qty, $cost ?? (int) $c->cost_copper,
-                $ts ?? Utc::ts($c->at), null, 'tsm', $c->tsm_ref, $c->game,
+                $ts ?? Utc::ts($c->at), null, Trade::SOURCE_TSM, $c->tsm_ref, $c->game,
             );
 
             DB::table('tsm_buy_candidates')->where('id', $c->id)->update(['status' => self::ACCEPTED]);
@@ -205,7 +206,7 @@ class ReconcileService
         $t = Trade::ownedBy($user)->inGame($game)->where('item_id', $itemId)->where('side', Trade::SIDE_VENDOR)
             ->orderByDesc('traded_at')->orderByDesc('id')->first(['qty', 'cost_copper']);
 
-        return $t === null ? null : intdiv((int) $t->cost_copper, max(1, (int) $t->qty));
+        return $t === null ? null : Money::unit((int) $t->cost_copper, (int) $t->qty);
     }
 
     /**

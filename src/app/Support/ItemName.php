@@ -8,6 +8,13 @@ final class ItemName
 {
     private const MAX_LENGTH = 120;
 
+    // items.name_source; precedence is Blizzard over TSM over none.
+    public const SOURCE_NONE = 'none';
+
+    public const SOURCE_TSM = 'tsm';
+
+    public const SOURCE_BLIZZARD = 'blizzard';
+
     /** `i:238511::1:6710` -> `i:238511`; pets (`p:2843:1:3` -> `p:2843`) work the same way. */
     public static function baseId(string $itemString): string
     {
@@ -47,7 +54,7 @@ final class ItemName
         $ids = [];
 
         foreach (array_chunk(array_values(array_unique(array_map('mb_strtolower', $names))), Bulk::CHUNK) as $chunk) {
-            $q = DB::table('items')->whereRaw('lower(name) in ('.implode(',', array_fill(0, count($chunk), '?')).')', $chunk);
+            $q = DB::table('items')->whereRaw('lower(name) in ('.Sql::placeholders(count($chunk)).')', $chunk);
 
             foreach (($commoditiesOnly ? $q->where('is_commodity', 1) : $q)->get(['id', 'name']) as $item) {
                 $ids[mb_strtolower($item->name)][] = (int) $item->id;

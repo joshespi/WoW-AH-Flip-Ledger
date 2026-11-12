@@ -16,6 +16,10 @@ class Upload extends Model
 
     public const STATUS_FAILED = 'failed';
 
+    public const SOURCE_MANUAL = 'manual';
+
+    public const SOURCE_UPLOADER = 'uploader';
+
     /** Not stored: the failure was temporary (busy, database error), so the same file may succeed later. */
     public bool $retryable = false;
 

@@ -12,7 +12,7 @@ final class Bounds
     public const MIN_TIME = 1_072_915_200;
 
     /** Latest accepted time ahead of now; two days covers every timezone and a skewed clock. */
-    public const MAX_FUTURE_SECONDS = 2 * 86400;
+    public const MAX_FUTURE_SECONDS = 2 * Utc::DAY;
 
     // Money and quantity limits keep qty x price inside a signed 64-bit integer (copper).
     public const MAX_QTY = 10_000_000;
@@ -89,6 +89,18 @@ final class Bounds
         return $id >= 1 && $id <= self::MAX_ITEM_ID;
     }
 
+    /** A per-unit price in copper, from $min (0, or 1 where free makes no sense) to MAX_PRICE. */
+    public static function validPrice(int $copper, int $min = 0): bool
+    {
+        return $copper >= $min && $copper <= self::MAX_PRICE;
+    }
+
+    /** A copper limit as whole gold for a message: "10,000,000". */
+    public static function gold(int $copper): string
+    {
+        return number_format($copper / Money::COPPER_PER_GOLD);
+    }
+
     /** A whole number typed into a form (digits only, at most 9), or null. */
     public static function wholeNumber(string $text): ?int
     {
@@ -116,7 +128,7 @@ final class Bounds
         return match (true) {
             ! self::validItemId($itemId) => 'item id is out of range',
             $qty < 1 || $qty > self::MAX_QTY => 'quantity must be between 1 and '.number_format(self::MAX_QTY),
-            $cost < 0 || $cost > self::MAX_COST => 'cost must be between 0 and '.number_format(self::MAX_COST / Money::COPPER_PER_GOLD).' gold',
+            $cost < 0 || $cost > self::MAX_COST => 'cost must be between 0 and '.self::gold(self::MAX_COST).' gold',
             ! self::plausibleTime($ts) => 'time is outside the plausible range',
             default => null,
         };

@@ -85,7 +85,7 @@ class TradesImportService
                 'cost_copper' => $t['cost'],
                 'side' => Trade::SIDE_BUY,
                 'note' => Bounds::note($t['note']),
-                'source' => 'csv',
+                'source' => Trade::SOURCE_CSV,
                 'import_key' => sha1(Game::keyPrefix($game).$base.'|'.$n),
                 'created_at' => $now,
                 'updated_at' => $now,

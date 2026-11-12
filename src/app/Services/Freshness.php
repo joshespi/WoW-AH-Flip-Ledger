@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\FetchRun;
 use App\Models\Upload;
 use App\Models\User;
+use App\Support\Utc;
 
 /**
  * How old the data behind the screens is, for the page header.
@@ -54,7 +55,7 @@ final readonly class Freshness
     public function pricesStale(): bool
     {
         return $this->lastFetchFailed
-            || ($this->pricesFetchedAt !== null && $this->now - $this->pricesFetchedAt > config('ledger.prices.stale_hours') * 3600);
+            || ($this->pricesFetchedAt !== null && $this->now - $this->pricesFetchedAt > FetchRun::staleAfter());
     }
 
     /** "just now", "5 min ago", "3 h ago", "2 d ago": coarse on purpose. */
@@ -63,9 +64,9 @@ final readonly class Freshness
         $seconds = max(0, $this->now - $ts);
 
         return $seconds < 90 ? __('just now') : __(':age ago', ['age' => match (true) {
-            $seconds < 3600 => intdiv($seconds, 60).' min',
-            $seconds < 86400 => intdiv($seconds, 3600).' h',
-            default => intdiv($seconds, 86400).' d',
+            $seconds < Utc::HOUR => intdiv($seconds, 60).' min',
+            $seconds < Utc::DAY => intdiv($seconds, Utc::HOUR).' h',
+            default => intdiv($seconds, Utc::DAY).' d',
         }]);
     }
 }

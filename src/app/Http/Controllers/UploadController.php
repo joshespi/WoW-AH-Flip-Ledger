@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Upload;
 use App\Services\IngestService;
 use App\Services\UploadService;
 use App\Support\Game;
@@ -49,7 +50,7 @@ class UploadController extends Controller
         $upload = $ingest->ingest(
             $request->user(),
             $request->file('file')->get(),
-            'manual',
+            Upload::SOURCE_MANUAL,
             $ms === null ? null : intdiv((int) $ms, 1000),
             game: $request->input('game') ?? Game::RETAIL,
             checkRealms: ! $request->boolean('game_confirmed'),

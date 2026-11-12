@@ -22,7 +22,7 @@ class PriceRollup
         $rows = 0;
 
         for ($i = 0; $i < $days; $i++) {
-            $rows += $this->rollupDay($region, Utc::day(time() - $i * 86400));
+            $rows += $this->rollupDay($region, Utc::day(Utc::daysAgo($i)));
         }
 
         return $rows;

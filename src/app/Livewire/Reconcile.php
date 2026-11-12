@@ -178,6 +178,6 @@ class Reconcile extends Component
         // Rows that were handled elsewhere drop out of the selection.
         $this->selected = array_values(array_intersect(array_map('intval', $this->selected), $shown));
 
-        return view('livewire.reconcile', ['rows' => $rows, 'user' => $user, 'vendored' => $reconcile->vendoredTotals($user, $user->activeGame())]);
+        return view('livewire.reconcile', ['rows' => $rows, 'vendored' => $reconcile->vendoredTotals($user, $user->activeGame())]);
     }
 }

@@ -34,7 +34,7 @@ class AlertService
         $current = $this->current($user);
         $states = DB::table('alert_states')->ownedBy($user)->get()->keyBy(fn ($s) => $s->kind.':'.$s->item_id);
 
-        $cooldown = (int) config('ledger.alerts.cooldown_hours') * 3600;
+        $cooldown = (int) config('ledger.alerts.cooldown_hours') * Utc::HOUR;
         $cap = (int) config('ledger.alerts.max_items_per_email');
         $send = [];
         $rows = [];

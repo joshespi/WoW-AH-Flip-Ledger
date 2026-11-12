@@ -7,6 +7,7 @@ use App\Models\FetchRun;
 use App\Models\User;
 use App\Services\AdminService;
 use App\Services\BackupStatus;
+use App\Support\Utc;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
@@ -27,7 +28,7 @@ class HealthCheck extends Command
     public function handle(AdminService $admin, BackupStatus $backups): int
     {
         $now = time();
-        $reminder = (int) config('ledger.health.reminder_hours') * 3600;
+        $reminder = (int) config('ledger.health.reminder_hours') * Utc::HOUR;
 
         // label => null when healthy (or not applicable), else what is wrong
         $checks = [];
@@ -84,7 +85,7 @@ class HealthCheck extends Command
             return self::SUCCESS;
         }
 
-        $to = User::where('is_admin', true)->whereNotNull('email_verified_at')->pluck('email')->all();
+        $to = User::admins()->pluck('email')->all();
 
         if ($to === []) {
             $this->warn('There are problems but no admin to tell: '.implode('; ', array_keys($problems)));

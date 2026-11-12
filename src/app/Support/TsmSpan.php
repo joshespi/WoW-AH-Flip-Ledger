@@ -34,7 +34,7 @@ final class TsmSpan
     /** @return array{0: string, 1: string}|null [from, to] database times of exactly this account's span, or null */
     public static function get(User $user, string $game, string $account = ''): ?array
     {
-        $row = DB::table('tsm_spans')->where('user_id', $user->id)->where('game', $game)->where('account', $account)->first(['from', 'to']);
+        $row = DB::table('tsm_spans')->ownedBy($user)->inGame($game)->where('account', $account)->first(['from', 'to']);
 
         return $row === null ? null : [$row->from, $row->to];
     }
@@ -46,7 +46,7 @@ final class TsmSpan
      */
     public static function covering(User $user, string $game, string $account): array
     {
-        return self::accounts(DB::table('tsm_spans')->where('user_id', $user->id)->where('game', $game), $account)
+        return self::accounts(DB::table('tsm_spans')->ownedBy($user)->inGame($game), $account)
             ->get(['from', 'to'])->map(fn ($r) => [$r->from, $r->to])->all();
     }
 
@@ -146,7 +146,7 @@ final class TsmSpan
             }
         }
 
-        DB::table('tsm_spans')->where('user_id', $user->id)->where('game', $game)->delete();
+        DB::table('tsm_spans')->ownedBy($user)->inGame($game)->delete();
         DB::table('tsm_spans')->insert(array_map(
             fn (string $a, array $s) => ['user_id' => $user->id, 'game' => $game, 'account' => $a, 'from' => $s[0], 'to' => $s[1]],
             array_keys($spans), $spans,

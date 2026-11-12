@@ -86,10 +86,33 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->is_demo || $this->isBeingImpersonated();
     }
 
+    /** The shared demo account. */
+    public function scopeDemo(Builder $query): void
+    {
+        $query->where('is_demo', true);
+    }
+
+    /** Every account but the demo. */
+    public function scopeReal(Builder $query): void
+    {
+        $query->where('is_demo', false);
+    }
+
+    public function scopeVerified(Builder $query): void
+    {
+        $query->whereNotNull('email_verified_at');
+    }
+
+    /** Admins who can be mailed. */
+    public function scopeAdmins(Builder $query): void
+    {
+        $query->where('is_admin', true)->verified();
+    }
+
     /** Accounts that count in public numbers (/stats, /scoreboard): verified and not the demo. */
     public function scopeCounted(Builder $query): void
     {
-        $query->where('is_demo', false)->whereNotNull('email_verified_at');
+        $query->real()->verified();
     }
 
     /** Counted accounts listed on the scoreboard right now: opted in, with a nickname. */

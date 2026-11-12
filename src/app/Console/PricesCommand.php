@@ -8,6 +8,8 @@ use Illuminate\Console\Command;
 /** Shared bits of the prices:* commands. */
 abstract class PricesCommand extends Command
 {
+    protected const REGION_OPTION = '{--region= : Region code (default: BLIZZARD_REGION)}';
+
     /** The --region option, else BLIZZARD_REGION. */
     protected function region(): string
     {

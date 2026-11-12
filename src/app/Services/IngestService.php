@@ -9,6 +9,7 @@ use App\Support\Bulk;
 use App\Support\Game;
 use App\Support\ItemName;
 use App\Support\PayloadDecoder;
+use App\Support\Sql;
 use App\Support\TsmSpan;
 use App\Support\Utc;
 use Illuminate\Contracts\Cache\Lock;
@@ -408,10 +409,10 @@ class IngestService
                 array_push($bindings, $id, $name);
             }
 
-            $in = implode(',', array_fill(0, count($chunk), '?'));
+            $in = Sql::placeholders(count($chunk));
             $added += DB::update(
-                'update items set name = case id '.implode(' ', $cases)." end, name_source = 'tsm', updated_at = ? where id in ({$in}) and name is null and is_commodity = 1",
-                [...$bindings, $now, ...array_keys($chunk)],
+                'update items set name = case id '.implode(' ', $cases)." end, name_source = ?, updated_at = ? where id in ({$in}) and name is null and is_commodity = 1",
+                [...$bindings, ItemName::SOURCE_TSM, $now, ...array_keys($chunk)],
             );
         }
 
@@ -421,7 +422,7 @@ class IngestService
     /** A file's mtime is trusted less than row times: one day of clock skew, not two. */
     private function plausibleMtime(?int $mtime, int $now): ?int
     {
-        return $mtime !== null && Bounds::plausibleTime($mtime, 86400, $now) ? $mtime : null;
+        return $mtime !== null && Bounds::plausibleTime($mtime, Utc::DAY, $now) ? $mtime : null;
     }
 
     private function label(?string $v, int $max): ?string

@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Models\Trade;
 use App\Support\Bounds;
+use App\Support\Holding;
 use App\Support\ItemName;
-use App\Support\Num;
 
 /**
  * Weighted-average cost ledger. Port of the legacy build_ledger, same integer math.
@@ -112,31 +112,18 @@ class LedgerService
     }
 
     /**
-     * Takes up to $qty units out of a holding at average cost: [units taken, their cost]. The one
-     * rule behind sales, adjustments and write-offs here and in ItemDetailService's replay.
-     *
-     * @return array{int, int}
-     */
-    public static function take(int $held, int $cost, int $qty): array
-    {
-        $m = min($qty, $held);
-
-        return [$m, $held > 0 ? Num::mulDiv($cost, $m, $held) : 0];
-    }
-
-    /**
      * @param  list<array{int, int, int, int}>  $events  [ts, side (0 buy, 1 sell, 2 + Trade::correctionRank()), qty, total copper (a correction's proceeds)]
      * @param  callable(int, int): void  $onPnl
      * @return array{bq: int, bc: int, sq: int, sr: int, pnl: int, oq: int, orev: int, inv: int, cost: int}
      */
     private function replay(array $events, callable $onPnl): array
     {
-        $a = ['bq' => 0, 'bc' => 0, 'sq' => 0, 'sr' => 0, 'pnl' => 0, 'oq' => 0, 'orev' => 0, 'inv' => 0, 'cost' => 0];
+        $a = ['bq' => 0, 'bc' => 0, 'sq' => 0, 'sr' => 0, 'pnl' => 0, 'oq' => 0, 'orev' => 0];
+        $h = new Holding;
 
         foreach ($events as [$ts, $side, $q, $c]) {
             if ($side === 0) {
-                $a['inv'] += $q;
-                $a['cost'] += $c;
+                $h->buy($q, $c);
                 $a['bq'] += $q;
                 $a['bc'] += $c;
 
@@ -144,22 +131,14 @@ class LedgerService
             }
 
             if ($side >= 2) {
-                [$m, $removed] = self::take($a['inv'], $a['cost'], $q);
-                if (Trade::booksPnl(Trade::CORRECTIONS[$side - 2])) {
-                    // Proceeds (none for a write-off) count for the units actually held, like a sale's revenue.
-                    $gain = Num::mulDiv($c, $m, $q) - $removed;
-                    $a['pnl'] += $gain;
-                    $gain !== 0 && $onPnl($ts, $gain);
-                }
-
-                $a['cost'] -= $removed;
-                $a['inv'] -= $m;
+                $gain = $h->correct(Trade::CORRECTIONS[$side - 2], $q, $c);
+                $a['pnl'] += $gain ?? 0;
+                $gain && $onPnl($ts, $gain);
 
                 continue;
             }
 
-            [$m, $cogs] = self::take($a['inv'], $a['cost'], $q);
-            $rev = Num::mulDiv($c, $m, $q);
+            [$m, $rev, $cogs] = $h->sell($q, $c);
 
             $a['pnl'] += $rev - $cogs;
             $rev !== $cogs && $onPnl($ts, $rev - $cogs);
@@ -168,10 +147,8 @@ class LedgerService
             $a['sr'] += $rev;
             $a['oq'] += $q - $m;
             $a['orev'] += $c - $rev;
-            $a['inv'] -= $m;
-            $a['cost'] -= $cogs;
         }
 
-        return $a;
+        return $a + ['inv' => $h->held, 'cost' => $h->cost];
     }
 }

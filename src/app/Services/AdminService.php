@@ -25,10 +25,10 @@ class AdminService
     public function overview(): array
     {
         // Each group of counts is one query (a boolean is 1 or 0 in both MariaDB and SQLite).
-        $users = User::where('is_demo', false)
-            ->selectRaw('count(*) as total, sum(email_verified_at is not null) as verified, sum(created_at >= ?) as new_7d', [Utc::sql(time() - 7 * 86400)])
+        $users = User::real()
+            ->selectRaw('count(*) as total, sum(email_verified_at is not null) as verified, sum(created_at >= ?) as new_7d', [Utc::sql(Utc::daysAgo(7))])
             ->first();
-        $uploads = Upload::where('received_at', '>=', Utc::sql(time() - 86400))
+        $uploads = Upload::where('received_at', '>=', Utc::sql(Utc::daysAgo(1)))
             ->selectRaw('sum(status = ?) as ok, sum(status = ?) as failed', [Upload::STATUS_OK, Upload::STATUS_FAILED])
             ->first();
         $items = DB::table('items')->selectRaw('count(*) as total, sum(name is null) as unnamed')->first();
@@ -38,8 +38,7 @@ class AdminService
                 'total' => (int) $users->total,
                 'verified' => (int) $users->verified,
                 'new_7d' => (int) $users->new_7d,
-                'with_upload' => DB::table('uploads')->join('users', 'users.id', '=', 'uploads.user_id')
-                    ->where('users.is_demo', false)->where('uploads.status', Upload::STATUS_OK)->distinct()->count('uploads.user_id'),
+                'with_upload' => Upload::succeeded()->whereIn('user_id', User::real()->select('id'))->distinct()->count('user_id'),
             ],
             'uploads' => ['ok_24h' => (int) $uploads->ok, 'failed_24h' => (int) $uploads->failed],
             'fetch' => $this->fetchHealth(),
@@ -58,7 +57,7 @@ class AdminService
      */
     public function fetchHealth(bool $withCounts = true): array
     {
-        $day = Utc::sql(time() - 86400);
+        $day = Utc::sql(Utc::daysAgo(1));
         $configured = app(BlizzardClient::class)->configured();
         $out = [];
 
@@ -72,11 +71,11 @@ class AdminService
                 'last' => $last,
                 'good' => $good,
                 'age' => $age,
-                'stale' => $good === null || $age > config('ledger.prices.stale_hours') * 3600 || $last?->status === FetchRun::STATUS_FAILED,
+                'stale' => $good === null || $age > FetchRun::staleAfter() || $last?->status === FetchRun::STATUS_FAILED,
             ];
 
             if ($withCounts) {
-                $runs = FetchRun::where('region', $region)->where('started_at', '>=', $day)
+                $runs = FetchRun::inRegion($region)->where('started_at', '>=', $day)
                     ->selectRaw('count(*) as total, sum(status = ?) as failed', [FetchRun::STATUS_FAILED])->first();
 
                 $h += [

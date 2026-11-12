@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Trade;
 use App\Models\Upload;
 use App\Models\User;
 use App\Support\Utc;
@@ -36,7 +37,7 @@ class SiteStatsService
     public function build(?int $now = null): array
     {
         $now ??= time();
-        $from = Utc::day($now - (self::DAYS - 1) * 86400);
+        $from = Utc::day(Utc::daysAgo(self::DAYS - 1, $now));
 
         // Per UTC day. date() is the same call on MariaDB and SQLite, and a `Y-m-d` lower bound
         // compares the same against date and datetime columns on both.
@@ -50,17 +51,17 @@ class SiteStatsService
         // One row per user and day (the primary key), so a day's count is its active users.
         $activeByDay = $series('user_activity_days', 'day');
         $sales = $series('tsm_sales', 'sold_at');
-        $buys = $series('trades', 'traded_at', fn ($q) => $q->where('trades.side', 'buy'));
+        $buys = $series('trades', 'traded_at', fn ($q) => $q->where('trades.side', Trade::SIDE_BUY));
         $uploads = $series('uploads', 'received_at', fn ($q) => $q->where('uploads.status', Upload::STATUS_OK));
 
         $active = $this->counted('user_activity_days')->where('user_activity_days.day', '>=', $from)
-            ->selectRaw('count(distinct case when user_activity_days.day >= ? then user_activity_days.user_id end) as week, count(distinct user_activity_days.user_id) as month', [Utc::day($now - 6 * 86400)])
+            ->selectRaw('count(distinct case when user_activity_days.day >= ? then user_activity_days.user_id end) as week, count(distinct user_activity_days.user_id) as month', [Utc::day(Utc::daysAgo(6, $now))])
             ->first();
 
         $days = [];
 
         for ($i = self::DAYS - 1; $i >= 0; $i--) {
-            $d = Utc::day($now - $i * 86400);
+            $d = Utc::day(Utc::daysAgo($i, $now));
             $days[] = [
                 'day' => $d,
                 'active' => (int) ($activeByDay[$d] ?? 0),

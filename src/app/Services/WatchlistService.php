@@ -161,8 +161,8 @@ class WatchlistService
             throw new InvalidArgumentException('"'.Str::limit(trim($text), 30).'" is not a gold amount.');
         }
 
-        if ($c < 0 || $c > Bounds::MAX_PRICE) {
-            throw new InvalidArgumentException('Targets must be between 0 and '.number_format(Bounds::MAX_PRICE / Money::COPPER_PER_GOLD).' gold per unit.');
+        if (! Bounds::validPrice($c)) {
+            throw new InvalidArgumentException('Targets must be between 0 and '.Bounds::gold(Bounds::MAX_PRICE).' gold per unit.');
         }
 
         return $c;

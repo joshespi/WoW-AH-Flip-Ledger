@@ -46,7 +46,7 @@ class TradesService
     }
 
     /** @throws InvalidArgumentException */
-    public function add(User $user, int $itemId, int $qty, int $cost, int $ts, ?string $note, string $source = 'manual', ?string $tsmRef = null, string $game = Game::RETAIL): Trade
+    public function add(User $user, int $itemId, int $qty, int $cost, int $ts, ?string $note, string $source = Trade::SOURCE_MANUAL, ?string $tsmRef = null, string $game = Game::RETAIL): Trade
     {
         return $this->create($user, Trade::SIDE_BUY, $itemId, $qty, $cost, $ts, $note, $source, $tsmRef, $game);
     }
@@ -59,7 +59,7 @@ class TradesService
      */
     public function adjust(User $user, int $itemId, int $qty, int $ts, ?string $note = null, string $game = Game::RETAIL): Trade
     {
-        return $this->create($user, Trade::SIDE_ADJUST, $itemId, $qty, 0, $ts, $note, 'system', null, $game);
+        return $this->create($user, Trade::SIDE_ADJUST, $itemId, $qty, 0, $ts, $note, Trade::SOURCE_SYSTEM, null, $game);
     }
 
     /**
@@ -72,12 +72,12 @@ class TradesService
     public function vendor(User $user, Trade $buy, int $unitProceeds): Trade
     {
         // MAX_PRICE x MAX_QTY fits in an int, so the total can't overflow; create() bounds it.
-        if ($unitProceeds < 0 || $unitProceeds > Bounds::MAX_PRICE) {
-            throw new InvalidArgumentException('Enter what the vendor paid for each, at most '.number_format(Bounds::MAX_PRICE / Money::COPPER_PER_GOLD).' gold.');
+        if (! Bounds::validPrice($unitProceeds)) {
+            throw new InvalidArgumentException('Enter what the vendor paid for each, at most '.Bounds::gold(Bounds::MAX_PRICE).' gold.');
         }
 
         return $this->create($user, Trade::SIDE_VENDOR, (int) $buy->item_id, (int) $buy->qty, $unitProceeds * (int) $buy->qty,
-            Utc::ts($buy->getRawOriginal('traded_at')), null, 'manual', $buy->tsm_ref, $buy->game);
+            Utc::ts($buy->getRawOriginal('traded_at')), null, Trade::SOURCE_MANUAL, $buy->tsm_ref, $buy->game);
     }
 
     /**
@@ -103,7 +103,7 @@ class TradesService
             throw new InvalidArgumentException('Held must be less than '.number_format($current).'. To add stock, add a buy.');
         }
 
-        return $this->create($user, $side, $itemId, $current - $held, 0, time(), $note, 'manual', null, $game);
+        return $this->create($user, $side, $itemId, $current - $held, 0, time(), $note, Trade::SOURCE_MANUAL, null, $game);
     }
 
     public function deleteCorrection(User $user, int $id): void
@@ -130,7 +130,7 @@ class TradesService
 
             if (($vendor = $this->vendorOf($user, $trade)) !== null) {
                 // vendor() stored unit x qty, so this division is exact.
-                $unit = intdiv((int) $vendor->cost_copper, max(1, (int) $vendor->qty));
+                $unit = Money::unit((int) $vendor->cost_copper, (int) $vendor->qty);
                 $vendor->update($this->attributes($itemId, $qty, $unit * $qty, $ts, $vendor->note));
             }
 
@@ -185,7 +185,7 @@ class TradesService
             foreach ($lines as $l) {
                 try {
                     $id = $l['id'] ?? ($ids[mb_strtolower($l['name'])] ??= $this->resolveItem($l['name']));
-                    $this->add($user, $id, $l['qty'], $l['cost'], $ts, null, 'paste', null, $game);
+                    $this->add($user, $id, $l['qty'], $l['cost'], $ts, null, Trade::SOURCE_PASTE, null, $game);
                 } catch (InvalidArgumentException $e) {
                     throw new InvalidArgumentException("line {$l['line']}: ".$e->getMessage());
                 }

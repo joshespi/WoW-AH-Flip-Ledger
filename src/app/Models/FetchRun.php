@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Utc;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -31,13 +32,25 @@ class FetchRun extends Model
     /** The newest run in a region that gave us usable prices (or confirmed there were none new). */
     public static function latestGood(string $region): ?self
     {
-        return static::where('region', $region)->succeeded()->latest('started_at')->first();
+        return static::inRegion($region)->succeeded()->latest('started_at')->first();
     }
 
     /** The newest run in a region that has ended, whatever its outcome. */
     public static function latestFinished(string $region): ?self
     {
-        return static::where('region', $region)->where('status', '!=', self::STATUS_RUNNING)->latest('started_at')->first();
+        return static::inRegion($region)->where('status', '!=', self::STATUS_RUNNING)->latest('started_at')->first();
+    }
+
+    /** The newest run in a region that brought new prices ('unchanged' does not count). */
+    public static function latestOk(string $region): ?self
+    {
+        return static::inRegion($region)->where('status', self::STATUS_OK)->latest('started_at')->latest('id')->first();
+    }
+
+    /** Seconds after which the newest good run's prices count as stale (ledger.prices.stale_hours). */
+    public static function staleAfter(): int
+    {
+        return (int) (config('ledger.prices.stale_hours') * Utc::HOUR);
     }
 
     /**
@@ -54,6 +67,11 @@ class FetchRun extends Model
         }
 
         return [$last, in_array($last->status, [self::STATUS_OK, self::STATUS_UNCHANGED], true) ? $last : static::latestGood($region)];
+    }
+
+    public function scopeInRegion(Builder $query, string $region): void
+    {
+        $query->where('region', $region);
     }
 
     /** Runs that gave us a usable snapshot, or confirmed there was nothing new. */

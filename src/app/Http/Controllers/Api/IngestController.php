@@ -39,7 +39,7 @@ class IngestController extends Controller
         $upload = $ingest->ingest(
             $request->user(),
             $payload,
-            'uploader',
+            Upload::SOURCE_UPLOADER,
             Bounds::count($request->header('X-File-Mtime')),
             $request->header('X-Client-Version'),
             $request->header('X-Wow-Account'),

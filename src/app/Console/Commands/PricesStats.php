@@ -7,7 +7,7 @@ use App\Services\PriceStatsService;
 
 class PricesStats extends PricesCommand
 {
-    protected $signature = 'prices:stats {--region= : Region code (default: BLIZZARD_REGION)}';
+    protected $signature = 'prices:stats '.self::REGION_OPTION;
 
     protected $description = 'Recompute item_stats (recent, typical, 60d, sold/day estimate) from stored snapshots';
 

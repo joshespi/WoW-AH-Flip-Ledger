@@ -12,7 +12,7 @@ class DemoController extends Controller
     /** Signs in as the shared demo account; there is no password to guess. */
     public function __invoke(Request $request): RedirectResponse
     {
-        $demo = User::where('is_demo', true)->first() ?? abort(404);
+        $demo = User::demo()->first() ?? abort(404);
 
         Auth::login($demo);
         $request->session()->regenerate();

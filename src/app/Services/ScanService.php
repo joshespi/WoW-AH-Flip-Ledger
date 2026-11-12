@@ -119,7 +119,7 @@ class ScanService
         $out = [];
 
         foreach (DB::table('price_daily')->where('region', $region)->whereIn('item_id', $ids)
-            ->where('day', '>=', Utc::day(Utc::ts($newest) - (self::SPARK_DAYS - 1) * 86400))
+            ->where('day', '>=', Utc::day(Utc::daysAgo(self::SPARK_DAYS - 1, Utc::ts($newest))))
             ->orderBy('item_id')->orderBy('day')->get(['item_id', 'floor_median']) as $d) {
             $out[(int) $d->item_id][] = (int) $d->floor_median;
         }

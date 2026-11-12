@@ -15,7 +15,7 @@ class StatsPrune extends Command
     public function handle(): int
     {
         $keep = (int) config('ledger.stats.activity_days');
-        $n = DB::table('user_activity_days')->where('day', '<', Utc::day(time() - $keep * 86400))->delete();
+        $n = DB::table('user_activity_days')->where('day', '<', Utc::day(Utc::daysAgo($keep)))->delete();
 
         $this->info("Pruned {$n} activity days.");
 

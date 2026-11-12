@@ -250,7 +250,7 @@ class PositionsService
 
         foreach ($trades as $t) {
             $events[] = ['type' => 'buy', 'ts' => $t['ts'], 'item_id' => $t['item'], 'name' => $names[$t['item']],
-                'qty' => $t['qty'], 'unit' => intdiv($t['cost'], max(1, $t['qty'])), 'total' => $t['cost']];
+                'qty' => $t['qty'], 'unit' => Money::unit($t['cost'], $t['qty']), 'total' => $t['cost']];
         }
 
         foreach ($newestSales as [$ts, $id, $qty, $unit]) {

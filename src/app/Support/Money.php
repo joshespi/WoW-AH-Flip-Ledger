@@ -31,6 +31,12 @@ final class Money
         return $cost * (1 + $marginPct / 100) / self::NET;
     }
 
+    /** Per-unit copper of a lot (floored); a zero quantity counts as one. */
+    public static function unit(int $total, int $qty): int
+    {
+        return intdiv($total, max(1, $qty));
+    }
+
     /**
      * @return array{sign: string, g: int, s: int, c: int}
      */

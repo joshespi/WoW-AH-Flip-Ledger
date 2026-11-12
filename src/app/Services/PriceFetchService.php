@@ -7,6 +7,7 @@ use App\Services\Blizzard\BlizzardClient;
 use App\Services\Blizzard\BlizzardException;
 use App\Services\Blizzard\CommoditiesParser;
 use App\Support\Bulk;
+use App\Support\ItemName;
 use App\Support\Utc;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -30,7 +31,7 @@ class PriceFetchService
     public function fetch(string $region, bool $force = false): FetchRun
     {
         // A run that died mid-way would otherwise stay "running" forever.
-        FetchRun::where('region', $region)->where('status', FetchRun::STATUS_RUNNING)
+        FetchRun::inRegion($region)->where('status', FetchRun::STATUS_RUNNING)
             ->where('started_at', '<', now()->subHour())
             ->update(['status' => FetchRun::STATUS_FAILED, 'error' => 'Interrupted before it finished.', 'finished_at' => now()]);
 
@@ -77,7 +78,7 @@ class PriceFetchService
 
     private function lastModified(string $region): ?int
     {
-        $last = FetchRun::where('region', $region)->succeeded()->whereNotNull('last_modified')->max('last_modified');
+        $last = FetchRun::inRegion($region)->succeeded()->whereNotNull('last_modified')->max('last_modified');
 
         return $last === null ? null : Utc::ts($last);
     }
@@ -115,7 +116,7 @@ class PriceFetchService
 
         foreach (array_chunk($ids, Bulk::CHUNK) as $chunk) {
             DB::table('items')->insertOrIgnore(array_map(
-                static fn (int $id): array => ['id' => $id, 'name' => null, 'name_source' => 'none', 'is_commodity' => true, 'created_at' => $now, 'updated_at' => $now],
+                static fn (int $id): array => ['id' => $id, 'name' => null, 'name_source' => ItemName::SOURCE_NONE, 'is_commodity' => true, 'created_at' => $now, 'updated_at' => $now],
                 $chunk,
             ));
 

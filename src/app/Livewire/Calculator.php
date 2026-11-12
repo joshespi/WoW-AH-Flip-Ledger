@@ -30,7 +30,7 @@ class Calculator extends Component
         if (trim($this->cost) !== '') {
             try {
                 $cost = Money::parseGold($this->cost);
-                if ($cost < 1 || $cost > Bounds::MAX_PRICE) {
+                if (! Bounds::validPrice($cost, 1)) {
                     $cost = null;
                     $error = __('That cost is out of range.');
                 }

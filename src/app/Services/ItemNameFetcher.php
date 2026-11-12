@@ -28,7 +28,7 @@ class ItemNameFetcher
         $ids = DB::table('items')
             ->where('is_commodity', true)
             ->whereNull('fetched_at')
-            ->where(fn ($q) => $q->whereNull('name')->orWhere('name_source', '!=', 'blizzard'))
+            ->where(fn ($q) => $q->whereNull('name')->orWhere('name_source', '!=', ItemName::SOURCE_BLIZZARD))
             ->orderByRaw('(name IS NULL) DESC')
             ->orderBy('id')
             ->limit($limit)
@@ -55,7 +55,7 @@ class ItemNameFetcher
                 $update = ['fetched_at' => $now, 'updated_at' => $now, 'quality' => $item['quality']];
 
                 if ($name !== null) {
-                    $update += ['name' => $name, 'name_source' => 'blizzard'];
+                    $update += ['name' => $name, 'name_source' => ItemName::SOURCE_BLIZZARD];
                 }
 
                 DB::table('items')->where('id', $id)->update($update);

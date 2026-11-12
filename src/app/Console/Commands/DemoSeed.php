@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Upload;
 use App\Models\User;
 use App\Services\IngestService;
 use App\Services\TradesImportService;
@@ -54,13 +55,13 @@ class DemoSeed extends Command
                 $name = ItemName::sanitize($name);
 
                 if ($id !== null && $name !== null && Bounds::validItemId($id)) {
-                    $rows[] = ['id' => $id, 'name' => $name, 'name_source' => 'tsm', 'is_commodity' => true, 'created_at' => $now, 'updated_at' => $now];
+                    $rows[] = ['id' => $id, 'name' => $name, 'name_source' => ItemName::SOURCE_TSM, 'is_commodity' => true, 'created_at' => $now, 'updated_at' => $now];
                 }
             }
 
             Bulk::insertOrIgnore('items', $rows);
 
-            $ingest->ingest($user, $contents, 'manual');
+            $ingest->ingest($user, $contents, Upload::SOURCE_MANUAL);
             $trades->import($user, (string) file_get_contents($csv));
 
             return $user;

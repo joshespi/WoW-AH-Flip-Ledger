@@ -19,7 +19,7 @@ class PricePruner
      */
     public function prune(): array
     {
-        $cutoff = Utc::sql(time() - (int) config('ledger.prices.snapshot_days') * 86400);
+        $cutoff = Utc::sql(Utc::daysAgo((int) config('ledger.prices.snapshot_days')));
 
         $pending = DB::table('price_snapshots')->where('taken_at', '<', $cutoff)
             ->selectRaw('region, date(taken_at) as day')->distinct()->orderBy('day')->get();
@@ -31,9 +31,9 @@ class PricePruner
         return [
             'snapshots' => DB::table('price_snapshots')->where('taken_at', '<', $cutoff)->delete(),
             'daily' => DB::table('price_daily')
-                ->where('day', '<', Utc::day(time() - (int) config('ledger.prices.daily_days') * 86400))->delete(),
+                ->where('day', '<', Utc::day(Utc::daysAgo((int) config('ledger.prices.daily_days'))))->delete(),
             'runs' => DB::table('fetch_runs')
-                ->where('started_at', '<', Utc::sql(time() - (int) config('ledger.prices.fetch_run_days') * 86400))->delete(),
+                ->where('started_at', '<', Utc::sql(Utc::daysAgo((int) config('ledger.prices.fetch_run_days'))))->delete(),
         ];
     }
 }

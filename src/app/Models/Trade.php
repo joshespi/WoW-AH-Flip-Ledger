@@ -13,6 +13,17 @@ class Trade extends Model
 
     public const SIDE_BUY = 'buy';
 
+    // Where a row came from (`source`).
+    public const SOURCE_MANUAL = 'manual';
+
+    public const SOURCE_SYSTEM = 'system';
+
+    public const SOURCE_PASTE = 'paste';
+
+    public const SOURCE_TSM = 'tsm';
+
+    public const SOURCE_CSV = 'csv';
+
     /** Removes units at average cost with no P/L: the ledger counted stock the user never held. */
     public const SIDE_ADJUST = 'adjust';
 

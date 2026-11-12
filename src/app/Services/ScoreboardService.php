@@ -80,7 +80,7 @@ class ScoreboardService
         $games = $user->enabledGames();
         $rows = [];
 
-        $since = array_map(fn (?int $days) => $days === null ? null : $now - $days * 86400, self::PERIODS);
+        $since = array_map(fn (?int $days) => $days === null ? null : Utc::daysAgo($days, $now), self::PERIODS);
 
         // Net sales (after the AH cut) and units per period from the sales log, in one pass per game.
         $sums = [];
@@ -141,7 +141,7 @@ class ScoreboardService
         $column = self::METRICS[$metric] ?? throw new \InvalidArgumentException("Unknown metric {$metric}.");
 
         $rows = $this->listed()
-            ->where('e.game', $game)->where('e.period', $period)->where('e.units', '>', 0)
+            ->inGame($game, 'e.game')->where('e.period', $period)->where('e.units', '>', 0)
             ->orderByDesc('e.'.$column)->orderByDesc('e.units')->orderBy('e.user_id')
             ->limit($limit)
             ->select('e.user_id', 'u.scoreboard_nickname as nickname', 'e.pnl_copper', 'e.sales_copper', 'e.units', 'e.flips', 'e.computed_at')

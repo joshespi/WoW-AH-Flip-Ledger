@@ -19,7 +19,7 @@ use Throwable;
  */
 class PricesProbe extends PricesCommand
 {
-    protected $signature = 'prices:probe {--region= : Region code (default: BLIZZARD_REGION)} {--item=238371 : Item id for the item lookup}';
+    protected $signature = 'prices:probe '.self::REGION_OPTION.' {--item=238371 : Item id for the item lookup}';
 
     protected $description = 'Verify the live Blizzard API: token, commodities shape, headers, If-Modified-Since, item lookup (no database writes)';
 

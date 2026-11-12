@@ -6,6 +6,7 @@ use App\Models\Trade;
 use App\Models\User;
 use App\Support\Csv;
 use App\Support\Money;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use ZipArchive;
@@ -53,44 +54,35 @@ class DataExportService
         }
 
         try {
-            $name = 'items.name as item_name';
             $iso = fn (mixed $utc) => self::iso($user, $utc);
             $sources = [
                 'trades.csv' => [
                     [...self::TRADE_COLUMNS, 'item_name', 'source', 'game'],
-                    DB::table('trades')->leftJoin('items', 'items.id', '=', 'trades.item_id')
-                        ->ownedBy($user, 'trades.user_id')->where('trades.side', Trade::SIDE_BUY)->orderBy('trades.traded_at')->orderBy('trades.id')
-                        ->select('trades.traded_at', 'trades.item_id', 'trades.qty', 'trades.cost_copper', 'trades.note', $name, 'trades.source', 'trades.game')->cursor(),
+                    $this->named($user, 'trades', 'traded_at', ['traded_at', 'item_id', 'qty', 'cost_copper', 'note', 'source', 'game'])
+                        ->where('trades.side', Trade::SIDE_BUY)->cursor(),
                     fn ($r) => [...self::tradeFields($user, $r), $r->item_name, $r->source, $r->game],
                 ],
                 'corrections.csv' => [
                     ['time', 'item', 'qty_removed', 'kind', 'note', 'item_name', 'game', 'proceeds_copper'],
-                    DB::table('trades')->leftJoin('items', 'items.id', '=', 'trades.item_id')
-                        ->ownedBy($user, 'trades.user_id')->whereIn('trades.side', Trade::CORRECTIONS)->orderBy('trades.traded_at')->orderBy('trades.id')
-                        ->select('trades.traded_at', 'trades.item_id', 'trades.qty', 'trades.side', 'trades.note', $name, 'trades.game', 'trades.cost_copper')->cursor(),
+                    $this->named($user, 'trades', 'traded_at', ['traded_at', 'item_id', 'qty', 'side', 'note', 'game', 'cost_copper'])
+                        ->whereIn('trades.side', Trade::CORRECTIONS)->cursor(),
                     fn ($r) => [$iso($r->traded_at), 'i:'.$r->item_id, $r->qty, $r->side, $r->note, $r->item_name, $r->game, Trade::proceeds($r->side, (int) $r->cost_copper)],
                 ],
                 'sales.csv' => [
                     ['time', 'item', 'item_name', 'qty', 'unit_price_after_cut_copper', 'realm', 'source', 'game'],
-                    DB::table('tsm_sales')->leftJoin('items', 'items.id', '=', 'tsm_sales.item_id')
-                        ->ownedBy($user, 'tsm_sales.user_id')->orderBy('tsm_sales.sold_at')->orderBy('tsm_sales.id')
-                        ->select('tsm_sales.sold_at', 'tsm_sales.item_id', $name, 'tsm_sales.qty', 'tsm_sales.unit_price_copper', 'tsm_sales.realm', 'tsm_sales.source', 'tsm_sales.game')->cursor(),
+                    $this->named($user, 'tsm_sales', 'sold_at', ['sold_at', 'item_id', 'qty', 'unit_price_copper', 'realm', 'source', 'game'])->cursor(),
                     fn ($r) => [$iso($r->sold_at), 'i:'.$r->item_id, $r->item_name, $r->qty, $r->unit_price_copper, $r->realm, $r->source, $r->game],
                 ],
                 'expired.csv' => $this->listing($user, 'tsm_expired', $iso),
                 'cancelled.csv' => $this->listing($user, 'tsm_cancelled', $iso),
                 'buy_suggestions.csv' => [
                     ['time', 'item', 'item_name', 'qty', 'cost_copper', 'status', 'realm', 'game'],
-                    DB::table('tsm_buy_candidates')->leftJoin('items', 'items.id', '=', 'tsm_buy_candidates.item_id')
-                        ->ownedBy($user, 'tsm_buy_candidates.user_id')->orderBy('tsm_buy_candidates.at')->orderBy('tsm_buy_candidates.id')
-                        ->select('tsm_buy_candidates.at', 'tsm_buy_candidates.item_id', $name, 'tsm_buy_candidates.qty', 'tsm_buy_candidates.cost_copper', 'tsm_buy_candidates.status', 'tsm_buy_candidates.realm', 'tsm_buy_candidates.game')->cursor(),
+                    $this->named($user, 'tsm_buy_candidates', 'at', ['at', 'item_id', 'qty', 'cost_copper', 'status', 'realm', 'game'])->cursor(),
                     fn ($r) => [$iso($r->at), 'i:'.$r->item_id, $r->item_name, $r->qty, $r->cost_copper, $r->status, $r->realm, $r->game],
                 ],
                 'watchlist.csv' => [
                     ['item', 'item_name', 'group', 'target_buy_copper', 'target_sell_copper', 'notes'],
-                    DB::table('watchlist_items')->leftJoin('items', 'items.id', '=', 'watchlist_items.item_id')
-                        ->ownedBy($user, 'watchlist_items.user_id')->orderBy('watchlist_items.sort')->orderBy('watchlist_items.id')
-                        ->select('watchlist_items.item_id', $name, 'watchlist_items.group_name', 'watchlist_items.target_buy_copper', 'watchlist_items.target_sell_copper', 'watchlist_items.notes')->cursor(),
+                    $this->named($user, 'watchlist_items', 'sort', ['item_id', 'group_name', 'target_buy_copper', 'target_sell_copper', 'notes'])->cursor(),
                     fn ($r) => ['i:'.$r->item_id, $r->item_name, $r->group_name, $r->target_buy_copper, $r->target_sell_copper, $r->notes],
                 ],
                 'uploads.csv' => [
@@ -120,12 +112,7 @@ class DataExportService
                 $path = tempnam(sys_get_temp_dir(), 'wfl-csv-');
                 $parts[] = $path;
                 $out = fopen($path, 'w');
-                Csv::put($out, $header);
-
-                foreach ($rows as $row) {
-                    Csv::put($out, $map($row));
-                }
-
+                Csv::write($out, $header, $rows, $map);
                 fclose($out);
                 $zip->addFile($path, $file);
             }
@@ -144,14 +131,24 @@ class DataExportService
         return $zipPath;
     }
 
+    /**
+     * $table's rows for $user with the catalog name as `item_name`, ordered by $order then id.
+     *
+     * @param  list<string>  $columns  of $table
+     */
+    private function named(User $user, string $table, string $order, array $columns): Builder
+    {
+        return DB::table($table)->leftJoin('items', 'items.id', '=', "{$table}.item_id")
+            ->ownedBy($user, "{$table}.user_id")->orderBy("{$table}.{$order}")->orderBy("{$table}.id")
+            ->select([...array_map(fn (string $c) => "{$table}.{$c}", $columns), 'items.name as item_name']);
+    }
+
     /** @return array{0: list<string>, 1: iterable<object>, 2: callable} */
     private function listing(User $user, string $table, callable $iso): array
     {
         return [
             ['time', 'item', 'item_name', 'qty', 'realm', 'game'],
-            DB::table($table)->leftJoin('items', 'items.id', '=', "{$table}.item_id")
-                ->ownedBy($user, "{$table}.user_id")->orderBy("{$table}.at")->orderBy("{$table}.id")
-                ->select("{$table}.at", "{$table}.item_id", 'items.name as item_name', "{$table}.qty", "{$table}.realm", "{$table}.game")->cursor(),
+            $this->named($user, $table, 'at', ['at', 'item_id', 'qty', 'realm', 'game'])->cursor(),
             fn ($r) => [$iso($r->at), 'i:'.$r->item_id, $r->item_name, $r->qty, $r->realm, $r->game],
         ];
     }
