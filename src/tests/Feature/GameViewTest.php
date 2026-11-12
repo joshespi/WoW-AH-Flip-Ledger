@@ -10,11 +10,13 @@ use App\Support\Game;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\AddonFile;
+use Tests\Support\SeedsUserRows;
 use Tests\TestCase;
 
 class GameViewTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsUserRows;
 
     private const T = AddonFile::T0;
 
@@ -108,9 +110,7 @@ class GameViewTest extends TestCase
     public function test_every_series_shares_one_axis(): void
     {
         $user = $this->user();
-        DB::table('tsm_sales')->insert([
-            ['user_id' => $user->id, 'game' => 'forever', 'realm' => 'R', 'item_id' => 5, 'qty' => 1, 'unit_price_copper' => 100, 'sold_at' => '2026-10-01 00:00:00', 'source' => 'Auction', 'dedupe_key' => str_repeat('a', 40), 'origin' => 'tsm'],
-        ]);
+        $this->seedSale($user, 5, 1, 100, '2026-10-01 00:00:00', Game::FOREVER);
         $this->buy($user, Game::FOREVER, 5, 1, 50);
 
         $ranges = app(CombinedService::class)->forUser($user, strtotime('2026-11-05 12:00:00'))['ranges'];

@@ -6,17 +6,19 @@ use App\Models\Upload;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
+use Tests\Support\CallsApi;
+use Tests\Support\SeedsUserRows;
 use Tests\TestCase;
 
 class PingApiTest extends TestCase
 {
+    use CallsApi;
     use RefreshDatabase;
+    use SeedsUserRows;
 
     private function ping(?string $token, array $headers = []): TestResponse
     {
-        $this->app['auth']->forgetGuards();
-
-        return $this->getJson('/api/v1/ping', $headers + ($token === null ? [] : ['Authorization' => 'Bearer '.$token]));
+        return $this->getWithToken('/api/v1/ping', $token, $headers);
     }
 
     public function test_a_valid_token_gets_ok_and_the_min_version(): void
@@ -34,8 +36,8 @@ class PingApiTest extends TestCase
     {
         $alice = User::factory()->create();
         $bob = User::factory()->create();
-        Upload::create(['user_id' => $bob->id, 'source' => 'manual', 'received_at' => now(), 'bytes' => 1, 'status' => 'failed']);
-        Upload::create(['user_id' => $alice->id, 'source' => 'uploader', 'received_at' => now()->subHour(), 'bytes' => 1, 'status' => 'ok']);
+        $this->seedUpload($bob, Upload::STATUS_FAILED);
+        $this->seedUpload($alice, extra: ['received_at' => now()->subHour()]);
 
         $this->ping($alice->issueIngestToken('pc'))->assertOk()->assertJsonPath('last_upload.status', 'ok');
     }

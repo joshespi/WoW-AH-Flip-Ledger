@@ -11,12 +11,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Tests\Support\SeedsUserRows;
 use Tests\Support\TsmFile;
 use Tests\TestCase;
 
 class UploadUndoTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsUserRows;
 
     /** One retail sale, the file most tests upload. */
     private const SALE = [['i:100', 5, 200, TsmFile::T0, 'Auction']];
@@ -62,7 +64,7 @@ class UploadUndoTest extends TestCase
     {
         $user = $this->user;
         $up = $this->upload($user, self::SALE);
-        DB::table('inventory')->insert(['user_id' => $user->id, 'game' => 'retail', 'item_id' => 100, 'qty' => 4, 'taken_at' => now()]);
+        $this->seedInventory($user, [100 => 4]);
         DB::table('tsm_spans')->where('user_id', $user->id)->update(['from' => '2026-01-01 00:00:00', 'to' => '2026-02-01 00:00:00']);
 
         $this->actingAs($user)->delete("/uploads/{$up->id}", ['clear_inventory' => '1'])->assertSessionHas('undone.inventory', true);
@@ -75,7 +77,7 @@ class UploadUndoTest extends TestCase
     {
         $user = $this->user;
         $up = $this->upload($user, self::SALE);
-        DB::table('inventory')->insert(['user_id' => $user->id, 'game' => 'retail', 'item_id' => 100, 'qty' => 4, 'taken_at' => now()]);
+        $this->seedInventory($user, [100 => 4]);
 
         $this->actingAs($user)->delete("/uploads/{$up->id}");
 

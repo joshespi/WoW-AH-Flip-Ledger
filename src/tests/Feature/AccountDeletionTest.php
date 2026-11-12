@@ -5,11 +5,13 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\CallsApi;
 use Tests\Support\Fixtures;
 use Tests\TestCase;
 
 class AccountDeletionTest extends TestCase
 {
+    use CallsApi;
     use Fixtures, RefreshDatabase;
 
     private const USER_TABLES = ['uploads', 'tsm_sales', 'tsm_expired', 'tsm_cancelled', 'tsm_buy_candidates', 'inventory'];
@@ -20,13 +22,7 @@ class AccountDeletionTest extends TestCase
         $bob = User::factory()->create();
 
         foreach ([$alice, $bob] as $user) {
-            $token = $user->issueIngestToken('pc');
-            $this->app['auth']->forgetGuards();
-            $this->call('POST', '/api/v1/ingest', [], [], [], [
-                'CONTENT_TYPE' => 'application/octet-stream',
-                'HTTP_AUTHORIZATION' => 'Bearer '.$token,
-                'HTTP_ACCEPT' => 'application/json',
-            ], $this->fixture('tsm/TradeSkillMaster.lua'))->assertOk();
+            $this->postIngest($this->fixture('tsm/TradeSkillMaster.lua'), $user->issueIngestToken('pc'))->assertOk();
         }
 
         $bobRows = array_map(fn ($t) => DB::table($t)->where('user_id', $bob->id)->count(), self::USER_TABLES);
@@ -56,7 +52,6 @@ class AccountDeletionTest extends TestCase
 
         $user->delete();
 
-        $this->app['auth']->forgetGuards();
-        $this->withToken($token)->postJson('/api/v1/ingest', [])->assertUnauthorized();
+        $this->postIngest('', $token)->assertUnauthorized();
     }
 }

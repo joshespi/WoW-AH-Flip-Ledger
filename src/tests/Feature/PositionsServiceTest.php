@@ -10,12 +10,14 @@ use App\Support\Money;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\LoadsLedgerFixture;
+use Tests\Support\SeedsUserRows;
 use Tests\TestCase;
 
 class PositionsServiceTest extends TestCase
 {
     use LoadsLedgerFixture;
     use RefreshDatabase;
+    use SeedsUserRows;
 
     /**
      * @return array<int, PositionRow>
@@ -83,10 +85,7 @@ class PositionsServiceTest extends TestCase
         $rows = $this->rows($user);
         $this->assertNull($rows[self::PORK]->unaccounted, 'no snapshot, nothing to compare');
 
-        DB::table('inventory')->insert([
-            ['user_id' => $user->id, 'item_id' => self::PORK, 'qty' => 8701, 'taken_at' => '2026-10-28 02:52:29'],
-            ['user_id' => $user->id, 'item_id' => self::SWARMER, 'qty' => 500, 'taken_at' => '2026-10-28 02:52:29'],
-        ]);
+        $this->seedInventory($user, [self::PORK => 8701, self::SWARMER => 500], '2026-10-28 02:52:29');
         $rows = $this->rows($user);
 
         $this->assertSame(15402 - 8701, $rows[self::PORK]->unaccounted);
@@ -98,7 +97,7 @@ class PositionsServiceTest extends TestCase
     {
         $user = $this->fixtureUser();
         DB::table('inventory')->where('user_id', $user->id)->delete();
-        DB::table('inventory')->insert(['user_id' => $user->id, 'item_id' => self::PORK, 'qty' => 8701, 'taken_at' => '2026-10-28 02:52:29']);
+        $this->seedInventory($user, [self::PORK => 8701], '2026-10-28 02:52:29');
         $before = $this->rows($user);
 
         $this->artisan('stock:match', ['--user' => $user->id])->expectsOutputToContain('Dry run')->assertSuccessful();
@@ -305,17 +304,10 @@ class PositionsServiceTest extends TestCase
         $this->seedItem(5, 'Thing');
         $this->importTrades($user, [[5, 100]], '2026-10-20T12:00:00Z');
 
-        $sale = fn (string $at, int $qty, string $key) => DB::table('tsm_sales')->insert([
-            'user_id' => $user->id, 'realm' => 'R', 'item_id' => 5, 'qty' => $qty, 'unit_price_copper' => 100,
-            'sold_at' => $at, 'source' => 'Auction', 'dedupe_key' => sha1($key),
-        ]);
-        $sale('2026-10-20 11:00:00', 1, 'before');
-        $sale('2026-10-20 13:00:00', 2, 'after1');
-        $sale('2026-10-21 09:00:00', 3, 'after2');
-        DB::table('tsm_sales')->insert([
-            'user_id' => $user->id, 'realm' => 'R', 'item_id' => 5, 'qty' => 9, 'unit_price_copper' => 100,
-            'sold_at' => '2026-10-22 09:00:00', 'source' => 'Vendor', 'dedupe_key' => sha1('vendor'),
-        ]);
+        $this->seedSale($user, 5, 1, 100, '2026-10-20 11:00:00');   // before
+        $this->seedSale($user, 5, 2, 100, '2026-10-20 13:00:00');
+        $this->seedSale($user, 5, 3, 100, '2026-10-21 09:00:00');
+        $this->seedSale($user, 5, 9, 100, '2026-10-22 09:00:00', source: 'Vendor');
 
         $recent = app(PositionsService::class)->forUser($user)->recent;
 

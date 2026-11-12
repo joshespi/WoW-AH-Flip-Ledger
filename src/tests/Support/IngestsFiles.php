@@ -7,8 +7,8 @@ use App\Models\User;
 use App\Services\IngestService;
 use App\Support\Game;
 use App\Support\TsmSpan;
+use App\Support\Utc;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Testing\TestResponse;
 
 /**
  * Ingest helpers for tests that hold the user in `$this->user`: addon and TSM files through
@@ -16,9 +16,11 @@ use Illuminate\Testing\TestResponse;
  */
 trait IngestsFiles
 {
+    use CallsApi;
+
     protected const T = AddonFile::T0;
 
-    protected const DAY = 86400;
+    protected const DAY = Utc::DAY;
 
     /**
      * @param  list<string>  $events
@@ -57,19 +59,5 @@ trait IngestsFiles
     protected function span(string $game = Game::RETAIL, string $account = ''): ?array
     {
         return TsmSpan::get($this->user, $game, $account);
-    }
-
-    /** @param  array<string, string>  $headers */
-    protected function postIngest(string $body, string $token, array $headers = []): TestResponse
-    {
-        // The auth manager caches the resolved user for the life of the app; tests that switch
-        // tokens mid-test need a fresh guard.
-        $this->app['auth']->forgetGuards();
-
-        return $this->call('POST', '/api/v1/ingest', [], [], [], $this->transformHeadersToServerVars($headers + [
-            'Authorization' => 'Bearer '.$token,
-            'Accept' => 'application/json',
-            'Content-Type' => 'application/octet-stream',
-        ]), $body);
     }
 }

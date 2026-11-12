@@ -10,6 +10,7 @@ use App\Services\TradesImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\LoadsLedgerFixture;
+use Tests\Support\SeedsUserRows;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -17,6 +18,7 @@ class DataExportTest extends TestCase
 {
     use LoadsLedgerFixture;
     use RefreshDatabase;
+    use SeedsUserRows;
 
     /** @return array<string, string> file name => contents */
     private function unzip(string $path): array
@@ -80,7 +82,7 @@ class DataExportTest extends TestCase
     {
         $user = $this->fixtureUser();
         Trade::create(['user_id' => $user->id, 'game' => 'forever', 'item_id' => 1, 'traded_at' => now(), 'qty' => 1, 'cost_copper' => 1, 'side' => 'buy', 'note' => 'FOREVER']);
-        DB::table('tsm_sales')->insert(['user_id' => $user->id, 'game' => 'forever', 'item_id' => 1, 'sold_at' => now(), 'qty' => 1, 'unit_price_copper' => 5, 'realm' => 'X', 'source' => 'Auction', 'dedupe_key' => 'forever:k']);
+        $this->seedSale($user, 1, 1, 5, time(), 'forever');
 
         $files = $this->unzip(app(DataExportService::class)->build($user));
 

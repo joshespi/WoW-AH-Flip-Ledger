@@ -8,19 +8,19 @@ use App\Models\Trade;
 use App\Models\User;
 use App\Services\PositionsService;
 use App\Services\TradesService;
-use App\Support\Utc;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Livewire\Livewire;
 use Tests\Support\SeedsMarketData;
+use Tests\Support\SeedsUserRows;
 use Tests\TestCase;
 
 class CorrectHoldingsTest extends TestCase
 {
     use RefreshDatabase;
     use SeedsMarketData;
+    use SeedsUserRows;
 
     private const T = 1_791_823_860; // 2026-10-12 16:51 UTC
 
@@ -30,10 +30,7 @@ class CorrectHoldingsTest extends TestCase
         $this->seedItem(100, 'Sin\'dorei Swarmer');
         $user = User::factory()->create(['timezone' => 'UTC']);
         app(TradesService::class)->add($user, 100, 100, 100_000, self::T, null);
-        DB::table('tsm_sales')->insert([
-            'user_id' => $user->id, 'realm' => 'R', 'item_id' => 100, 'qty' => 40, 'unit_price_copper' => 2000,
-            'sold_at' => Utc::sql(self::T + 100), 'source' => 'Auction', 'dedupe_key' => sha1('s'),
-        ]);
+        $this->seedSale($user, 100, 40, 2000, self::T + 100);
 
         return $user;
     }
@@ -116,7 +113,7 @@ class CorrectHoldingsTest extends TestCase
     public function test_less_tsm_stock_warns_about_uncollected_mail_but_is_not_the_default(): void
     {
         $user = $this->user();
-        DB::table('inventory')->insert(['user_id' => $user->id, 'item_id' => 100, 'qty' => 25, 'taken_at' => Utc::sql(self::T + 200)]);
+        $this->seedInventory($user, [100 => 25], self::T + 200);
 
         Livewire::actingAs($user)->test(CorrectHoldings::class, ['itemId' => 100, 'ledgerHeld' => 60])
             ->assertSet('held', '0')->assertSee('TSM stock: 25')->assertSee('shows 35 fewer')->assertSee('count those sales twice');
@@ -131,7 +128,7 @@ class CorrectHoldingsTest extends TestCase
         Livewire::actingAs($user)->test(CorrectHoldings::class, ['itemId' => 100, 'ledgerHeld' => 60])
             ->assertDontSee('TSM stock')->assertDontSee('count those sales twice');
 
-        DB::table('inventory')->insert(['user_id' => $user->id, 'item_id' => 555, 'qty' => 3, 'taken_at' => Utc::sql(self::T + 200)]);
+        $this->seedInventory($user, [555 => 3], self::T + 200);
 
         $this->assertSame(0, $positions->tsmStock($user, 100));
         Livewire::actingAs($user)->test(CorrectHoldings::class, ['itemId' => 100, 'ledgerHeld' => 60])
@@ -141,7 +138,7 @@ class CorrectHoldingsTest extends TestCase
     public function test_no_warning_when_tsm_stock_covers_the_ledger(): void
     {
         $user = $this->user();
-        DB::table('inventory')->insert(['user_id' => $user->id, 'item_id' => 100, 'qty' => 60, 'taken_at' => Utc::sql(self::T + 200)]);
+        $this->seedInventory($user, [100 => 60], self::T + 200);
 
         Livewire::actingAs($user)->test(CorrectHoldings::class, ['itemId' => 100, 'ledgerHeld' => 60])
             ->assertSet('held', '0')->assertSee('TSM stock: 60')->assertDontSee('count those sales twice');

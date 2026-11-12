@@ -8,11 +8,13 @@ use App\Models\User;
 use App\Services\UploaderBuilds;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Support\SeedsUserRows;
 use Tests\TestCase;
 
 class SetupTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsUserRows;
 
     private string $dir;
 
@@ -51,7 +53,7 @@ class SetupTest extends TestCase
 
     private function upload(User $user, string $status, ?string $error = null): void
     {
-        Upload::create(['user_id' => $user->id, 'source' => 'manual', 'received_at' => now(), 'bytes' => 1, 'status' => $status, 'error' => $error]);
+        $this->seedUpload($user, $status, ['error' => $error]);
     }
 
     public function test_lists_only_verified_files_of_the_newest_version(): void

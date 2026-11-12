@@ -2,11 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Models\Upload;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Route as LaravelRoute;
 use Illuminate\Support\Facades\Route;
+use Tests\Support\SeedsUserRows;
 use Tests\TestCase;
 
 /**
@@ -19,6 +19,7 @@ use Tests\TestCase;
 class TenantIsolationTest extends TestCase
 {
     use RefreshDatabase;
+    use SeedsUserRows;
 
     /** Routes that are public on purpose. */
     private const PUBLIC_URIS = [
@@ -124,7 +125,7 @@ class TenantIsolationTest extends TestCase
         $owned = [
             'token' => $alice->createToken('alice pc', ['ingest'])->accessToken->id,
             'id' => $alice->id,
-            'upload' => Upload::create(['user_id' => $alice->id, 'source' => 'manual', 'received_at' => now(), 'bytes' => 1, 'status' => 'ok'])->id,
+            'upload' => $this->seedUpload($alice)->id,
             'hash' => sha1($alice->email),
             'item' => 987654,
             'user' => $alice->id,

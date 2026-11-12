@@ -6,19 +6,19 @@ use App\Models\User;
 use App\Models\WatchlistItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
+use Tests\Support\CallsApi;
 use Tests\Support\LoadsLedgerFixture;
 use Tests\TestCase;
 
 class AddonFeedApiTest extends TestCase
 {
+    use CallsApi;
     use LoadsLedgerFixture;
     use RefreshDatabase;
 
     private function feed(?string $token, array $headers = []): TestResponse
     {
-        $this->app['auth']->forgetGuards();
-
-        return $this->getJson('/api/v1/addon-feed', $headers + ($token === null ? [] : ['Authorization' => 'Bearer '.$token]));
+        return $this->getWithToken('/api/v1/addon-feed', $token, $headers);
     }
 
     private function token(User $user): string

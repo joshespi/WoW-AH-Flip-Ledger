@@ -10,12 +10,14 @@ use App\Support\Utc;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\SeedsMarketData;
+use Tests\Support\SeedsUserRows;
 use Tests\TestCase;
 
 class ItemDetailTest extends TestCase
 {
     use RefreshDatabase;
     use SeedsMarketData;
+    use SeedsUserRows;
 
     private const T = 1_791_823_860; // 2026-10-12 16:51 UTC
 
@@ -28,10 +30,7 @@ class ItemDetailTest extends TestCase
 
     private function sale(User $user, int $at, int $qty, int $unit, int $item = 100): void
     {
-        DB::table('tsm_sales')->insert([
-            'user_id' => $user->id, 'realm' => 'R', 'item_id' => $item, 'qty' => $qty, 'unit_price_copper' => $unit,
-            'sold_at' => Utc::sql($at), 'source' => 'Auction', 'dedupe_key' => sha1("$at$qty$unit$item"),
-        ]);
+        $this->seedSale($user, $item, $qty, $unit, $at);
     }
 
     private function listing(string $table, User $user, int $at, int $qty): void

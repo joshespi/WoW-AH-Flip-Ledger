@@ -11,12 +11,14 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\LoadsLedgerFixture;
+use Tests\Support\SeedsUserRows;
 use Tests\TestCase;
 
 class LedgerPagesTest extends TestCase
 {
     use LoadsLedgerFixture;
     use RefreshDatabase;
+    use SeedsUserRows;
 
     public function test_guests_and_unverified_users_cannot_see_the_ledger_screens(): void
     {
@@ -90,7 +92,7 @@ class LedgerPagesTest extends TestCase
         $user = $this->fixtureUser(prices: true);
 
         DB::table('inventory')->where('user_id', $user->id)->delete();
-        DB::table('inventory')->insert(['user_id' => $user->id, 'item_id' => self::PORK, 'qty' => 8701, 'taken_at' => '2026-10-28 02:52:29']);
+        $this->seedInventory($user, [self::PORK => 8701], '2026-10-28 02:52:29');
 
         $this->actingAs($user)->get('/positions')->assertOk()->assertSee('6,701 more than your TSM stock');
     }
@@ -210,10 +212,7 @@ class LedgerPagesTest extends TestCase
 
     private function upload(User $user, int $mtime): void
     {
-        Upload::create([
-            'user_id' => $user->id, 'source' => 'manual', 'file_mtime' => $mtime, 'received_at' => now(),
-            'bytes' => 1, 'status' => Upload::STATUS_OK, 'counts' => [],
-        ]);
+        $this->seedUpload($user, extra: ['file_mtime' => $mtime, 'counts' => []]);
     }
 
     public function test_the_freshness_bar_renders_nothing_for_a_guest(): void

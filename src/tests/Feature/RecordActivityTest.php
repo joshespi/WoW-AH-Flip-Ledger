@@ -35,11 +35,10 @@ class RecordActivityTest extends TestCase
     {
         $user = User::factory()->create();
         $token = $user->issueIngestToken('pc');
-        $this->app['auth']->forgetGuards();
 
         // Unattended: the uploader pings and polls whether anyone plays.
-        $this->getJson('/api/v1/ping', ['Authorization' => 'Bearer '.$token])->assertOk();
-        $this->getJson('/api/v1/addon-feed', ['Authorization' => 'Bearer '.$token])->assertOk();
+        $this->getWithToken('/api/v1/ping', $token)->assertOk();
+        $this->getWithToken('/api/v1/addon-feed', $token)->assertOk();
         $this->assertSame([], $this->days($user));
 
         $this->postIngest(TsmFile::make(), $token)->assertOk();

@@ -37,6 +37,12 @@ trait FakesBlizzard
         Cache::flush();
     }
 
+    /** No credentials: the price commands and health checks stay idle. */
+    protected function blizzardUnconfigured(): void
+    {
+        config(['services.blizzard.client_id' => null, 'services.blizzard.client_secret' => null]);
+    }
+
     protected function commoditiesBody(): string
     {
         return file_get_contents(__DIR__.'/../fixtures/blizzard/commodities.json');

@@ -9,15 +9,15 @@ use App\Services\BackupStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
+use Tests\Support\FakesBlizzard;
 use Tests\Support\SeedsMarketData;
-use Tests\Support\TempFiles;
 use Tests\TestCase;
 
 class HealthCheckTest extends TestCase
 {
+    use FakesBlizzard;
     use RefreshDatabase;
     use SeedsMarketData;
-    use TempFiles;
 
     protected function setUp(): void
     {
@@ -88,7 +88,7 @@ class HealthCheckTest extends TestCase
 
         $this->check();                      // configured, but no run yet
 
-        config(['services.blizzard.client_id' => null, 'services.blizzard.client_secret' => null]);
+        $this->blizzardUnconfigured();
         $this->seedFetchRun('failed', time() - 60);
         $this->check();                      // runs exist, but no credentials
 

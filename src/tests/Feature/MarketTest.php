@@ -12,12 +12,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\Support\SeedsMarketData;
+use Tests\Support\SeedsUserRows;
 use Tests\TestCase;
 
 class MarketTest extends TestCase
 {
     use RefreshDatabase;
     use SeedsMarketData;
+    use SeedsUserRows;
 
     private function user(): User
     {
@@ -158,15 +160,12 @@ class MarketTest extends TestCase
         $this->assertSame([], $ids('winners'));
 
         // Item 200: bought at 50, sold at 80 after the cut. Item 100: sold below cost.
-        $row = ['user_id' => $user->id, 'realm' => 'r', 'qty' => 10, 'sold_at' => '2026-10-01 00:00:00', 'source' => 'Auction'];
         DB::table('trades')->insert([
             ['user_id' => $user->id, 'item_id' => 200, 'traded_at' => '2026-09-01 00:00:00', 'qty' => 10, 'cost_copper' => 500, 'side' => 'buy'],
             ['user_id' => $user->id, 'item_id' => 100, 'traded_at' => '2026-09-01 00:00:00', 'qty' => 10, 'cost_copper' => 900, 'side' => 'buy'],
         ]);
-        DB::table('tsm_sales')->insert([
-            $row + ['item_id' => 200, 'unit_price_copper' => 80, 'dedupe_key' => str_repeat('a', 40)],
-            $row + ['item_id' => 100, 'unit_price_copper' => 60, 'dedupe_key' => str_repeat('b', 40)],
-        ]);
+        $this->seedSale($user, 200, 10, 80, '2026-10-01 00:00:00');
+        $this->seedSale($user, 100, 10, 60, '2026-10-01 00:00:00');
         $this->assertSame([200], $ids('winners'));
 
         $this->assertSame($ids('discount'), $ids('bogus'));   // unknown mode falls back
