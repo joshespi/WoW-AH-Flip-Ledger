@@ -14,13 +14,17 @@ use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\FakesBlizzard;
 use Tests\Support\SeedsMarketData;
+use Tests\Support\SeedsUserRows;
 use Tests\TestCase;
 
 class AdminTest extends TestCase
 {
+    use FakesBlizzard;
     use RefreshDatabase;
     use SeedsMarketData;
+    use SeedsUserRows;
 
     private function admin(): User
     {
@@ -29,7 +33,7 @@ class AdminTest extends TestCase
 
     private function upload(User $user, string $status, ?string $error = null, ?array $counts = null): Upload
     {
-        return Upload::create(['user_id' => $user->id, 'source' => 'uploader', 'client_version' => '0.1.0', 'received_at' => now(), 'bytes' => 2048, 'status' => $status, 'error' => $error, 'counts' => $counts]);
+        return $this->seedUpload($user, $status, ['source' => Upload::SOURCE_UPLOADER, 'client_version' => '0.1.0', 'bytes' => 2048, 'error' => $error, 'counts' => $counts]);
     }
 
     public function test_grant_and_revoke_from_the_command_line(): void
@@ -109,6 +113,16 @@ class AdminTest extends TestCase
         $this->seedFetchRun('ok', time() - 300, time() - 600);
 
         $this->actingAs($this->admin())->get('/admin/fetch')->assertOk()->assertSee('Healthy');
+    }
+
+    public function test_manual_fetch_is_admin_only_and_reports_the_result(): void
+    {
+        $this->blizzardUnconfigured();
+
+        $this->actingAs(User::factory()->create())->post('/admin/fetch')->assertNotFound();
+
+        $this->actingAs($this->admin())->post('/admin/fetch')->assertRedirect('/admin/fetch')->assertSessionHas('fetch_error');
+        $this->get('/admin/fetch')->assertOk()->assertSee('Fetch now');
     }
 
     public function test_users_page_searches_counts_and_hides_impersonation_for_protected_accounts(): void

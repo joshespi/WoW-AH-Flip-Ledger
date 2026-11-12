@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Services\AdminService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\View\View;
 
 class AdminController extends Controller
@@ -28,5 +30,16 @@ class AdminController extends Controller
     public function fetchRuns(AdminService $admin): View
     {
         return view('admin.fetch', ['runs' => $admin->fetchRuns(), 'health' => $admin->fetchHealth()]);
+    }
+
+    // Same code path as the scheduled run; an unchanged snapshot costs one conditional request.
+    // nginx waits just past this time limit (location = /admin/fetch).
+    public function fetchNow(): RedirectResponse
+    {
+        set_time_limit(300);
+        $code = Artisan::call('prices:fetch');
+        $out = trim(Artisan::output());
+
+        return redirect()->route('admin.fetch')->with($code === 0 ? 'fetch_ok' : 'fetch_error', $out);
     }
 }

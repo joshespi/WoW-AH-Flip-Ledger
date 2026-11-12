@@ -53,6 +53,17 @@ server {
         fastcgi_param SCRIPT_NAME /index.php;
     }
 
+    # Admin "Fetch now" (POST /admin/fetch) runs a whole price fetch in the request; must match
+    # the route path and AdminController::fetchNow's time limit.
+    location = /admin/fetch {
+        fastcgi_read_timeout 310s;
+        set $upstream_app app:9000;
+        fastcgi_pass $upstream_app;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $realpath_root/index.php;
+        fastcgi_param SCRIPT_NAME /index.php;
+    }
+
     # Vite build output has content-hashed names, so it can be cached for good. Served here
     # without PHP; the app's security headers do not apply, so the one that matters is set.
     location ^~ /build/ {

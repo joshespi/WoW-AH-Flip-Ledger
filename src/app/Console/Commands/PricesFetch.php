@@ -8,10 +8,14 @@ use App\Services\Blizzard\BlizzardClient;
 use App\Services\PriceFetchService;
 use App\Services\PriceRollup;
 use App\Services\PriceStatsService;
+use Illuminate\Support\Facades\Cache;
 
 class PricesFetch extends PricesCommand
 {
-    protected $signature = 'prices:fetch {--region= : Region code (default: BLIZZARD_REGION)} {--force : Ignore Last-Modified and reprocess the current snapshot}';
+    protected $signature = 'prices:fetch '.self::REGION_OPTION.' {--force : Ignore Last-Modified and reprocess the current snapshot}';
+
+    /** Longer than any real run; a run that dies frees the lock after this. */
+    private const LOCK_SECONDS = 30 * 60;
 
     protected $description = 'Fetch Blizzard commodity prices, store a snapshot, then roll up the day and recompute item stats';
 
@@ -22,6 +26,25 @@ class PricesFetch extends PricesCommand
         }
 
         $region = $this->region();
+
+        // One fetch per region at a time, however it was started (schedule, shell, admin "Fetch now").
+        $lock = Cache::lock("prices:fetch:{$region}", self::LOCK_SECONDS);
+
+        if (! $lock->get()) {
+            $this->error('A price fetch for this region is already running.');
+
+            return self::FAILURE;
+        }
+
+        try {
+            return $this->fetchAndDerive($region, $fetch, $rollup, $stats);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function fetchAndDerive(string $region, PriceFetchService $fetch, PriceRollup $rollup, PriceStatsService $stats): int
+    {
         $run = $fetch->fetch($region, (bool) $this->option('force'));
 
         if ($run->status === FetchRun::STATUS_FAILED) {

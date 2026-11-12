@@ -19,6 +19,7 @@ use App\Http\Controllers\TradesController;
 use App\Http\Controllers\TradesImportController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\WelcomeController;
+use App\View\Components\AppLayout;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', WelcomeController::class);
@@ -36,7 +37,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/positions', [PositionsController::class, 'index'])->name('positions.index');
 
-    foreach (['trades' => ['Trades', 'one'], 'reconcile' => ['Reconcile', 'one'], 'market' => ['Market', 'market'], 'scan' => ['Scan', 'market'], 'calculator' => ['Calculator', 'market']] as $page => [$title, $games]) {
+    foreach (['trades' => ['Trades', AppLayout::GAMES_ONE], 'reconcile' => ['Reconcile', AppLayout::GAMES_ONE], 'market' => ['Market', AppLayout::GAMES_MARKET], 'scan' => ['Scan', AppLayout::GAMES_MARKET], 'calculator' => ['Calculator', AppLayout::GAMES_MARKET]] as $page => [$title, $games]) {
         Route::view("/{$page}", 'livewire-page', ['title' => $title, 'livewire' => $page, 'games' => $games])->name("{$page}.index");
     }
 
@@ -70,6 +71,7 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     Route::get('/users', [AdminController::class, 'users'])->name('users');
     Route::get('/uploads', [AdminController::class, 'uploads'])->name('uploads');
     Route::get('/fetch', [AdminController::class, 'fetchRuns'])->name('fetch');
+    Route::post('/fetch', [AdminController::class, 'fetchNow'])->middleware('throttle:6,60')->name('fetch.now');
     Route::post('/users/{user}/impersonate', [ImpersonationController::class, 'start'])->name('impersonate');
 });
 

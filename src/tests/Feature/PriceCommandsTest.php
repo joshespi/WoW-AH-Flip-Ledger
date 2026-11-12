@@ -7,6 +7,7 @@ use App\Services\IngestService;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\Support\FakesBlizzard;
@@ -20,7 +21,7 @@ class PriceCommandsTest extends TestCase
 
     public function test_without_credentials_the_commands_refuse_and_make_no_requests(): void
     {
-        config(['services.blizzard.client_id' => null, 'services.blizzard.client_secret' => null]);
+        $this->blizzardUnconfigured();
         Http::fake();
 
         foreach (['prices:fetch', 'prices:names', 'prices:probe'] as $command) {
@@ -44,6 +45,21 @@ class PriceCommandsTest extends TestCase
         $this->assertSame(4, DB::table('price_daily')->count());
         $this->assertSame(4, DB::table('item_stats')->count());
         $this->assertSame(384000, (int) DB::table('item_stats')->where('item_id', 238371)->value('floor'));
+    }
+
+    public function test_a_fetch_refuses_while_another_is_running_for_the_region(): void
+    {
+        $this->fakeBlizzard();
+        $held = Cache::lock('prices:fetch:us', 60);
+        $this->assertTrue($held->get());
+
+        $this->artisan('prices:fetch')->expectsOutputToContain('already running')->assertFailed();
+
+        Http::assertNothingSent();
+        $this->assertSame(0, DB::table('fetch_runs')->count());
+
+        $held->release();
+        $this->artisan('prices:fetch')->assertSuccessful();
     }
 
     public function test_a_repeat_fetch_says_nothing_new_and_a_failure_exits_nonzero(): void
@@ -129,7 +145,7 @@ class PriceCommandsTest extends TestCase
             $this->assertTrue($event->withoutOverlapping, "{$name} must be withoutOverlapping()");
         }
 
-        config(['services.blizzard.client_id' => null, 'services.blizzard.client_secret' => null]);
+        $this->blizzardUnconfigured();
         $this->assertFalse($find('prices:fetch')->filtersPass($this->app));
         $this->assertFalse($find('prices:names')->filtersPass($this->app));
         $this->assertTrue($find('prices:prune')->filtersPass($this->app), 'pruning needs no credentials');
