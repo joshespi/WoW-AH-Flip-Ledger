@@ -9,6 +9,7 @@
 set -eu
 
 cd "$(dirname "$0")/.."
+. scripts/docker.sh
 
 VERSION="${1:-$(grep 'Version = ' uploader/internal/version/version.go | cut -d'"' -f2)}"
 
@@ -43,8 +44,7 @@ cp uploader/dist/* "$PUBLISH"/
 # (AddonPackager, run on app start) builds the same bytes, so keep the two in step. Its hash joins the published
 # SHA256SUMS, which is where the app lists it from.
 . scripts/addon-version.sh
-HERE=$(pwd -W 2>/dev/null || pwd)
-MSYS_NO_PATHCONV=1 docker run --rm -v "$HERE:/repo" -w /repo alpine:3.20 sh -c '
+alpine_run '
     set -eu
     apk add --no-cache zip >/dev/null
     rm -rf /tmp/addon && mkdir /tmp/addon && cp -r addon/WowFlipLedger /tmp/addon/

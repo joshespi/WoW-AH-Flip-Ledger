@@ -13,3 +13,9 @@ if [ -z "$DB_DATABASE" ]; then
     echo "DB_DATABASE is not set in .env" >&2
     exit 1
 fi
+
+# db_exec <client> [args]: runs a MariaDB client in the `db` container as root against the app's
+# database, reading stdin. Used for mariadb-dump and mariadb.
+db_exec() {
+    docker compose exec -T db sh -c 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; c=$1; shift; exec "$c" "$@" -u root "$MYSQL_DATABASE"' sh "$@"
+}

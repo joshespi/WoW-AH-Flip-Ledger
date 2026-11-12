@@ -6,10 +6,7 @@
 set -eu
 
 cd "$(dirname "$0")/.."
-
-# Git Bash on Windows needs a Windows-style path for docker -v and must not rewrite /src.
-HERE=$(pwd -W 2>/dev/null || pwd)
-export MSYS_NO_PATHCONV=1
+. scripts/docker.sh
 
 exec docker run --rm \
     -v "$HERE/uploader:/src" \

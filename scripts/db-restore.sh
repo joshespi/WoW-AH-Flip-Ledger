@@ -23,6 +23,6 @@ if [ "$confirmed" != "--yes" ]; then
 fi
 
 echo "Restoring $file into '$DB_DATABASE' ..."
-gunzip -c "$file" | docker compose exec -T db sh -c 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mariadb -u root "$MYSQL_DATABASE"'
+gunzip -c "$file" | db_exec mariadb
 
 echo "Done."

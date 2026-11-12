@@ -10,7 +10,6 @@ mkdir -p backups
 out="backups/${DB_DATABASE}-$(date +%Y%m%d_%H%M%S).sql.gz"
 
 echo "Backing up '$DB_DATABASE' to $out ..."
-docker compose exec -T db sh -c 'export MYSQL_PWD="$MYSQL_ROOT_PASSWORD"; exec mariadb-dump --single-transaction --routines -u root "$MYSQL_DATABASE"' \
-    | gzip > "$out"
+db_exec mariadb-dump --single-transaction --routines | gzip > "$out"
 
 echo "Done: $out ($(du -h "$out" | cut -f1))"
