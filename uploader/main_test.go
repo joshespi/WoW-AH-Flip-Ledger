@@ -14,7 +14,9 @@ import (
 	"testing"
 	"time"
 
+	"wowflipledger/uploader/internal/addon"
 	"wowflipledger/uploader/internal/config"
+	"wowflipledger/uploader/internal/wow"
 )
 
 const tok = "7|wfl_" + "abcdefghijklmnopqrstuvwxyz0123456789ABCD"
@@ -97,7 +99,7 @@ func cli(t *testing.T, dir, stdin string, args ...string) result {
 func wowTree(t *testing.T, content string) (root, file string) {
 	t.Helper()
 	root = filepath.Join(t.TempDir(), "_retail_")
-	file = filepath.Join(root, "WTF", "Account", "ACCT", "SavedVariables", "TradeSkillMaster.lua")
+	file = wow.SavedVariablesPath(root, "ACCT", "TradeSkillMaster.lua")
 	os.MkdirAll(filepath.Dir(file), 0o755)
 	if err := os.WriteFile(file, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
@@ -286,7 +288,7 @@ func (a *api) feedCalls() int {
 func TestAddonSyncIsOffUntilEnabled(t *testing.T) {
 	a := newAPI(t)
 	root, _ := wowTree(t, "TradeSkillMasterDB = {}")
-	os.MkdirAll(filepath.Join(root, "Interface", "AddOns", "WowFlipLedger"), 0o755)
+	os.MkdirAll(addon.Dir(root), 0o755)
 	dir := configured(t, a, root)
 
 	r := cli(t, dir, "", "once")
@@ -296,7 +298,7 @@ func TestAddonSyncIsOffUntilEnabled(t *testing.T) {
 	if a.feedCalls() != 0 {
 		t.Error("fetched the feed while addon sync is off")
 	}
-	if _, err := os.Stat(filepath.Join(root, "Interface", "AddOns", "WowFlipLedger", "Data.lua")); err == nil {
+	if _, err := os.Stat(addon.DataPath(root)); err == nil {
 		t.Error("Data.lua written while addon sync is off")
 	}
 	if r = cli(t, dir, "", "status"); !strings.Contains(r.out, "Addon:    off") {
@@ -307,7 +309,7 @@ func TestAddonSyncIsOffUntilEnabled(t *testing.T) {
 func TestAddonEnableThenOnceWritesDataLuaAndNothingElse(t *testing.T) {
 	a := newAPI(t)
 	root, tsm := wowTree(t, "TradeSkillMasterDB = {}")
-	folder := filepath.Join(root, "Interface", "AddOns", "WowFlipLedger")
+	folder := addon.Dir(root)
 	os.MkdirAll(folder, 0o755)
 	os.WriteFile(filepath.Join(folder, "WowFlipLedger.toc"), []byte("## Title: WFL"), 0o644)
 	dir := configured(t, a, root)
@@ -484,7 +486,7 @@ func TestInstallAndUninstallOnUnsupportedSystems(t *testing.T) {
 func TestOnceUploadsTheAddonRecordToo(t *testing.T) {
 	a := newAPI(t)
 	root, _ := wowTree(t, "TradeSkillMasterDB = {}")
-	rec := filepath.Join(root, "WTF", "Account", "ACCT", "SavedVariables", "WowFlipLedger.lua")
+	rec := wow.SavedVariablesPath(root, "ACCT", "WowFlipLedger.lua")
 	os.WriteFile(rec, []byte("WowFlipLedgerDB = {}"), 0o644)
 	dir := configured(t, a, root)
 
@@ -516,7 +518,7 @@ func TestOnceUploadsTheAddonRecordToo(t *testing.T) {
 func TestForeverFilesAreSentTaggedWithTheirGame(t *testing.T) {
 	a := newAPI(t)
 	root, _ := wowTree(t, "TradeSkillMasterDB = {} -- retail")
-	forever := filepath.Join(filepath.Dir(root), "_forever_", "WTF", "Account", "ACCT", "SavedVariables")
+	forever := wow.SavedVariablesDir(filepath.Join(filepath.Dir(root), "_forever_"), "ACCT")
 	os.MkdirAll(forever, 0o755)
 	os.WriteFile(filepath.Join(forever, "WowFlipLedger.lua"), []byte("WowFlipLedgerDB = {} -- forever"), 0o644)
 	dir := configured(t, a, root)

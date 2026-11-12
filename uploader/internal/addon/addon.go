@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"wowflipledger/uploader/internal/client"
+	"wowflipledger/uploader/internal/fsx"
 	"wowflipledger/uploader/internal/state"
 )
 
@@ -54,34 +55,7 @@ func Write(root string, data []byte) error {
 		return fmt.Errorf("%s is not a regular file; remove it and sync again", dst)
 	}
 
-	tmp := dst + ".tmp"
-	// A leftover (or planted) temp file must not be written through.
-	if err := os.Remove(tmp); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
-	if err != nil {
-		return err
-	}
-	if _, err := f.Write(data); err != nil {
-		f.Close()
-		os.Remove(tmp)
-		return err
-	}
-	if err := f.Sync(); err != nil {
-		f.Close()
-		os.Remove(tmp)
-		return err
-	}
-	if err := f.Close(); err != nil {
-		os.Remove(tmp)
-		return err
-	}
-	if err := os.Rename(tmp, dst); err != nil {
-		os.Remove(tmp)
-		return err
-	}
-	return nil
+	return fsx.WriteFileAtomic(dst, data, 0o644)
 }
 
 // Fetcher is what Sync needs from the API client.
@@ -236,9 +210,5 @@ func (s *Sync) note(kind Kind, res client.Result, msg string) *Event {
 }
 
 func (s *Sync) backoff() time.Duration {
-	d := s.Opts.BackoffBase
-	for i := 1; i < s.fails && d < s.Opts.BackoffMax; i++ {
-		d *= 2
-	}
-	return min(d, s.Opts.BackoffMax)
+	return client.Backoff(s.Opts.BackoffBase, s.Opts.BackoffMax, s.fails)
 }

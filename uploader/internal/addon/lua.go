@@ -2,8 +2,6 @@ package addon
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +10,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"wowflipledger/uploader/internal/fsx"
 )
 
 // SupportedSchema is the feed layout this uploader knows how to render.
@@ -65,8 +65,7 @@ func Render(feed []byte) (lua []byte, sum string, err error) {
 		return nil, "", err
 	}
 
-	h := sha256.Sum256(stable)
-	return []byte(header + "WFL_FEED = " + string(full) + "\n"), hex.EncodeToString(h[:]), nil
+	return []byte(header + "WFL_FEED = " + string(full) + "\n"), fsx.SHA256Hex(stable), nil
 }
 
 // encode writes the top-level object.

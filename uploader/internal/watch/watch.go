@@ -7,8 +7,6 @@ package watch
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"os"
@@ -16,6 +14,7 @@ import (
 
 	"wowflipledger/uploader/internal/addon"
 	"wowflipledger/uploader/internal/client"
+	"wowflipledger/uploader/internal/fsx"
 	"wowflipledger/uploader/internal/state"
 	"wowflipledger/uploader/internal/wow"
 )
@@ -190,7 +189,7 @@ func (s *Syncer) syncFile(ctx context.Context, f wow.File, force bool) *Event {
 		return &Event{File: f, Kind: Skipped, Message: "file is still changing"}
 	}
 
-	sum := hash(data)
+	sum := fsx.SHA256Hex(data)
 	if !force && known && entry.SHA256 == sum {
 		// Same content (e.g. a /reload that changed nothing): remember the new mtime, send nothing.
 		s.remember(f, fi, sum, entry.Status, entry.Message, entry.At)
@@ -285,18 +284,9 @@ func (s *Syncer) readStable(ctx context.Context, path string) ([]byte, os.FileIn
 }
 
 func (s *Syncer) backoff(fails int, retryAfter time.Duration) time.Duration {
-	d := s.Opts.BackoffBase
-	for i := 1; i < fails && d < s.Opts.BackoffMax; i++ {
-		d *= 2
-	}
-	d = min(d, s.Opts.BackoffMax)
+	d := client.Backoff(s.Opts.BackoffBase, s.Opts.BackoffMax, fails)
 	if s.Opts.Jitter != nil {
 		d = s.Opts.Jitter(d)
 	}
 	return max(d, retryAfter)
-}
-
-func hash(b []byte) string {
-	sum := sha256.Sum256(b)
-	return hex.EncodeToString(sum[:])
 }

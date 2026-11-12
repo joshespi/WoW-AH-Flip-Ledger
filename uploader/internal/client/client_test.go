@@ -17,6 +17,20 @@ const token = "12|wfl_" + "abcdefghijklmnopqrstuvwxyz0123456789ABCD"
 
 func newClient(srv *httptest.Server) *Client { return New(srv.URL, token, "1.2.3") }
 
+// serve starts a server that always answers status, headers and body, closed with the test.
+func serve(t *testing.T, status int, body string, headers map[string]string) *Client {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for k, v := range headers {
+			w.Header().Set(k, v)
+		}
+		w.WriteHeader(status)
+		io.WriteString(w, body)
+	}))
+	t.Cleanup(srv.Close)
+	return newClient(srv)
+}
+
 func upload(t *testing.T, c *Client, data []byte) (Result, Outcome, error) {
 	t.Helper()
 	return c.Upload(context.Background(), data, time.Unix(1_790_000_000, 0), "acct-abc123", "retail")
@@ -91,12 +105,7 @@ func TestStatusClassification(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(tc.status)
-			io.WriteString(w, tc.body)
-		}))
-		res, outcome, err := upload(t, newClient(srv), []byte("x"))
-		srv.Close()
+		res, outcome, err := upload(t, serve(t, tc.status, tc.body, nil), []byte("x"))
 
 		if err != nil {
 			t.Errorf("%d: unexpected error %v", tc.status, err)
@@ -108,13 +117,7 @@ func TestStatusClassification(t *testing.T) {
 }
 
 func TestRetryAfterIsParsed(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Retry-After", "37")
-		w.WriteHeader(429)
-	}))
-	defer srv.Close()
-
-	res, outcome, _ := upload(t, newClient(srv), []byte("x"))
+	res, outcome, _ := upload(t, serve(t, 429, "", map[string]string{"Retry-After": "37"}), []byte("x"))
 	if outcome != Retry || res.RetryAfter != 37*time.Second {
 		t.Errorf("outcome=%v retryAfter=%v", outcome, res.RetryAfter)
 	}
@@ -122,13 +125,7 @@ func TestRetryAfterIsParsed(t *testing.T) {
 
 func TestRetryAfterIsCapped(t *testing.T) {
 	for _, v := range []string{"99999999", "9223372036854775807"} {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Retry-After", v)
-			w.WriteHeader(503)
-		}))
-
-		res, _, _ := upload(t, newClient(srv), []byte("x"))
-		srv.Close()
+		res, _, _ := upload(t, serve(t, 503, "", map[string]string{"Retry-After": v}), []byte("x"))
 		if res.RetryAfter != MaxRetryAfter {
 			t.Errorf("Retry-After %s: got %v, want %v", v, res.RetryAfter, MaxRetryAfter)
 		}
@@ -250,13 +247,7 @@ func TestFeedClassifiesStatuses(t *testing.T) {
 	cases := map[int]Outcome{200: OK, 401: Fatal, 403: Fatal, 426: Fatal, 429: Retry, 500: Retry, 503: Retry}
 
 	for status, want := range cases {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Retry-After", "7")
-			w.WriteHeader(status)
-			io.WriteString(w, `{"message":"nope"}`)
-		}))
-		_, res, outcome, _ := newClient(srv).Feed(context.Background())
-		srv.Close()
+		_, res, outcome, _ := serve(t, status, `{"message":"nope"}`, map[string]string{"Retry-After": "7"}).Feed(context.Background())
 
 		if outcome != want {
 			t.Errorf("%d: got %v want %v", status, outcome, want)

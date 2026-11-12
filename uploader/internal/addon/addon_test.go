@@ -2,8 +2,6 @@ package addon
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"io/fs"
 	"os"
@@ -13,7 +11,9 @@ import (
 	"time"
 
 	"wowflipledger/uploader/internal/client"
+	"wowflipledger/uploader/internal/fsx"
 	"wowflipledger/uploader/internal/state"
+	"wowflipledger/uploader/internal/wow"
 )
 
 type fakeFeed struct {
@@ -41,7 +41,7 @@ const feedV1 = `{"schema":1,"generated_at":100,"positions":[]}`
 func wowTree(t *testing.T, installed bool) string {
 	t.Helper()
 	root := t.TempDir()
-	sv := filepath.Join(root, "WTF", "Account", "ACCT", "SavedVariables")
+	sv := wow.SavedVariablesDir(root, "ACCT")
 	if err := os.MkdirAll(sv, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -76,8 +76,7 @@ func snapshot(t *testing.T, root string) map[string]string {
 		if err != nil {
 			return err
 		}
-		sum := sha256.Sum256(b)
-		out[p] = hex.EncodeToString(sum[:])
+		out[p] = fsx.SHA256Hex(b)
 		return nil
 	})
 	if err != nil {

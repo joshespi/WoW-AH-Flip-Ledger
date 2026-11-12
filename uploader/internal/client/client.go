@@ -116,7 +116,7 @@ func (c *Client) Upload(ctx context.Context, data []byte, mtime time.Time, label
 
 // Ping checks the token and version without uploading anything.
 func (c *Client) Ping(ctx context.Context) (Result, Outcome, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+"/api/v1/ping", nil)
+	req, err := c.get(ctx, "/api/v1/ping")
 	if err != nil {
 		return Result{}, Fatal, err
 	}
@@ -126,7 +126,7 @@ func (c *Client) Ping(ctx context.Context) (Result, Outcome, error) {
 // Feed fetches the in-game addon feed. The body comes back raw: the addon package validates and
 // renders it. A feed over maxFeed is Rejected rather than silently cut short.
 func (c *Client) Feed(ctx context.Context) ([]byte, Result, Outcome, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+"/api/v1/addon-feed", nil)
+	req, err := c.get(ctx, "/api/v1/addon-feed")
 	if err != nil {
 		return nil, Result{}, Fatal, err
 	}
@@ -136,6 +136,19 @@ func (c *Client) Feed(ctx context.Context) ([]byte, Result, Outcome, error) {
 		return nil, r, Rejected, nil
 	}
 	return body, r, outcome, err
+}
+
+func (c *Client) get(ctx context.Context, path string) (*http.Request, error) {
+	return http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+path, nil)
+}
+
+// Backoff is base doubled per failure after the first, capped at limit.
+func Backoff(base, limit time.Duration, fails int) time.Duration {
+	d := base
+	for i := 1; i < fails && d < limit; i++ {
+		d *= 2
+	}
+	return min(d, limit)
 }
 
 func (c *Client) do(req *http.Request) (Result, Outcome, error) {

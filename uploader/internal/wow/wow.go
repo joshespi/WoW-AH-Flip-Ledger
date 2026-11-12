@@ -6,8 +6,6 @@
 package wow
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -15,6 +13,8 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+
+	"wowflipledger/uploader/internal/fsx"
 )
 
 // The only two file names ever read.
@@ -46,6 +46,19 @@ func GameLabel(game string) string {
 		return "Classic"
 	}
 	return "Retail"
+}
+
+// AccountsDir is <root>/WTF/Account.
+func AccountsDir(root string) string { return filepath.Join(root, "WTF", "Account") }
+
+// SavedVariablesDir is <root>/WTF/Account/<account>/SavedVariables.
+func SavedVariablesDir(root, account string) string {
+	return filepath.Join(AccountsDir(root), account, "SavedVariables")
+}
+
+// SavedVariablesPath is the file <name> in SavedVariablesDir.
+func SavedVariablesPath(root, account, name string) string {
+	return filepath.Join(SavedVariablesDir(root, account), name)
 }
 
 // siblingRoot is the install folder beside root (the _retail_ folder).
@@ -107,7 +120,7 @@ func detectRoot(explicit string, defaults []string) (string, error) {
 	}
 	for _, c := range candidates {
 		for _, root := range []string{c, filepath.Join(c, "_retail_")} {
-			if isDir(filepath.Join(root, "WTF", "Account")) {
+			if isDir(AccountsDir(root)) {
 				return root, nil
 			}
 		}
@@ -136,7 +149,7 @@ func FindFiles(root string) ([]File, error) {
 }
 
 func findIn(root, game string) ([]File, error) {
-	dir := filepath.Join(root, "WTF", "Account")
+	dir := AccountsDir(root)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -152,7 +165,7 @@ func findIn(root, game string) ([]File, error) {
 			continue
 		}
 		for _, f := range []struct{ name, suffix string }{{tsmFile, ""}, {addonFile, "-addon"}} {
-			p := filepath.Join(dir, e.Name(), "SavedVariables", f.name)
+			p := SavedVariablesPath(root, e.Name(), f.name)
 			if fi, err := os.Lstat(p); err == nil && fi.Mode().IsRegular() {
 				files = append(files, File{Account: e.Name(), Label: Label(e.Name()) + tag + f.suffix, Path: p, Game: game, Info: fi})
 			}
@@ -164,8 +177,7 @@ func findIn(root, game string) ([]File, error) {
 
 // Label is a stable, non-identifying tag for an account folder name.
 func Label(account string) string {
-	sum := sha256.Sum256([]byte(account))
-	return "acct-" + hex.EncodeToString(sum[:])[:6]
+	return "acct-" + fsx.SHA256Hex([]byte(account))[:6]
 }
 
 func isDir(p string) bool {
@@ -178,7 +190,7 @@ func isDir(p string) bool {
 func Siblings(root string) []string {
 	var games []string
 	for _, s := range siblings {
-		if isDir(filepath.Join(siblingRoot(root, s.folder), "WTF", "Account")) {
+		if isDir(AccountsDir(siblingRoot(root, s.folder))) {
 			games = append(games, s.game)
 		}
 	}

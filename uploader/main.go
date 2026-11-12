@@ -43,6 +43,9 @@ const (
 	exitNotSetup = 78
 )
 
+// shortTime is how status lines show a time.
+const shortTime = "2006-01-02 15:04"
+
 const usage = `wowflipledger-uploader ` + "%s" + `
 
 Usage: wowflipledger-uploader [--config-dir DIR] <command> [flags]
@@ -212,7 +215,7 @@ func (a *app) status() int {
 		for _, f := range files {
 			line := "never uploaded"
 			if e, ok := st.Get(f.Path); ok {
-				line = fmt.Sprintf("%s at %s", e.Status, e.At.Local().Format("2006-01-02 15:04"))
+				line = fmt.Sprintf("%s at %s", e.Status, e.At.Local().Format(shortTime))
 				if e.Message != "" {
 					line += " (" + e.Message + ")"
 				}
@@ -419,7 +422,7 @@ func (a *app) addonLine(cfg *config.Config, root string, rootErr error) {
 	}
 	st, _ := state.Open(a.dir)
 	if w := st.GetAddon(); w.Path == addon.DataPath(root) && !w.WrittenAt.IsZero() {
-		fmt.Fprintf(a.out, "Addon:    on, Data.lua written %s\n", w.WrittenAt.Local().Format("2006-01-02 15:04"))
+		fmt.Fprintf(a.out, "Addon:    on, Data.lua written %s\n", w.WrittenAt.Local().Format(shortTime))
 		return
 	}
 	fmt.Fprintf(a.out, "Addon:    on, nothing written yet (%s)\n", addon.DataPath(root))

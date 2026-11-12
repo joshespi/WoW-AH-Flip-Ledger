@@ -94,7 +94,7 @@ func newEnv(t *testing.T, accounts ...string) *env {
 }
 
 func (e *env) path(account string) string {
-	return filepath.Join(e.root, "WTF", "Account", account, "SavedVariables", "TradeSkillMaster.lua")
+	return wow.SavedVariablesPath(e.root, account, "TradeSkillMaster.lua")
 }
 
 func (e *env) write(account, content string, mtime int64) {
