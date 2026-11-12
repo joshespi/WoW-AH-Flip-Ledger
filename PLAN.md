@@ -406,6 +406,16 @@ Checklist:
 - [x] `TenantIsolationTest::PUBLIC_URIS` gains `stats` and `scoreboard`. CLAUDE.md gets a short "Stats and scoreboard" section.
 - [x] Tests (611 green, Pint clean, build and MariaDB smoke done; checked in the built-in browser: `/stats` and `/scoreboard` light and dark, chart series switch, sidebar and Profile box as the demo, no console or CSP errors. Not seen: a populated scoreboard in a browser, an opt-in by a real account): `RecordActivityTest`, `StatsPageTest` (no gold in output, demo excluded), `ScoreboardTest` (validation, P/L matches `PositionsService`, 7d window, instant opt-out, no name or email in the HTML, demo never listed, bad params fall back), export test updated. Full suite, Pint, `npm run build`, browser check (light/dark, CSP console), and `scoreboard:build` / `stats:prune` run on MariaDB.
 
+## Phase 15: DRY and polish pass
+
+No behaviour change apart from one visual style for cards, toggles and dashes.
+
+- [x] Backend: `Support\Holding` behind both position replays; `Utc::DAY`/`HOUR`/`daysAgo`; `FetchRun::staleAfter`/`latestOk`/`inRegion`; `User` scopes `demo`/`real`/`admins`; `Trade`/`Upload`/`ItemName` source constants; `Money::unit`; `Bounds::validPrice`/`gold`; `Sql::placeholders`; `Csv::write`/`download`; one item-joined query in the data export; `PricesCommand::REGION_OPTION`.
+- [x] Front end: `.card-title`, `.card-head`, `.link`, `.note`, `.empty`, `.dl-label`, `.seg`, `.code-block`, `.field-file`, `.page-title`, `.legal` in `app.css`; `<x-time>` and `<x-num>`; `heading`/`actions` slots on the app layout (item and positions pages keep their `<h1>`); stat tiles, chips and `<x-money>` reused in admin, the freshness bar and the landing page; `indigo-950` in the gold scale; mail and chart colours from the app palette; chart setup shared in `app.js`.
+- [x] Tests: `SeedsUserRows`, `CallsApi`, `FakesBlizzard::blizzardUnconfigured`.
+- [ ] Uploader, addon and scripts (separate session).
+- [ ] Left for later, on purpose: `<x-table>` / `<x-chart-card>` / `<x-field>` wrappers, `MarketStats::numbers()`, a shared Reconcile bulk helper (the write-guard test wants `attempt()` in each action), CSV import through `ItemName::idsByName()`, and the remaining test seed helpers (buys, candidates, `price_daily`, addon record builders).
+
 ## Open items (need me before the phase that uses them)
 
 - **Brevo sender** (Phase 2, before real signups): verify a sender on `wowledger.joshespi.com` (`.env.example` assumes `noreply@wowledger.joshespi.com`) and create the SMTP key. The DNS record for the hostname itself is also mine to add.
