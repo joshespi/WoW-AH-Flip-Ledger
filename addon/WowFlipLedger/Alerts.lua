@@ -42,8 +42,8 @@ function ns.announce()
         return
     end
 
-    local age = ns.age()
-    if age and age > ns.STALE_AFTER then
+    local age, stale = ns.stale()
+    if stale then
         ns.print("Ledger data is " .. ns.ageText(age) .. ". Is the uploader running?")
     end
 

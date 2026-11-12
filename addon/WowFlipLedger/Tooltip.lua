@@ -19,7 +19,7 @@ local function onTooltip(tooltip, data)
     tooltip:AddLine("WoW Flip Ledger", unpack(ns.COLOR.blue))
 
     for _, l in ipairs(lines) do
-        local c = ns.COLOR[l[3]] or ns.COLOR.white
+        local c = ns.color(l[3])
         tooltip:AddDoubleLine(l[1], l[2], 0.8, 0.8, 0.8, c[1], c[2], c[3])
     end
 end

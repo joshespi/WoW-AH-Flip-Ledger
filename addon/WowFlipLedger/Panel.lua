@@ -20,7 +20,7 @@ local mode = "positions"
 local pool = {}
 
 local function setColor(fs, name)
-    local c = ns.COLOR[name] or ns.COLOR.white
+    local c = ns.color(name)
     fs:SetTextColor(c[1], c[2], c[3])
 end
 

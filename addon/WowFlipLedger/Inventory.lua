@@ -28,6 +28,12 @@ local function add(map, id, qty)
     map[id] = (map[id] or 0) + (qty or 1)
 end
 
+local function merge(into, from)
+    for id, qty in pairs(from or {}) do
+        add(into, id, qty)
+    end
+end
+
 -- Which store a container index belongs to, from the name Blizzard gives it (indices change
 -- between patches; the names keep their meaning). nil skips it.
 local function kindOf(name)
@@ -176,14 +182,10 @@ function ns.flushInventory()
     for _, c in pairs(d.chars or {}) do
         -- A store that was never scanned is nil.
         for _, name in ipairs({ "bags", "bank", "auc", "mail" }) do
-            for id, qty in pairs(c[name] or {}) do
-                add(total, id, qty)
-            end
+            merge(total, c[name])
         end
     end
-    for id, qty in pairs(d.warband or {}) do
-        add(total, id, qty)
-    end
+    merge(total, d.warband)
 
     local ids = {}
     for id in pairs(total) do

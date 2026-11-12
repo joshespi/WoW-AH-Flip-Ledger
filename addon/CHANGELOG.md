@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- Internal clean-up, no behaviour change.
+
 ## 0.2.1
 
 - Loads in World of Warcraft: Forever (interface 16001). Some 0.2.0 downloads lacked it, so Forever showed the addon as incompatible and recorded nothing. If yours did, install this version in `_forever_\Interface\AddOns`.

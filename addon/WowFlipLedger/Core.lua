@@ -13,6 +13,11 @@ ns.COLOR = {
     white = { 1, 1, 1 },
 }
 
+-- The color for a name, white when unknown.
+function ns.color(name)
+    return ns.COLOR[name] or ns.COLOR.white
+end
+
 -- Item names come from the server; keep a stray "|" from being read as a chat escape code.
 function ns.esc(s)
     return (tostring(s):gsub("|", "||"))
@@ -72,6 +77,12 @@ function ns.age()
     end
 end
 
+-- Age of the data and whether it is past STALE_AFTER (nil, false when there is no feed time).
+function ns.stale()
+    local age = ns.age()
+    return age, age ~= nil and age > ns.STALE_AFTER
+end
+
 function ns.ageText(seconds)
     if seconds < 90 then
         return "just now"
@@ -90,11 +101,11 @@ function ns.freshness()
         return "No data yet. Run the uploader with addon sync on, then /reload.", "red"
     end
 
-    local age = ns.age()
+    local age, stale = ns.stale()
     local text = "Data as of " .. (age and ns.ageText(age) or "an unknown time")
     local color = "gray"
 
-    if age and age > ns.STALE_AFTER then
+    if stale then
         text = text .. " (old: is the uploader running?)"
         color = "amber"
     end
@@ -104,6 +115,22 @@ function ns.freshness()
     end
 
     return text, color
+end
+
+-- Text and color name; nil when the market is neither.
+local function marketText(p)
+    if p.market == "below" then
+        return "below typical", "green"
+    elseif p.market == "above" then
+        return "above typical", "amber"
+    end
+end
+
+local function pnlColor(v)
+    if v == nil then
+        return "gray"
+    end
+    return v >= 0 and "green" or "red"
 end
 
 -- Lines for an item's tooltip: { left, right, colorName }. nil when the item is not in the ledger.
@@ -132,12 +159,11 @@ function ns.tooltipLines(id)
             add("Floor now", "no price yet", "gray")
         end
         if p.unrealized ~= nil then
-            add("Unrealized", ns.money(p.unrealized), p.unrealized >= 0 and "green" or "red")
+            add("Unrealized", ns.money(p.unrealized), pnlColor(p.unrealized))
         end
-        if p.market == "below" then
-            add("Market", "below typical", "green")
-        elseif p.market == "above" then
-            add("Market", "above typical", "amber")
+        local market, marketColor = marketText(p)
+        if market then
+            add("Market", market, marketColor)
         elseif not p.stats_ready then
             add("Market", "collecting data", "gray")
         end
@@ -158,8 +184,8 @@ function ns.tooltipLines(id)
         end
     end
 
-    local age = ns.age()
-    if age and age > ns.STALE_AFTER then
+    local age, stale = ns.stale()
+    if stale then
         add("Ledger data", ns.ageText(age), "amber")
     end
 
@@ -203,15 +229,14 @@ function ns.rows(mode)
         elseif p.status == "underwater" then
             state, color = "underwater", "red"
         end
-        if p.market == "below" then
-            state = state .. ", below typical"
-        elseif p.market == "above" then
-            state = state .. ", above typical"
+        local market = marketText(p)
+        if market then
+            state = state .. ", " .. market
         end
 
         out[#out + 1] = {
             cells = { ns.esc(p.name), tostring(p.held), ns.money(p.avg_cost), ns.money(p.floor), ns.money(p.unrealized), state },
-            colors = { [5] = p.unrealized and (p.unrealized >= 0 and "green" or "red") or "gray", [6] = color },
+            colors = { [5] = pnlColor(p.unrealized), [6] = color },
         }
     end
 

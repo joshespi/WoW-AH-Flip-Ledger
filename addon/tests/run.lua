@@ -10,8 +10,7 @@ local check, eq = T.check, T.eq
 
 -- WoW API stubs -------------------------------------------------------------------------------
 
-local NOW = 1700000000
-function time() return NOW end
+T.stubClock()
 function GetCoinTextureString(n)
     return string.format("%dg%02ds%02dc", math.floor(n / 10000), math.floor(n / 100) % 100, n % 100)
 end
@@ -21,13 +20,19 @@ tinsert = table.insert
 UISpecialFrames = {}
 SlashCmdList = {}
 Enum = { TooltipDataType = { Item = 0 } }
-C_Timer = { After = function(_, f) f() end }
 
 local hook
 TooltipDataProcessor = { AddTooltipPostCall = function(_, f) hook = f end }
 
 local printed = {}
 function print(...) printed[#printed + 1] = table.concat({ ... }, " ") end
+
+-- Calls fn and returns the lines it printed.
+local function said(fn, ...)
+    printed = {}
+    fn(...)
+    return printed
+end
 
 local texts = {}
 
@@ -64,10 +69,7 @@ end
 -- Load the addon the way WoW does: every file gets the addon name and a shared table -----------
 
 dofile(DATA)
-local ns = {}
-for _, file in ipairs({ "Core.lua", "Recorder.lua", "Inventory.lua", "Tooltip.lua", "Panel.lua", "Alerts.lua" }) do
-    assert(loadfile(ADDON_DIR .. "/" .. file))("WowFlipLedger", ns)
-end
+local ns = T.load(ADDON_DIR, { "Core.lua", "Recorder.lua", "Inventory.lua", "Tooltip.lua", "Panel.lua", "Alerts.lua" })
 
 check(type(WFL_FEED) == "table", "Data.lua defines WFL_FEED")
 eq(WFL_FEED.schema, 1, "schema")
@@ -160,16 +162,16 @@ local text, color = ns.freshness()
 eq(text, "Data as of just now", "fresh data")
 eq(color, "gray", "fresh color")
 
-NOW = 1700000000 + 3 * 3600
+T.now = 1700000000 + 3 * 3600
 text = ns.freshness()
 eq(text, "Data as of 3 h ago", "hours")
 
-NOW = 1700000000 + 2 * 86400
+T.now = 1700000000 + 2 * 86400
 text, color = ns.freshness()
 check(text:find("old"), "old data warns")
 eq(color, "amber", "old data color")
 
-NOW = 1700000000
+T.now = 1700000000
 WFL_FEED.prices_stale = true
 text = ns.freshness()
 check(text:find("prices stale"), "stale prices are flagged")
@@ -178,36 +180,26 @@ WFL_FEED.prices_stale = false
 -- Alerts -------------------------------------------------------------------------------------
 
 WowFlipLedgerDB = nil
-printed = {}
-ns.announce()
-eq(#printed, 2, "first login prints both alerts")
-check(printed[1]:find("Buy target: Bloomline is at 3g10s00c %(target 3g50s00c%)"), "buy alert text")
-check(printed[2]:find("In profit: Wyrmfish"), "profit alert text")
+local out = said(ns.announce)
+eq(#out, 2, "first login prints both alerts")
+check(out[1]:find("Buy target: Bloomline is at 3g10s00c %(target 3g50s00c%)"), "buy alert text")
+check(out[2]:find("In profit: Wyrmfish"), "profit alert text")
 
-printed = {}
-ns.announce()
-eq(#printed, 0, "a reload with the same data stays quiet")
+eq(#said(ns.announce), 0, "a reload with the same data stays quiet")
 
 WFL_FEED.generated_at = WFL_FEED.generated_at + 600
-printed = {}
-ns.announce()
-eq(#printed, 2, "new data announces again")
+eq(#said(ns.announce), 2, "new data announces again")
 
-NOW = WFL_FEED.generated_at + 3 * 86400
-printed = {}
+T.now = WFL_FEED.generated_at + 3 * 86400
 WFL_FEED.generated_at = WFL_FEED.generated_at - 1
-ns.announce()
-check(printed[1] and printed[1]:find("Is the uploader running"), "old data warns at login")
-NOW = 1700000000
+out = said(ns.announce)
+check(out[1] and out[1]:find("Is the uploader running"), "old data warns at login")
+T.now = 1700000000
 
 reset(nil)
 WowFlipLedgerDB = nil
-printed = {}
-ns.announce()
-eq(#printed, 1, "no data prints one hint")
-printed = {}
-ns.announce()
-eq(#printed, 0, "the hint is shown once")
+eq(#said(ns.announce), 1, "no data prints one hint")
+eq(#said(ns.announce), 0, "the hint is shown once")
 check(ns.tooltipLines(238371) == nil, "no data, no tooltip lines")
 eq(#ns.rows("positions"), 0, "no data, no rows")
 check(select(1, ns.freshness()):find("No data yet"), "no data message")
@@ -248,7 +240,7 @@ WowFlipLedgerFrame._scripts.OnShow()
 check(sawText("No ledger data yet"), "no data: the panel explains what to do")
 check(sawText("No data yet"), "no data: the header line says so")
 
-reset({ schema = 1, generated_at = NOW, positions = {}, watchlist = {}, alerts = {}, summary = { realized = 0, unrealized = 0 } })
+reset({ schema = 1, generated_at = T.now, positions = {}, watchlist = {}, alerts = {}, summary = { realized = 0, unrealized = 0 } })
 texts = {}
 WowFlipLedgerFrame._scripts.OnShow()
 check(sawText("No open positions"), "no positions: the panel says so")
@@ -257,15 +249,9 @@ reset(saved)
 SlashCmdList["WOWFLIPLEDGER"]("")
 check(not WowFlipLedgerFrame:IsShown(), "closed again")
 
-printed = {}
-SlashCmdList["WOWFLIPLEDGER"]("alerts")
-eq(#printed, 2, "/wfl alerts lists them")
-printed = {}
-SlashCmdList["WOWFLIPLEDGER"]("status")
-eq(#printed, 1, "/wfl status")
-printed = {}
-SlashCmdList["WOWFLIPLEDGER"]("help")
-eq(#printed, 2, "/wfl help")
+eq(#said(SlashCmdList["WOWFLIPLEDGER"], "alerts"), 2, "/wfl alerts lists them")
+eq(#said(SlashCmdList["WOWFLIPLEDGER"], "status"), 1, "/wfl status")
+eq(#said(SlashCmdList["WOWFLIPLEDGER"], "help"), 2, "/wfl help")
 SlashCmdList["WOWFLIPLEDGER"]("  ALERTS  ")
 check(true, "commands are trimmed and case-insensitive")
 

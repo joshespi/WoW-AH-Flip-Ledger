@@ -9,15 +9,14 @@ local check, eq = T.check, T.eq
 
 -- Stubs ---------------------------------------------------------------------------------------
 
-local NOW = 1700000000
+T.stubClock()
+local NOW = T.now
 local DAY = 86400
-function time() return NOW end
 function GetTime() return 123.456 end
 function GetNormalizedRealmName() return "Area52" end
 function GetBuildInfo() return "12.1.5", "70783", "Nov 1 2026", 120105 end
 WOW_PROJECT_ID = 1
 UnitGUID = function() return "Player-3676-0A1B2C3D" end
-C_Timer = { After = function(_, f) f() end }
 C_Item = {
     GetItemNameByID = function(id) return ({ [238371] = "Wyrmfish", [238365] = "Swarmer", [238366] = "Swarmer" })[id] end,
     GetItemInfoInstant = function(name) return ({ ["Cached Thing"] = 4242 })[name] end,
@@ -105,9 +104,31 @@ C_Container = {
 -- Load ----------------------------------------------------------------------------------------
 
 local FILES = { "Core.lua", "Recorder.lua", "Inventory.lua" }
-local ns = {}
-for _, file in ipairs(FILES) do
-    assert(loadfile(ADDON_DIR .. "/" .. file))("WowFlipLedger", ns)
+local ns = T.load(ADDON_DIR, FILES)
+
+-- A record string as the recorder writes it (realm fixed).
+local function rec(kind, t, ...)
+    return table.concat({ kind, t, "Area52", ... }, "|")
+end
+
+-- A confirmed purchase; unit and total quote it, or nil to leave it unpriced.
+local function buy(id, qty, unit, total)
+    C_AuctionHouse.StartCommoditiesPurchase(id, qty)
+    if unit then fire("COMMODITY_PRICE_UPDATED", unit, total) end
+    C_AuctionHouse.ConfirmCommoditiesPurchase(id, qty)
+    fire("COMMODITY_PURCHASE_SUCCEEDED")
+end
+
+-- One Auction House invoice mail in the inbox, then the money is taken. o: subject, type, money,
+-- daysLeft, and the invoice's bid, buyout, deposit, cut, count.
+local function sellerMail(name, o)
+    mail = { {
+        subject = o.subject or ("Auction successful: " .. name),
+        money = o.money,
+        daysLeft = o.daysLeft,
+        invoice = { type = o.type or "seller", name = name, bid = o.bid, buyout = o.buyout, deposit = o.deposit, cut = o.cut, count = o.count },
+    } }
+    TakeInboxMoney(1)
 end
 
 -- d.inv ("item:qty" strings) as id -> qty.
@@ -132,11 +153,8 @@ eq(#d.events, 0, "starts empty")
 
 -- Buys ---------------------------------------------------------------------------------------
 
-C_AuctionHouse.StartCommoditiesPurchase(238371, 200)
-fire("COMMODITY_PRICE_UPDATED", 40000, 8000000)
-C_AuctionHouse.ConfirmCommoditiesPurchase(238371, 200)
-fire("COMMODITY_PURCHASE_SUCCEEDED")
-eq(d.events[1], "buy|1700000000|Area52|238371|200|8000000", "a confirmed purchase is booked with the quoted total")
+buy(238371, 200, 40000, 8000000)
+eq(d.events[1], rec("buy", NOW, 238371, 200, 8000000), "a confirmed purchase is booked with the quoted total")
 
 C_AuctionHouse.StartCommoditiesPurchase(238371, 10)
 fire("COMMODITY_PRICE_UPDATED", 50000, 500000)
@@ -150,77 +168,66 @@ eq(#d.events, 1, "success without a confirmation is ignored")
 
 -- No price event: price it from the listings (two lots: 5 at 100, then 100 at 120).
 results = { { quantity = 5, unitPrice = 100 }, { quantity = 100, unitPrice = 120 } }
-C_AuctionHouse.StartCommoditiesPurchase(238371, 20)
-C_AuctionHouse.ConfirmCommoditiesPurchase(238371, 20)
-fire("COMMODITY_PURCHASE_SUCCEEDED")
-eq(d.events[2], "buy|1700000000|Area52|238371|20|2300", "price falls back to walking the listings")
+buy(238371, 20)
+eq(d.events[2], rec("buy", NOW, 238371, 20, 2300), "price falls back to walking the listings")
 
 results = {}
-C_AuctionHouse.StartCommoditiesPurchase(238371, 20)
-C_AuctionHouse.ConfirmCommoditiesPurchase(238371, 20)
-fire("COMMODITY_PURCHASE_SUCCEEDED")
+buy(238371, 20)
 eq(#d.events, 2, "no price at all books nothing")
 eq(d.missed, 1, "and counts it as missed")
 
 -- Sales --------------------------------------------------------------------------------------
 
-mail = { { subject = "Auction successful: Wyrmfish", money = 1900000, daysLeft = 25, invoice = { type = "seller", name = "Wyrmfish", bid = 2000000, buyout = 0, deposit = 5000, cut = 100000, count = 50 } } }
-TakeInboxMoney(1)
-eq(d.events[3], "sale|" .. (NOW - 5 * DAY) .. "|Area52|238371|50|2000000|100000", "a sale is booked at the mail's date, gross and cut")
+sellerMail("Wyrmfish", { money = 1900000, daysLeft = 25, bid = 2000000, buyout = 0, deposit = 5000, cut = 100000, count = 50 })
+eq(d.events[3], rec("sale", NOW - 5 * DAY, 238371, 50, 2000000, 100000), "a sale is booked at the mail's date, gross and cut")
 
 TakeInboxMoney(1)
 AutoLootMailItem(1)
 eq(#d.events, 3, "the same mail seen by another hook adds nothing")
 
-mail = { { subject = "Auction successful: Mystery", money = 1, daysLeft = 20, invoice = { type = "seller", name = "Mystery", bid = 500, deposit = 0, cut = 25, count = 1 } } }
-TakeInboxMoney(1)
+sellerMail("Mystery", { money = 1, daysLeft = 20, bid = 500, deposit = 0, cut = 25, count = 1 })
 eq(#d.events, 3, "a name nobody knows is not guessed")
 eq(#d.unresolved, 1, "it waits instead")
-eq(d.unresolved[1], "sale|" .. (NOW - 10 * DAY) .. "|Area52|Mystery|1|500|25", "waiting record")
+eq(d.unresolved[1], rec("sale", NOW - 10 * DAY, "Mystery", 1, 500, 25), "waiting record")
 
 ns.learn(777, "Mystery")
 ns.resolveWaiting()
 eq(#d.unresolved, 0, "a later-learned name releases it")
-eq(d.events[4], "sale|" .. (NOW - 10 * DAY) .. "|Area52|777|1|500|25", "released sale is booked with its id")
+eq(d.events[4], rec("sale", NOW - 10 * DAY, 777, 1, 500, 25), "released sale is booked with its id")
 
 -- A name we have never seen is asked of the client (it knows cached items).
-mail = { { subject = "Auction successful: Cached Thing", money = 1, daysLeft = 10, invoice = { type = "seller", name = "Cached Thing", bid = 1000, deposit = 0, cut = 50, count = 4 } } }
-TakeInboxMoney(1)
-eq(d.events[5], "sale|" .. (NOW - 20 * DAY) .. "|Area52|4242|4|1000|50", "an unknown name the client can place is booked")
+sellerMail("Cached Thing", { money = 1, daysLeft = 10, bid = 1000, deposit = 0, cut = 50, count = 4 })
+eq(d.events[5], rec("sale", NOW - 20 * DAY, 4242, 4, 1000, 50), "an unknown name the client can place is booked")
 table.remove(d.events)
 
 -- 238365 and 238366 share a name: ambiguous.
 ns.learn(238365)
 ns.learn(238366)
-mail = { { subject = "Auction successful: Swarmer", money = 1, invoice = { type = "seller", name = "Swarmer", bid = 900, deposit = 0, cut = 45, count = 3 } } }
-TakeInboxMoney(1)
+sellerMail("Swarmer", { money = 1, bid = 900, deposit = 0, cut = 45, count = 3 })
 eq(#d.events, 4, "two items with one name are not guessed")
 eq(#d.unresolved, 1, "ambiguous sale waits")
 d.unresolved = {}
 
-mail = { { subject = "Sale Pending: Wyrmfish", invoice = { type = "seller_temp_invoice", name = "Wyrmfish", bid = 100, deposit = 0, cut = 5, count = 1 } } }
-TakeInboxMoney(1)
+sellerMail("Wyrmfish", { subject = "Sale Pending: Wyrmfish", type = "seller_temp_invoice", bid = 100, deposit = 0, cut = 5, count = 1 })
 eq(#d.events, 4, "a pending sale is not a sale")
 
-mail = { { subject = "Auction won: Wyrmfish", invoice = { type = "buyer", name = "Wyrmfish", bid = 100, deposit = 0, cut = 0, count = 1 } } }
-TakeInboxMoney(1)
+sellerMail("Wyrmfish", { subject = "Auction won: Wyrmfish", type = "buyer", bid = 100, deposit = 0, cut = 0, count = 1 })
 eq(#d.events, 4, "won-auction mail is not booked (the purchase was)")
 
-mail = { { subject = "Auction successful: Wyrmfish", money = 5, invoice = { type = "seller", name = "Wyrmfish", bid = 0, buyout = 0, cut = 0, count = 1 } } }
-TakeInboxMoney(1)
+sellerMail("Wyrmfish", { money = 5, bid = 0, buyout = 0, cut = 0, count = 1 })
 eq(#d.events, 4, "an invoice with no price is ignored")
 
 -- Expired and cancelled ---------------------------------------------------------------------
 
 mail = { { subject = "Auction expired: Wyrmfish", daysLeft = 28, items = { { name = "Wyrmfish", id = 238371, qty = 120 } } } }
 TakeInboxItem(1, 1)
-eq(d.events[5], "expired|" .. (NOW - 2 * DAY) .. "|Area52|238371|120", "expired lot returns")
+eq(d.events[5], rec("expired", NOW - 2 * DAY, 238371, 120), "expired lot returns")
 TakeInboxItem(1, 1)
 eq(#d.events, 5, "taking it twice books it once")
 
 mail = { { subject = "Auction cancelled: Wyrmfish", daysLeft = 29, items = { { name = "Wyrmfish", id = 238371, qty = 15 } } } }
 TakeInboxItem(1, 1)
-eq(d.events[6], "cancelled|" .. (NOW - 1 * DAY) .. "|Area52|238371|15", "cancelled lot returns")
+eq(d.events[6], rec("cancelled", NOW - 1 * DAY, 238371, 15), "cancelled lot returns")
 
 mail = { { subject = "Hello from a friend", items = { { name = "Wyrmfish", id = 238371, qty = 1 } } } }
 TakeInboxItem(1, 1)
@@ -280,8 +287,8 @@ local kept = d.events
 d.events = {}
 for i = 1, 8 do ns.addEvent("expired", NOW + i, "Area52", 1, i) end
 eq(#d.events, 5, "the log is cut back to the cap once it is past the slack")
-eq(d.events[1], "expired|" .. (NOW + 4) .. "|Area52|1|4", "oldest dropped")
-eq(d.events[#d.events], "expired|" .. (NOW + 8) .. "|Area52|1|8", "newest kept")
+eq(d.events[1], rec("expired", NOW + 4, 1, 4), "oldest dropped")
+eq(d.events[#d.events], rec("expired", NOW + 8, 1, 8), "newest kept")
 ns.addEvent("expired", NOW + 9, "Area52", 1, 9)
 eq(#d.events, 6, "within the slack nothing is copied")
 d.events = kept
@@ -296,10 +303,7 @@ check(status:find("auction house API present", 1, true) ~= nil, "status reports 
 do
     local saved = { C_AuctionHouse = C_AuctionHouse, C_Container = C_Container, TakeInboxMoney = TakeInboxMoney }
     C_AuctionHouse, C_Container, TakeInboxMoney = nil, nil, nil
-    local ns2 = {}
-    for _, file in ipairs(FILES) do
-        assert(loadfile(ADDON_DIR .. "/" .. file))("WowFlipLedger", ns2)
-    end
+    local ns2 = T.load(ADDON_DIR, FILES)
     fire("PLAYER_LOGIN")
     fire("PLAYER_LOGOUT")
     check(ns2.recorderStatus():find("missing", 1, true) ~= nil, "no auction API is reported, not an error")

@@ -326,11 +326,11 @@ function ns.onMailTaken(index)
             return
         end
 
-        local id = ns.resolve(name)
+        local id, realm = ns.resolve(name), ns.realm()
         if id then
-            ns.addEvent("sale", t, ns.realm(), id, count, gross, cut or 0)
+            ns.addEvent("sale", t, realm, id, count, gross, cut or 0)
         else
-            ns.addUnresolved("sale", t, ns.realm(), name, count, gross, cut or 0)
+            ns.addUnresolved("sale", t, realm, name, count, gross, cut or 0)
         end
         return
     end
@@ -350,8 +350,9 @@ function ns.onMailTaken(index)
         return
     end
 
+    local realm = ns.realm()
     for _, it in ipairs(ns.attachments(index)) do
-        ns.addEvent(kind, t, ns.realm(), it.id, it.qty)
+        ns.addEvent(kind, t, realm, it.id, it.qty)
     end
 end
 
