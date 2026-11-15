@@ -1,30 +1,24 @@
 # WoW Flip Ledger
 
-Track World of Warcraft auction house flips. Sign up, send your data (companion uploader or manual file upload), and see realized P/L, positions and market prices for commodities (US region).
+Track World of Warcraft auction house flips. Sign up, send your data (companion uploader or manual upload), and see realized P/L, positions and market prices for commodities (US region).
 
-- **Data:** your TradeSkillMaster `SavedVariables`, or the site's own in-game addon (`addon/`, no TSM needed), which records your buys, sales, expiries, cancels and stock. Where both cover the same time, TSM wins.
-- **Games:** Retail, Forever and Classic, each a separate ledger, with an All view. Market prices (Blizzard's AH API) are Retail only.
-- **Public pages:** `/stats` (anonymous site-wide counts) and an opt-in `/scoreboard` (nicknames only).
+- **Data:** your TradeSkillMaster `SavedVariables`, or the in-game addon (`addon/`, no TSM needed). Where both cover the same time, TSM wins.
+- **Games:** Retail, Forever and Classic, each its own ledger, plus an All view. Blizzard AH prices are Retail only.
+- **Public pages:** `/stats` (anonymous counts) and an opt-in `/scoreboard` (nicknames only).
 
-Built on [TradeSkillMaster](https://www.tradeskillmaster.com): TSM's records are the main source of sales, expirations and cancellations, and this project would not exist without it. If you trade on the auction house, use TSM.
+Built on [TradeSkillMaster](https://www.tradeskillmaster.com), whose records are the main source of sales, expirations and cancellations. If you trade on the AH, use TSM. Not affiliated with Blizzard Entertainment or TradeSkillMaster.
 
-Not affiliated with Blizzard Entertainment or TradeSkillMaster.
-
-[PLAN.md](PLAN.md) holds the roadmap and the decisions behind it; [CLAUDE.md](CLAUDE.md) is the working guide for the codebase.
+[PLAN.md](PLAN.md) is the roadmap; [CLAUDE.md](CLAUDE.md) is the codebase guide.
 
 ## Run it locally
 
-Everything runs in Docker. There is no local PHP, Node or Go install.
+Everything runs in Docker; no local PHP, Node or Go.
 
 ```bash
 scripts/setup.sh
 ```
 
-That creates `.env` with generated secrets and starts the stack. The first start installs dependencies and builds assets, so watch it with `docker compose logs -f app`. The app is at http://localhost:8087.
-
-Mail goes to the container log (`MAIL_MAILER=log`), so verification and reset links appear in `docker compose logs app`.
-
-## Everyday commands
+This creates `.env` with generated secrets and starts the stack (first start installs and builds; watch `docker compose logs -f app`). App: http://localhost:8087. Mail goes to the container log, so verification and reset links show up there.
 
 ```bash
 docker compose exec app php artisan <command>
@@ -39,113 +33,67 @@ docker compose exec app ./vendor/bin/pint
 ```
 docker-compose.yml   app (php-fpm), scheduler, nginx, db (MariaDB), backup
 docker/              image, nginx and backup config
-scripts/             setup, db backup and restore, uploader and addon build, CurseForge publish
+scripts/             setup, backup/restore, uploader and addon build, CurseForge publish
 src/                 the Laravel app
-addon/               in-game recorder addon (Lua); see addon/CURSEFORGE.md, tests in addon/tests
+addon/               in-game recorder addon (Lua); see addon/CURSEFORGE.md
 legacy/              original Python CLI, kept as a test oracle
 uploader/            companion uploader (Go); see uploader/README.md
 ```
 
 ## Deploy
 
-The same `docker-compose.yml` runs locally and in production; only `.env` differs. nginx serves plain HTTP on `APP_BIND:APP_PORT` (default `127.0.0.1:8087`); TLS, DNS and the reverse proxy are yours to provide.
+The same `docker-compose.yml` serves local and production; only `.env` differs. nginx serves plain HTTP on `APP_BIND:APP_PORT` (default `127.0.0.1:8087`); TLS, DNS and the reverse proxy are yours.
 
-### 1. Configure `.env`
+1. **Configure.** `scripts/setup.sh --no-start`, then edit `.env` (the top of `.env.example` lists every production override). Key settings:
+   - `APP_ENV=production`, `APP_DEBUG=false`, `LOG_LEVEL=warning`
+   - `APP_DOMAIN`, `APP_URL` (`https://` + hostname)
+   - `TRUSTED_PROXIES`: the proxy's IP/CIDR as nginx sees it, never `*`
+   - `LEDGER_FORCE_HTTPS=true`, only after the HSTS check below passes
+   - `MAIL_*` (SMTP; `MAIL_FROM_ADDRESS` must be a verified sender)
+   - `BLIZZARD_CLIENT_ID`, `BLIZZARD_CLIENT_SECRET` (price jobs idle until both are set)
+   - `LEDGER_CONTACT_EMAIL` (shown on About, Privacy, Terms)
 
-```bash
-scripts/setup.sh --no-start      # creates .env and fills APP_KEY and the database passwords
-```
+   Back up `.env` separately from the DB backups: it holds `APP_KEY`, without which the data is unusable.
 
-Then edit `.env` (the top of `.env.example` lists every production override):
+2. **Start.** `docker compose up -d --build`. In production the entrypoint skips dev dependencies, runs `migrate --force` and caches config and routes.
 
-| Setting                                        | Production value                                                                                           |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `APP_ENV`                                      | `production`                                                                                               |
-| `APP_DEBUG`                                    | `false`                                                                                                    |
-| `APP_DOMAIN`, `APP_URL`                        | your hostname, and `https://` + hostname                                                                   |
-| `APP_BIND`                                     | `127.0.0.1` (the default) when the proxy runs on the same host; `0.0.0.0` only for a proxy on another host |
-| `TRUSTED_PROXIES`                              | the proxy's IP/CIDR **as nginx sees it** (never `*`; see below)                                            |
-| `SESSION_SECURE_COOKIE`                        | `true` (this is also the default when `APP_ENV=production`)                                                |
-| `LEDGER_FORCE_HTTPS`                           | `true`, once the HSTS check below passes                                                                   |
-| `LOG_LEVEL`                                    | `warning`                                                                                                  |
-| `MAIL_*`                                       | your SMTP provider (the example values are Brevo's relay); `MAIL_FROM_ADDRESS` must be a verified sender   |
-| `BLIZZARD_CLIENT_ID`, `BLIZZARD_CLIENT_SECRET` | a client from develop.battle.net; price jobs stay idle until both are set                                  |
-| `LEDGER_CONTACT_EMAIL`                         | shown on the About, Privacy and Terms pages                                                                |
+3. **Proxy.** It must send `Host`, `X-Forwarded-For` (the client address, not appended), `X-Forwarded-Proto` and `X-Forwarded-Port`, and allow bodies of at least 50 MB on `POST /api/v1/ingest` and `POST /uploads` (everything else is capped at 2 MB). Laravel trusts `X-Forwarded-*` only from `TRUSTED_PROXIES`; for a same-host proxy that is usually the compose network gateway (`docker network inspect wow-flip-ledger_default`). Verify:
 
-Keep a copy of `.env` somewhere safe and separate from the backups: it holds `APP_KEY`, which the data is not usable without, and the database passwords.
+   ```bash
+   curl -sI https://<your host>/ | grep -i strict-transport-security
+   ```
 
-### 2. Start it
+   HSTS appears only when Laravel sees HTTPS, so seeing it means the proxy is trusted. With `LEDGER_FORCE_HTTPS` on and the proxy untrusted, every request redirects forever.
 
-```bash
-docker compose up -d --build
-docker compose logs -f app      # first start: composer install, asset build, migrations, caches
-```
+4. **First run.**
 
-With `APP_ENV=production` the entrypoint installs without dev dependencies, runs `migrate --force` and caches config and routes.
+   ```bash
+   docker compose exec app php artisan admin:grant you@example.com   # register on the site first
+   scripts/build-uploader.sh                                         # uploader for /setup
+   docker compose exec app php artisan demo:seed                     # optional read-only demo
+   docker compose exec app php artisan prices:probe                  # check Blizzard credentials
+   ```
 
-### 3. What the app needs from your proxy
+   The addon zip publishes itself on start when its TOC version is new (a changed addon without a version bump is refused). Re-run `build-uploader.sh` only for a new uploader release; bump `LEDGER_MIN_CLIENT_VERSION` only to refuse old uploaders.
 
-- **Headers:** `Host`, `X-Forwarded-For` (set to the client address, not appended), `X-Forwarded-Proto` and `X-Forwarded-Port`. `X-Forwarded-Host` is ignored.
-- **Body size:** at least 50 MB for `POST /api/v1/ingest` and `POST /uploads` (TSM files); everything else is capped at 2 MB by our nginx.
-- **Trust:** Laravel believes `X-Forwarded-*` only from `TRUSTED_PROXIES`. For a proxy on the same host the address nginx sees is usually the compose network's gateway (`docker network inspect wow-flip-ledger_default`). Restart with `docker compose up -d` after changing it.
+5. **Update.** `git pull && docker compose up -d --build`. Back up first if the release has migrations.
 
-Check the trust is right:
+## Hardening
 
-```bash
-curl -sI https://<your host>/ | grep -i strict-transport-security
-```
-
-HSTS is only sent when Laravel sees the request as HTTPS, so seeing it means the proxy headers are trusted. Only then set `LEDGER_FORCE_HTTPS=true`: with it on and the proxy untrusted, every request looks like plain HTTP and is redirected forever.
-
-### 4. First-run tasks
-
-```bash
-# make yourself an admin (register an account on the site first)
-docker compose exec app php artisan admin:grant you@example.com
-
-# build and publish the companion uploader for the /setup page (needs Docker only)
-scripts/build-uploader.sh
-
-# optional read-only demo account from the anonymized sample data
-docker compose exec app php artisan demo:seed
-
-# check the Blizzard credentials without writing anything
-docker compose exec app php artisan prices:probe
-```
-
-Prices are fetched hourly by the `scheduler` container, alerts go out after each refresh, and `health:check` emails admins about failures (below). The in-game addon zip publishes itself: on every start the app zips `addon/` when its TOC version is new (`php artisan addon:package`; a changed addon without a version bump is refused and logged, keeping the old zip). Re-run `scripts/build-uploader.sh` only when you release a new uploader version, and bump `LEDGER_MIN_CLIENT_VERSION` only when old uploaders must be refused.
-
-### 5. Updating
-
-```bash
-git pull
-docker compose up -d --build
-```
-
-The entrypoint reinstalls dependencies, rebuilds assets, migrates and publishes a new addon version. Take a backup first if the release has migrations.
-
-## What is hardened
-
-- **Headers on every response** (`SecurityHeaders` middleware): a Content-Security-Policy that allows only the site's own origin plus a per-request nonce for the one inline theme script, `frame-ancestors 'none'`, `nosniff`, a strict referrer policy, a locked-down permissions policy, and HSTS plus `upgrade-insecure-requests` over HTTPS. Nothing third-party is loaded. `script-src` keeps `unsafe-eval` because Alpine (shipped with Livewire) evaluates the expressions in the templates.
-- **Cookies:** `Secure`, `HttpOnly` and `SameSite=Lax` sessions; secure by default in production.
-- **Proxy trust:** `TRUSTED_PROXIES` is an explicit list; `X-Forwarded-Host` is never trusted, and `trustHosts()` pins the accepted Host to `APP_URL`.
-- **Static assets** under `/build/` are served by nginx with long-lived caching and `nosniff`.
-- **Uploads** are parsed in memory and never stored; the database is not published on the host.
+- `SecurityHeaders` sets a self-only CSP (nonce for inline scripts; `unsafe-eval` stays for Alpine), `frame-ancestors 'none'`, `nosniff`, referrer and permissions policies, and HSTS over HTTPS. Nothing third-party loads.
+- Sessions are `Secure`, `HttpOnly`, `SameSite=Lax`. `X-Forwarded-Host` is never trusted; `trustHosts()` pins Host to `APP_URL`.
+- Uploads are parsed in memory and never stored. The database is not published on the host.
 
 ## Backups
 
-The `backup` service writes a gzip dump of the database to `./backups` every day at 03:10 UTC, keeps 14 days (`BACKUP_KEEP_DAYS`, `BACKUP_HOUR_UTC`), takes one at start if none is recent, and records the time of the last good one in `backups/LAST_OK`. Dumps are mode 600 and hold every user's data.
-
-- **Copy them off the machine.** A dump on the same disk is not a backup.
-- **Check it is working:** the admin overview shows the last good dump, and `health:check` emails the admins when none has completed for 36 hours.
-- **Take one now:** `scripts/db-backup.sh`.
-- **Restore** (replaces the live database after a confirmation prompt; `--yes` skips it):
+The `backup` service dumps the database (gzip, mode 600) daily at 03:10 UTC, keeps 14 days (`BACKUP_KEEP_DAYS`, `BACKUP_HOUR_UTC`), and writes `backups/LAST_OK`. Copy dumps off the machine; the admin overview shows the last good one.
 
 ```bash
-scripts/db-restore.sh backups/<file>.sql.gz
+scripts/db-backup.sh                          # take one now
+scripts/db-restore.sh backups/<file>.sql.gz   # replace the live DB (asks first; --yes skips)
 ```
 
-- **Test a restore without touching live data,** into a throwaway container, then compare row counts:
+Test a restore in a throwaway container and compare row counts:
 
 ```bash
 docker run -d --name restore-test -e MARIADB_ROOT_PASSWORD=scratch -e MARIADB_DATABASE=restore_test mariadb:11.8
@@ -154,10 +102,10 @@ docker exec restore-test mariadb -uroot -pscratch restore_test -e "select count(
 docker rm -f restore-test
 ```
 
-Do this after setting up backups and now and then after; a restore you have never run is a guess. A dump of this stack was restored this way during development and every table's row count matched the live database (the sessions and cache tables aside, which change constantly). Backup copies expire with the retention above, which is also how long a deleted account can linger in them.
+Deleted accounts can linger in backups until retention expires.
 
 ## Monitoring
 
-`health:check` runs every 30 minutes and emails every verified admin when the Blizzard price fetch is failing or stale, or backups have stopped. It reports a problem when it starts, repeats every 12 hours while it lasts (`LEDGER_HEALTH_REMINDER_HOURS`), and says when it is fixed. It stays quiet about things that are not set up (no Blizzard credentials, no backup service). The same state is on the admin pages: fetch health and every fetch attempt, uploads and failures, and the backup card.
+`health:check` (every 30 min) emails verified admins when the price fetch fails or goes stale, or backups stop (36 h). It repeats every 12 h (`LEDGER_HEALTH_REMINDER_HOURS`), reports recovery, and ignores things not set up. The same state is on the admin pages.
 
-Other scheduled work (all in `bootstrap/app.php`, run by the `scheduler` container): `prices:fetch` at :05 and :35 (Blizzard updates hourly; the second try catches a late update), `prices:names` every 15 minutes, `alerts:send` at :20 and :50, `prices:prune` daily, `scoreboard:build` hourly (the public scoreboard; opt-in and opt-out apply at once regardless), and `stats:prune` daily (drops activity days older than 90, the window the privacy page promises). `/stats` is cached for 10 minutes.
+Scheduled work lives in `bootstrap/app.php`: `prices:fetch` (:05, :35), `prices:names`, `alerts:send`, `prices:prune`, `scoreboard:build`, `stats:prune`.
