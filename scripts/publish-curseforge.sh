@@ -2,8 +2,7 @@
 # Uploads the addon zip that scripts/build-uploader.sh produced to CurseForge.
 #   CURSEFORGE_TOKEN=... scripts/publish-curseforge.sh [release|beta|alpha]
 #
-# NOT YET RUN: it follows CurseForge's upload API as documented but has never been used against a
-# real project. Needs CURSEFORGE_TOKEN (an API token, never commit it); CURSEFORGE_PROJECT_ID defaults to ours (1783753).
+# Needs CURSEFORGE_TOKEN (an API token, never commit it); CURSEFORGE_PROJECT_ID defaults to ours (1783753).
 # Game version ids are looked up by name, so GAME_VERSIONS must match names CurseForge lists
 # (see https://wow.curseforge.com/api/game/versions with your token).
 #   GAME_VERSIONS="12.1.5"          comma separated, defaults to that
@@ -38,7 +37,15 @@ ESC=$(printf '%s' "$CHANGELOG" | sed ':a;N;$!ba;s/\\/\\\\/g;s/"/\\"/g;s/\n/\\n/g
 META="{\"changelog\":\"$ESC\",\"changelogType\":\"markdown\",\"displayName\":\"WoW Flip Ledger $VERSION\",\"gameVersions\":[$IDS],\"releaseType\":\"$TYPE\"}"
 
 echo "Uploading $ZIP to project $CURSEFORGE_PROJECT_ID as $TYPE ($GAME_VERSIONS)"
-curl -fsS -H "X-Api-Token: $CURSEFORGE_TOKEN" \
-    -F "metadata=$META" -F "file=@$ZIP" \
-    "$API/projects/$CURSEFORGE_PROJECT_ID/upload-file"
+# --form-string, not -F: -F reads ';' in a value as a parameter and cuts the JSON there.
+RESP=$(mktemp)
+trap 'rm -f "$RESP"' EXIT
+CODE=$(curl -sS -o "$RESP" -w '%{http_code}' -H "X-Api-Token: $CURSEFORGE_TOKEN" \
+    --form-string "metadata=$META" -F "file=@$ZIP" \
+    "$API/projects/$CURSEFORGE_PROJECT_ID/upload-file")
+cat "$RESP"
 echo
+case "$CODE" in
+    2??) ;;
+    *) echo "CurseForge answered HTTP $CODE" >&2; exit 1 ;;
+esac
