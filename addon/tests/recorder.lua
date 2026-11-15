@@ -18,6 +18,7 @@ function GetBuildInfo() return "12.1.5", "70783", "Nov 1 2026", 120105 end
 WOW_PROJECT_ID = 1
 UnitGUID = function() return "Player-3676-0A1B2C3D" end
 C_Item = {
+    GetItemID = function(loc) return loc.id end,
     GetItemNameByID = function(id) return ({ [238371] = "Wyrmfish", [238365] = "Swarmer", [238366] = "Swarmer" })[id] end,
     GetItemInfoInstant = function(name) return ({ ["Cached Thing"] = 4242 })[name] end,
 }
@@ -46,6 +47,8 @@ local results = {}
 C_AuctionHouse = {
     StartCommoditiesPurchase = function() end,
     ConfirmCommoditiesPurchase = function() end,
+    PostCommodity = function() end,
+    CalculateCommodityDeposit = function(_, duration, qty) return qty * 10 * duration end,
     GetCommoditySearchResultsQuantity = function() return #results end,
     GetCommoditySearchResultInfo = function(_, i) return results[i] end,
     GetOwnedAuctions = function()
@@ -279,6 +282,81 @@ bank = false
 fire("PLAYER_LOGIN")
 fire("PLAYER_LOGOUT")
 eq(invMap(d)[238371], 233, "a second character adds its own stock; the warband bank is not doubled")
+
+-- Deposits -----------------------------------------------------------------------------------
+
+local function post(id, qty, confirm)
+    C_AuctionHouse.PostCommodity({ id = id }, 2, qty, 100)
+    if confirm ~= false then fire("AUCTION_HOUSE_AUCTION_CREATED", 1) end
+end
+local function takeItems(subject, id, qty, days)
+    mail = { { subject = subject, daysLeft = days or 29, items = { { name = "X", id = id, qty = qty } } } }
+    TakeInboxItem(1, 1)
+end
+local function deposits()
+    local out = {}
+    for _, e in ipairs(d.events) do
+        if e:match("^deposit|") then out[#out + 1] = e end
+    end
+    return out
+end
+local function lot(id, qty, dep) return string.format("%d|%d|%d|%d|Area52", id, NOW, qty, dep) end
+
+d.events, d.lots, d.depositMissed = {}, {}, 0
+
+post(238371, 100)
+eq(d.lots[1], lot(238371, 100, 2000), "a confirmed post is an open lot with its deposit")
+
+-- A sale of 40 uses 40% of the lot; the deposit comes back, nothing is lost.
+sellerMail("Wyrmfish", { money = 1, daysLeft = 25, bid = 100000, buyout = 0, deposit = 800, cut = 5000, count = 40 })
+eq(d.lots[1], lot(238371, 60, 1200), "a sale uses up part of the lot and its share of the deposit")
+eq(#deposits(), 0, "a sale loses no deposit")
+
+takeItems("Auction expired: Wyrmfish", 238371, 60)
+eq(deposits()[1], rec("deposit", NOW - DAY, 238371, 60, 1200), "the rest expiring loses what is left of the deposit")
+eq(#d.lots, 0, "the lot is used up")
+
+post(555, 10)
+takeItems("Auction cancelled: X", 555, 10)
+eq(deposits()[2], rec("deposit", NOW - DAY, 555, 10, 200), "a cancel loses the deposit too")
+
+post(600, 10)
+post(600, 30)
+takeItems("Auction expired: Y", 600, 20)
+eq(deposits()[3], rec("deposit", NOW - DAY, 600, 20, 400), "oldest lots go first, a lot's share is pro rata")
+eq(d.lots[1], lot(600, 20, 400), "the rest of the second lot stays open")
+d.lots = {}
+
+takeItems("Auction expired: Z", 700, 5)
+eq(#deposits(), 3, "an expiry with no matching post books nothing")
+eq(d.depositMissed, 1, "and is counted")
+
+post(800, 5, false)
+fire("AUCTION_HOUSE_POST_ERROR")
+post(801, 1)
+eq(#d.lots, 1, "a post the game rejected is not kept")
+eq(d.lots[1], lot(801, 1, 20), "only the confirmed one is")
+d.lots = {}
+
+ns.addLot(1, NOW - 50 * DAY, 1, 1)
+ns.addLot(2, NOW, 1, 1)
+eq(#d.lots, 1, "a lot too old to be collected is dropped")
+
+post(900, 1, false)
+fire("AUCTION_HOUSE_AUCTION_CREATED", 2)
+eq(#d.lots, 2, "a post the client confirmed late still counts")
+
+-- Lots are per realm, and a lot past its mail life never matches.
+d.lots, d.events = {}, {}
+post(950, 10)
+function GetNormalizedRealmName() return "Elsewhere" end
+takeItems("Auction expired: W", 950, 10)
+eq(#deposits(), 0, "a lot on another realm is not used")
+function GetNormalizedRealmName() return "Area52" end
+eq(#d.lots, 1, "and stays open")
+eq(select(2, ns.takeLots(950, 10, "Area52", NOW + 41 * DAY)), 0, "a lot past its mail life does not match")
+
+d.events, d.lots = {}, {}
 
 -- Prune --------------------------------------------------------------------------------------
 

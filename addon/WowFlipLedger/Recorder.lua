@@ -6,6 +6,9 @@
 --   buy       a = total copper paid
 --   sale      a = gross copper, b = AH cut (the price you got is a - b)
 --   expired / cancelled
+--   deposit   qty = units, a = deposit copper forfeited on them (written with an expired/cancelled)
+-- Posts are kept as open lots ("item|time|qty|deposit" in d.lots): a sale uses a lot up (the deposit
+-- comes back), an expiry or cancel uses it up and books its share of the deposit as lost.
 -- Sales mail names the item but gives no id, so a sale whose name maps to more than one id (or none)
 -- waits in `unresolved` and is never guessed.
 local ADDON, ns = ...
@@ -16,8 +19,12 @@ ns.TRIM_SLACK = 1000
 ns.MAX_NAMES = 6000
 ns.MAX_SEEN = 400
 ns.MAX_UNRESOLVED = 500
+ns.MAX_LOTS = 2000
+-- Mail lives 30 days after a 48 h auction; a lot older than this can no longer be collected.
+local LOT_DAYS = 40
 
 local AUCTION_MAIL_DAYS = 30
+local DAY = 86400
 local floor = math.floor
 
 local function clean(s)
@@ -159,6 +166,7 @@ function ns.resolveWaiting()
 
         if id and f[1] == "sale" then
             ns.addEvent("sale", tonumber(f[2]), f[3], id, tonumber(f[5]), tonumber(f[6]), tonumber(f[7]) or 0)
+            ns.takeLots(id, tonumber(f[5]) or 0, f[3])
         else
             still[#still + 1] = row
         end
@@ -237,6 +245,103 @@ function ns.onPurchaseFailed()
     purchase = nil
 end
 
+-- Posts and deposits -------------------------------------------------------------------------
+
+-- Posts waiting for the game to confirm them: { id, qty, deposit, at }.
+local pending = {}
+local PENDING_SECONDS = 300
+
+local function parseLot(s)
+    local id, t, qty, deposit, realm = s:match("^(%d+)|(%d+)|(%d+)|(%d+)|([^|]*)$")
+    return tonumber(id), tonumber(t), tonumber(qty), tonumber(deposit), realm
+end
+
+function ns.addLot(id, t, qty, deposit, realm)
+    local d = ns.db()
+    d.lots[#d.lots + 1] = join(id, t, qty, deposit, realm or ns.realm())
+
+    local cutoff = t - LOT_DAYS * DAY
+    while #d.lots > ns.MAX_LOTS or (d.lots[1] and (select(2, parseLot(d.lots[1])) or 0) < cutoff) do
+        table.remove(d.lots, 1)
+    end
+end
+
+-- Takes up to qty units from the item's oldest lots on that realm (the db is account-wide; a lot
+-- older than LOT_DAYS can no longer be collected, so it never matches). Returns the units found and the deposit that
+-- belonged to them (a lot's last units carry the rounding remainder).
+function ns.takeLots(id, qty, realm, now)
+    local d = ns.db()
+    local need, matched, deposit = qty, 0, 0
+    realm = realm or ns.realm()
+    local oldest = (now or time()) - LOT_DAYS * DAY
+    local keep = {}
+
+    local prefix = string.format("%d|", id)
+
+    for _, s in ipairs(d.lots) do
+        local lid, t, lqty, ldep, lrealm
+        if s:sub(1, #prefix) == prefix then
+            lid, t, lqty, ldep, lrealm = parseLot(s)
+        end
+
+        if lid == id and lrealm == realm and t >= oldest and need > 0 and lqty and lqty > 0 then
+            local take = math.min(lqty, need)
+            local share = take == lqty and ldep or floor(ldep * take / lqty)
+
+            need = need - take
+            matched = matched + take
+            deposit = deposit + share
+            if lqty > take then
+                keep[#keep + 1] = join(lid, t, lqty - take, ldep - share, lrealm)
+            end
+        else
+            keep[#keep + 1] = s
+        end
+    end
+
+    if matched > 0 then
+        d.lots = keep
+    end
+    return matched, deposit
+end
+
+-- Hooked after PostCommodity: the deposit is quoted now, kept only if the game confirms the post.
+function ns.onPost(location, duration, quantity)
+    local ah = C_AuctionHouse
+    if not (ah and ah.CalculateCommodityDeposit and C_Item and C_Item.GetItemID) then
+        return
+    end
+
+    local ok, id = pcall(C_Item.GetItemID, location)
+    local ok2, deposit = pcall(ah.CalculateCommodityDeposit, id, duration, quantity)
+    quantity = tonumber(quantity)
+    deposit = tonumber(deposit)
+
+    if not (ok and ok2 and tonumber(id) and quantity and quantity > 0 and deposit and deposit > 0) then
+        return
+    end
+
+    local now = time()
+    while pending[1] and now - pending[1].at > PENDING_SECONDS do
+        table.remove(pending, 1)
+    end
+    pending[#pending + 1] = { id = tonumber(id), qty = quantity, deposit = deposit, at = now }
+    while #pending > 20 do
+        table.remove(pending, 1)
+    end
+end
+
+function ns.onPostCreated()
+    local p = table.remove(pending, 1)
+    if p and time() - p.at <= PENDING_SECONDS then
+        ns.addLot(p.id, time(), p.qty, whole(p.deposit))
+    end
+end
+
+function ns.onPostFailed()
+    table.remove(pending, 1)
+end
+
 -- Mail: sales, expiries, cancels -----------------------------------------------------------------
 
 -- "Auction expired: %s" as a pattern, from the game's own text so every locale works.
@@ -305,7 +410,7 @@ function ns.onMailTaken(index)
     -- Auction mail lives 30 days, so what is left dates it. A sale is booked when it happened.
     local t = now
     if daysLeft then
-        t = math.min(now, floor(now + daysLeft * 86400 - AUCTION_MAIL_DAYS * 86400))
+        t = math.min(now, floor(now + daysLeft * DAY - AUCTION_MAIL_DAYS * DAY))
     end
 
     -- The invoice is only readable once the mail has been opened.
@@ -329,6 +434,7 @@ function ns.onMailTaken(index)
         local id, realm = ns.resolve(name), ns.realm()
         if id then
             ns.addEvent("sale", t, realm, id, count, gross, cut or 0)
+            ns.takeLots(id, count, realm)
         else
             ns.addUnresolved("sale", t, realm, name, count, gross, cut or 0)
         end
@@ -353,6 +459,14 @@ function ns.onMailTaken(index)
     local realm = ns.realm()
     for _, it in ipairs(ns.attachments(index)) do
         ns.addEvent(kind, t, realm, it.id, it.qty)
+
+        local matched, lost = ns.takeLots(it.id, it.qty, realm)
+        if lost > 0 then
+            ns.addEvent("deposit", t, realm, it.id, matched, lost)
+        end
+        if matched < it.qty then
+            d.depositMissed = d.depositMissed + 1
+        end
     end
 end
 
@@ -369,7 +483,7 @@ end
 function ns.recorderStatus()
     local d = ns.db()
     local c = ns.clientInfo()
-    local counts = { buy = 0, sale = 0, expired = 0, cancelled = 0 }
+    local counts = { buy = 0, sale = 0, expired = 0, cancelled = 0, deposit = 0 }
 
     for _, row in ipairs(d.events) do
         local kind = row:match("^(%a+)|")
@@ -379,8 +493,8 @@ function ns.recorderStatus()
     end
 
     return string.format(
-        "Recording: %d buys, %d sales, %d expired, %d cancelled; %d sales waiting on an item name; %d buys missed. Client %s (%s), interface %s, project %s, auction house API %s.",
-        counts.buy, counts.sale, counts.expired, counts.cancelled, #d.unresolved, d.missed,
+        "Recording: %d buys, %d sales, %d expired, %d cancelled; %d deposits lost recorded (%d expired/cancelled had no or only a partly matching post); %d sales waiting on an item name; %d buys missed. Client %s (%s), interface %s, project %s, auction house API %s.",
+        counts.buy, counts.sale, counts.expired, counts.cancelled, counts.deposit, d.depositMissed, #d.unresolved, d.missed,
         tostring(c.version), tostring(c.build), tostring(c.toc), tostring(c.project), c.ah and "present" or "missing"
     )
 end
@@ -393,9 +507,11 @@ ns.on("COMMODITY_PRICE_UPDATED", function(_, _, total)
 end)
 ns.on("COMMODITY_PURCHASE_SUCCEEDED", ns.onPurchaseSucceeded)
 ns.on("COMMODITY_PURCHASE_FAILED", ns.onPurchaseFailed)
+ns.on("AUCTION_HOUSE_AUCTION_CREATED", ns.onPostCreated)
+ns.on("AUCTION_HOUSE_POST_ERROR", ns.onPostFailed)
 
 if C_AuctionHouse then
-    for name, fn in pairs({ StartCommoditiesPurchase = ns.onPurchaseStart, ConfirmCommoditiesPurchase = ns.onPurchaseConfirm }) do
+    for name, fn in pairs({ StartCommoditiesPurchase = ns.onPurchaseStart, ConfirmCommoditiesPurchase = ns.onPurchaseConfirm, PostCommodity = ns.onPost }) do
         if type(C_AuctionHouse[name]) == "function" then
             hooksecurefunc(C_AuctionHouse, name, fn)
         end

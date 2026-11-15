@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- Records the deposit you lose when an auction expires or is cancelled (matched to the post it came from, so the site can count it as a loss). Auctions posted before this version have no deposit on record.
+
 ## 0.2.2
 
 - Internal clean-up, no behaviour change.
