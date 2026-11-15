@@ -19,7 +19,7 @@
             [__('Avg cost'), 'num', __('Weighted average cost of what you still hold.')],
             [__('Break-even'), 'num', __('Average cost / :net: the sell price that covers the :cut% AH cut.', ['net' => 1 - $cut, 'cut' => $cut * 100])],
             [__('Target sell'), 'num', __('Average cost with your :margin% target margin and the AH cut (change it in Settings).', ['margin' => $user->target_margin_pct])],
-            [__('Floor'), 'num', __('Lowest unit price on the auction house at the last Blizzard snapshot.')],
+            [__('Floor'), 'num', __('Lowest unit price on the auction house: the last Blizzard snapshot (Retail) or your last in-game scan (Forever, Classic).')],
             [__('vs break-even'), 'num', __('Floor relative to break-even.')],
             [__('Recent'), 'num', __('Estimate: median floor over the last 24 hours.')],
             [__('Typical'), 'num', __('Estimate: median of daily median floors over 30 days.')],

@@ -15,7 +15,7 @@ class PricesPrune extends Command
     {
         $r = $pruner->prune();
 
-        $this->info(sprintf('Pruned %s snapshots, %s daily rows, %s fetch runs.', number_format($r['snapshots']), number_format($r['daily']), number_format($r['runs'])));
+        $this->info(sprintf('Pruned %s snapshots, %s daily rows, %s fetch runs, %s price scans.', number_format($r['snapshots']), number_format($r['daily']), number_format($r['runs']), number_format($r['scans'])));
 
         return self::SUCCESS;
     }

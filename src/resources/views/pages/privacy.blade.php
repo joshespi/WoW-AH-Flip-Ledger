@@ -10,12 +10,13 @@
             <li><strong>Account:</strong> your name, email address and a hash of your password (never the password), plus your settings: timezone, region, target margin, market share and the stale-data warning time.</li>
             <li><strong>Uploader tokens:</strong> a hash of each token, its name, and when it was last used. Tokens can only upload.</li>
             <li><strong>From the addon's record or your TradeSkillMaster data:</strong> your auction sales, expired and cancelled auctions (with the deposit lost on each, when the addon recorded it), your auction buys (kept only as suggestions) and your inventory counts: item, quantity, price, time and realm. <strong>Buyer and seller names are not stored.</strong> The addon's file also holds an anonymous label per character (a hash, not the name) and item names it has seen; neither is stored. The uploaded file is read in memory and then discarded; it is not kept.</li>
+            <li><strong>Price scans (Forever, Classic):</strong> the auction house prices the addon saw when you opened the auction house: item, lowest price, quantity, number of listings and the hour, with your region and game. They price your own positions only and are never shown to anyone else. Kept {{ config('ledger.prices.scan_days') }} days.</li>
             <li><strong>What you enter:</strong> your buys, notes, watchlist items, targets and groups.</li>
             <li><strong>Upload history:</strong> when each upload arrived, its size, whether it worked, any error message, the uploader version and a short label derived from your WoW account folder (not the folder name itself).</li>
             <li><strong>Activity:</strong> the days you used the site or uploaded data (the date only, not the time or what you did). Kept {{ config('ledger.stats.activity_days') }} days, then deleted. Used only to count active users.</li>
             <li><strong>Technical data:</strong> your IP address is used to limit abuse, and the web server keeps ordinary request logs for security and troubleshooting.</li>
         </ul>
-        <p>Item prices and names come from Blizzard's public auction house data and are shared by everyone. They are not personal data, and none of your data is sent to Blizzard.</p>
+        <p>Item prices and names come from Blizzard's public auction house data and are shared by everyone. They are not personal data, and none of your data is sent to Blizzard. Forever and Classic have no Blizzard feed, so their prices are your own price scans (above), used for your account only.</p>
 
         <h2>Cookies and tracking</h2>
         <p>The site sets a session cookie and a security (CSRF) cookie so you can stay signed in. Your light, dark or system theme choice is kept in your browser's local storage. There are no analytics, advertising or tracking scripts, and no pages load anything from third parties.</p>

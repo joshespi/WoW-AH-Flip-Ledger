@@ -80,6 +80,14 @@ class DataExportService
                     $this->named($user, 'ah_deposits', 'at', ['at', 'item_id', 'qty', 'lost_copper', 'realm', 'game'])->cursor(),
                     fn ($r) => [$iso($r->at), 'i:'.$r->item_id, $r->item_name, $r->qty, $r->lost_copper, $r->realm, $r->game],
                 ],
+                'price_scans.csv' => [
+                    ['time', 'item', 'item_name', 'lowest_unit_price_copper', 'quantity', 'listings', 'region', 'game'],
+                    DB::table('scan_prices')->leftJoin('items', 'items.id', '=', 'scan_prices.item_id')
+                        ->ownedBy($user, 'scan_prices.user_id')->orderBy('scan_prices.taken_at')->orderBy('scan_prices.item_id')
+                        ->select('scan_prices.taken_at', 'scan_prices.item_id', 'items.name as item_name', 'scan_prices.floor',
+                            'scan_prices.quantity', 'scan_prices.num_auctions', 'scan_prices.region', 'scan_prices.game')->cursor(),
+                    fn ($r) => [$iso($r->taken_at), 'i:'.$r->item_id, $r->item_name, $r->floor, $r->quantity, $r->num_auctions, $r->region, $r->game],
+                ],
                 'buy_suggestions.csv' => [
                     ['time', 'item', 'item_name', 'qty', 'cost_copper', 'status', 'realm', 'game'],
                     $this->named($user, 'tsm_buy_candidates', 'at', ['at', 'item_id', 'qty', 'cost_copper', 'status', 'realm', 'game'])->cursor(),
@@ -177,6 +185,8 @@ class DataExportService
             expired.csv          Expired auctions.
             cancelled.csv        Cancelled auctions.
             deposits.csv         Auction deposits lost on expired or cancelled auctions (from the addon).
+            price_scans.csv      Auction house prices your addon saw in Forever and Classic, one row per
+                                 item per hour (listings is 0 when only the browse list was seen).
             buy_suggestions.csv  TSM's own buy log rows, kept only as suggestions to reconcile.
             watchlist.csv        Your watchlist and targets (copper per unit).
             uploads.csv          Your upload history.

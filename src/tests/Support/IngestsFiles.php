@@ -26,11 +26,11 @@ trait IngestsFiles
      * @param  list<string>  $events
      * @param  list<string>  $inv
      */
-    protected function addon(array $events, array $inv = [], ?int $last = null, string $game = Game::RETAIL, ?string $account = null): Upload
+    protected function addon(array $events, array $inv = [], ?int $last = null, string $game = Game::RETAIL, ?string $account = null, array $prices = []): Upload
     {
         return app(IngestService::class)->ingest(
             $this->user,
-            AddonFile::make($events, $inv, last: $last ?? self::T + 10 * self::DAY),
+            AddonFile::make($events, $inv, last: $last ?? self::T + 10 * self::DAY, prices: $prices),
             'uploader',
             self::T + 10 * self::DAY,
             wowAccount: $account,

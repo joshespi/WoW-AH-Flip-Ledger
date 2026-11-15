@@ -41,6 +41,7 @@ class IngestService
         private readonly TsmParser $parser,
         private readonly AddonParser $addon,
         private readonly UploadGameCheck $games,
+        private readonly ScanStatsService $scans,
     ) {}
 
     /** One writer of a user's uploaded data at a time: ingest and undo both hold it. */
@@ -104,13 +105,24 @@ class IngestService
         }
 
         try {
-            return DB::transaction(function () use ($base, $user, $game, $data, $mtime, $received) {
+            $upload = DB::transaction(function () use ($base, $user, $game, $data, $mtime, $received) {
                 // Created first so the rows it inserts can carry its id (see UploadService::undo).
                 $upload = Upload::create($base + ['status' => Upload::STATUS_OK]);
                 $upload->update(['counts' => $this->store($user, $game, TsmSpan::account($base['wow_account']), $data, $mtime ?? $received, $mtime !== null, $upload->id)]);
 
                 return $upload;
             });
+
+            // After the commit: the upload stands even if the stats cannot be computed.
+            if (($upload->counts['prices']['seen'] ?? 0) > 0) {
+                try {
+                    $this->scans->recompute($user, $game);
+                } catch (Throwable $e) {
+                    report($e);
+                }
+            }
+
+            return $upload;
         } catch (Throwable $e) {
             report($e);
 
@@ -198,6 +210,12 @@ class IngestService
             };
             $rows = $this->rows($base, $keyPrefix.'deposit', 'dedupe_key', $data->rows('csvDeposits'), $deposit, $skipped);
             $counts['deposits'] = ['seen' => count($rows), 'new' => Bulk::insertOrIgnore('ah_deposits', $rows)];
+        }
+
+        // Price scans for games with no Blizzard feed: the user's own observations of the market,
+        // not ledger rows, so no span filter and no upload_id (undo leaves them).
+        if ($addon && ! Game::hasMarket($game) && $data->rows('csvPrices') !== []) {
+            $counts['prices'] = $this->scans->store($user, $game, $data->rows('csvPrices'));
         }
 
         if ($addon) {

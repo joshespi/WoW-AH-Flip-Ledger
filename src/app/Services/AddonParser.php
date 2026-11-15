@@ -11,7 +11,7 @@ use App\Support\Game;
  * with anchored patterns, size, line and row caps.
  *
  * The addon writes one record per string ("kind|time|realm|item|qty|a|b"), which WoW's serializer
- * puts on its own line. Only the `events` and `inv` lists, the `last` time and the client's
+ * puts on its own line. Only the `events`, `prices` and `inv` lists, the `last` time and the client's
  * `interface` number (which game wrote the file) are read; everything else in the file
  * (per-character snapshots, learned names) is skipped.
  */
@@ -28,6 +28,11 @@ class AddonParser
     private const ENTRY = '/^"([^"\\\\]{1,200})",(?: -- \[\d+\])?$/D';
 
     private const INV = '/^(\d{1,9}):(\d{1,15})$/D';
+
+    // "time|item|floor|qty|auctions": one price scan of an item (see Prices.lua).
+    private const PRICE = '/^(\d{9,12})\|(\d{1,9})\|(\d{1,12})\|(\d{1,12})\|(\d{1,9})$/D';
+
+    private const MAX_PRICE_ROWS = 100_000;
 
     private const REALM = '/^[A-Za-z0-9\' -]{1,64}$/Du';
 
@@ -62,6 +67,7 @@ class AddonParser
         $mode = null;
         $depth = 0;
         $rows = 0;
+        $priceRows = 0;
         foreach (LuaLines::of($contents, $this->maxLines, 'WoW Flip Ledger') as $line) {
             $line = trim($line);
 
@@ -77,7 +83,11 @@ class AddonParser
                 if ($closes) {
                     $mode = null;
                 } elseif (preg_match(self::ENTRY, $line, $m)) {
-                    if ($mode === 'inv') {
+                    if ($mode === 'prices') {
+                        if (preg_match(self::PRICE, $m[1], $p) && ++$priceRows <= self::MAX_PRICE_ROWS) {
+                            $csv['csvPrices'][] = ['time' => $p[1], 'itemString' => 'i:'.$p[2], 'floor' => $p[3], 'quantity' => $p[4], 'auctions' => $p[5]];
+                        }
+                    } elseif ($mode === 'inv') {
                         if (preg_match(self::INV, $m[1], $i)) {
                             $inventory['i:'.$i[1]] = ($inventory['i:'.$i[1]] ?? 0) + (int) $i[2];
                         }
@@ -95,6 +105,8 @@ class AddonParser
                     $mode = 'events';
                 } elseif ($line === '["unresolved"] = {') {
                     $mode = 'unresolved';
+                } elseif ($line === '["prices"] = {') {
+                    $mode = 'prices';
                 } elseif ($line === '["inv"] = {') {
                     $mode = 'inv';
                 } elseif (preg_match(self::LAST, $line, $m)) {

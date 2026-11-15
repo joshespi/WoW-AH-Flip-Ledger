@@ -9,7 +9,7 @@
             <li><strong>Your sales</strong> come from your own auction activity, recorded by this site's in-game addon or by TradeSkillMaster, whichever you run. You send the saved file with a small companion program or by uploading it by hand. Sales, expirations and cancellations are read from it; the file itself is not kept.</li>
             <li><strong>Your buys</strong> are entered by you (typed, pasted from chat, or imported from a CSV), because TSM's own buy log double-counts commodity lots. The addon's recorded buys, and TSM's, are offered as suggestions you can accept in Reconcile.</li>
             <li><strong>Costs</strong> use a weighted average. Profit is counted after the 5% auction house cut.</li>
-            <li><strong>Market prices</strong> are fetched from Blizzard's auction house data every hour. Recent, typical, 60-day and sold-per-day figures are our own estimates built from those snapshots, not TradeSkillMaster's numbers, and are shown only once an item has enough history.</li>
+            <li><strong>Market prices</strong> are fetched from Blizzard's auction house data every hour. Recent, typical, 60-day and sold-per-day figures are our own estimates built from those snapshots, not TradeSkillMaster's numbers, and are shown only once an item has enough history. Forever and Classic have no Blizzard feed, so their prices come from what your own addon sees when you open the auction house (yours only, never pooled with other players'); history there is as complete as your scans.</li>
         </ul>
 
         <h2>Built on TradeSkillMaster</h2>

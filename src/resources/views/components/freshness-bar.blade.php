@@ -21,7 +21,7 @@
         <span>
             <span class="font-medium text-gray-700 dark:text-gray-300">{{ __('Prices') }}</span>
             @if ($f->pricesAt === null)
-                <span>{{ __('not fetched yet') }}</span>
+                <span>{{ $f->scans ? __('none scanned yet: open the auction house in game') : __('not fetched yet') }}</span>
             @else
                 <span class="tabular-nums">{{ $when($f->pricesAt) }}</span>
                 <span>({{ $f->ago($f->pricesAt) }})</span>

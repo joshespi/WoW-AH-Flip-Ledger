@@ -259,7 +259,7 @@ class PriceRollupAndStatsTest extends TestCase
 
         $result = app(PricePruner::class)->prune();
 
-        $this->assertSame(['snapshots' => 2, 'daily' => 1, 'runs' => 1], $result);
+        $this->assertSame(['snapshots' => 2, 'daily' => 1, 'scans' => 0, 'runs' => 1], $result);
         $this->assertSame([$recentAt], DB::table('price_snapshots')->pluck('taken_at')->all());
 
         $daily = DB::table('price_daily')->where('day', $old)->first();
@@ -273,7 +273,7 @@ class PriceRollupAndStatsTest extends TestCase
     {
         $this->snap(Utc::sql(time() - 3600), 7, 100);
 
-        $this->assertSame(['snapshots' => 0, 'daily' => 0, 'runs' => 0], app(PricePruner::class)->prune());
+        $this->assertSame(['snapshots' => 0, 'daily' => 0, 'scans' => 0, 'runs' => 0], app(PricePruner::class)->prune());
         $this->assertSame(1, DB::table('price_snapshots')->count());
     }
 }

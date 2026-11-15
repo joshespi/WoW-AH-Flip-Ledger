@@ -33,7 +33,7 @@
                 </div>
             @endforeach
         </div>
-        <p class="-mt-3 note">{{ __('Only Retail has a price feed, so floor value and unrealized P/L are blank for the other games, and the Total for those two rows counts Retail only.') }}</p>
+        <p class="-mt-3 note">{{ __('Retail floors come from Blizzard. Forever and Classic have no feed, so their floor value and unrealized P/L use the prices your addon saw in the auction house and cover only items you have looked at; the Total for those two rows adds up what is priced.') }}</p>
 
         <div class="card p-4 sm:p-6 text-gray-600 dark:text-gray-300"
              x-data="combinedChart(@js(['ranges' => $ranges, 'labels' => $names, 'games' => $games, 'styles' => $styles]))">

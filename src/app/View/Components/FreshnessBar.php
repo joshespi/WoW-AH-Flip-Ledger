@@ -16,7 +16,7 @@ class FreshnessBar extends Component
     public function __construct()
     {
         $this->user = auth()->user();
-        $this->freshness = $this->user === null ? null : Freshness::for($this->user);
+        $this->freshness = $this->user === null ? null : Freshness::for($this->user, $this->user->activeGame());
     }
 
     /** Nothing to show a guest (an error page, a future public page that uses the app layout). */

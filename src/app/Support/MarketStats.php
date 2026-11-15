@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -18,19 +19,21 @@ final class MarketStats
     }
 
     /**
-     * The item_stats rows for $ids, keyed by item id. Only games with a price feed have any
-     * (Game::hasMarket); the others get none.
+     * The item_stats rows for $ids in the user's region, keyed by item id: Blizzard's (shared) for
+     * Retail, the user's own addon scans (scan_stats, the same columns) for the other games.
      *
      * @param  list<int>  $ids
      * @return array<int, object>
      */
-    public static function forItems(string $region, string $game, array $ids): array
+    public static function forItems(User $user, string $game, array $ids): array
     {
-        if (! Game::hasMarket($game) || $ids === []) {
+        if ($ids === []) {
             return [];
         }
 
-        return DB::table('item_stats')->where('region', $region)->whereIn('item_id', $ids)->get()->keyBy('item_id')->all();
+        $query = Game::hasMarket($game) ? DB::table('item_stats') : DB::table('scan_stats')->ownedBy($user)->where('game', $game);
+
+        return $query->where('region', $user->region)->whereIn('item_id', $ids)->get()->keyBy('item_id')->all();
     }
 
     public static function ready(?object $stat): bool

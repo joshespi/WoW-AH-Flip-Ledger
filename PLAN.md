@@ -443,6 +443,24 @@ Checklist:
 - [x] Tests: `AddonParserTest`, `AddonIngestTest` (stored, idempotent, kept when a TSM upload widens the span, removed by undo), `LedgerServiceTest` (loss booked, before first buy ignored, parity of `build()`), item page and dashboard tests, scoreboard P/L still equals `PositionsService`. Done: 650 tests green, Pint clean, addon harness 66+63 checks. Not done: `npm run build` (no JS change), MariaDB smoke, browser check.
 - [ ] In-game check (Retail, then Forever): which event confirms a commodity post; `CalculateCommodityDeposit` vs the gold actually taken; whether a cancel costs more than the deposit (`GetCancelCost`); the sale invoice's deposit field on a partial commodity sale; expired and cancelled mail (not yet seen in game at all, Phase 12).
 
+## Phase 17: Forever and Classic prices (addon scans)
+
+Probed 2026-11-14 (read-only): Blizzard's Game Data API has no Forever auction feed. `dynamic-classic-us` has an empty commodities endpoint and per-realm auctions for old Classic realms only; `classic1x` and `classicann` list realms but 404 on auctions; guessed Forever namespaces return 403/404. So Forever (and Classic) prices come from the addon.
+
+Decisions:
+- **Addon records what you see**, once per item per hour: commodity searches (lowest price, total quantity, listings) and the browse list (lowest price and total quantity, 0 listings). Retail records nothing (Blizzard has it).
+- **Same screens, own tables:** `scan_prices` (hourly rows, kept 90 d) and `scan_stats` (the `item_stats` columns, per user, region and game), so Retail's pipeline is untouched. `MarketStats::forItems()` reads the right one; positions, dashboard and item page need no other change. Same `min_days` gate. `sold_per_day_est` is always null: scans are too sparse to tell sales from cancels, so days-to-sell stays "collecting".
+- **Per user, not shared** (changed in review, 2026-11-14): sign-up is open, so pooled scans would let one crafted upload set every user's floor and P/L for any hour nobody else scanned. Each user's floors come from their own scans only; rows carry `user_id` (cascade delete) and are in the data export and on the privacy page. A later upload replaces an hour (the addon keeps the newest scan of it); scan times may be at most an hour ahead. Pooling across users later would need a per-contributor median and a privacy change.
+- **Assumption, unverified:** Forever's AH is region-wide like Retail commodities, so scans are keyed by region and game only. If it turns out to be per realm, add `realm` to both tables.
+
+- [x] Probe Blizzard for a Forever feed (none).
+- [x] Addon 0.4.0 `Prices.lua` (`d.prices`, `time|item|lowest|qty|auctions`, 20000 cap, 14 d), `/wfl recorder` count; Lua tests (`addon/tests/prices.lua`).
+- [x] `AddonParser` reads `prices`; `IngestService` stores them for non-Retail games (`ScanStatsService::store`), recomputes stats after the commit.
+- [x] `ScanStatsService` (floor, recent, typical, hist60, days), `PricePruner` prunes scans, header "Prices" shows the newest scan for Forever/Classic, item chart from scans, summary shows unrealized once something is priced. Tests: `ScanPricesTest`.
+- [x] Review fixes: scans per user (export, privacy, cascade), future times capped, later upload replaces the hour, addon handles partial searches (`HasFullCommoditySearchResults`, `COMMODITY_SEARCH_RESULTS_ADDED`) and Unknown commodity status.
+- [ ] In-game check on Forever: `COMMODITY_SEARCH_RESULTS_UPDATED`/`_ADDED`, `HasFullCommoditySearchResults` and `GetNumCommoditySearchResults`/`GetCommoditySearchResultInfo`, `AUCTION_HOUSE_BROWSE_RESULTS_UPDATED`/`GetBrowseResults` (`minPrice`, `totalQuantity`, `GetItemCommodityStatus`), whether Forever's AH is per realm. Classic Era may still use the old auction house API (`QueryAuctionItems`), which `Prices.lua` does not read: check before relying on Classic prices.
+- [ ] Left: Market, Scan and Calculator pages stay Retail-only (watchlist and alerts need per-game support).
+
 ## Open items (need me before the phase that uses them)
 
 - **Brevo sender** (Phase 2, before real signups): verify a sender on `wowledger.joshespi.com` (`.env.example` assumes `noreply@wowledger.joshespi.com`) and create the SMTP key. The DNS record for the hostname itself is also mine to add.

@@ -1,4 +1,4 @@
-<x-app-layout :title="$d['name']" games="market">
+<x-app-layout :title="$d['name']">
     <x-slot name="heading">{{ $d['name'] }} <span class="text-sm font-normal text-gray-400 dark:text-gray-500">#{{ $d['id'] }}</span></x-slot>
     <x-slot name="actions"><a href="{{ route('positions.index') }}" class="link text-sm">{{ __('All positions') }}</a></x-slot>
 

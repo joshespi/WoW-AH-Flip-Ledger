@@ -44,7 +44,7 @@ class PositionsService
         $names = $this->names($ids);
         $inventory = DB::table('inventory')->ownedBy($user)->inGame($game)->pluck('qty', 'item_id')->all();
         $hasSnapshot = $inventory !== [];
-        $stats = MarketStats::forItems($user->region, $game, $ids);
+        $stats = MarketStats::forItems($user, $game, $ids);
 
         $rows = [];
 
@@ -193,7 +193,7 @@ class PositionsService
     }
 
     /**
-     * Floor value and unrealized P/L are null for a game with no price feed: there is no floor.
+     * Floor value and unrealized P/L are null for a game with no Blizzard feed until a scan has priced something.
      *
      * @param  list<PositionRow>  $rows
      * @return array{realized: int, stock_cost: int, stock_at_floor: ?int, unrealized: ?int, own_stock_sales: int, unpriced_items: int, deposits_lost: int}
@@ -215,7 +215,7 @@ class PositionsService
             }
         }
 
-        if (! Game::hasMarket($game)) {
+        if (! Game::hasMarket($game) && ! array_filter($rows, fn (PositionRow $r): bool => $r->valueAtFloor !== null)) {
             $s['stock_at_floor'] = $s['unrealized'] = null;
         }
 

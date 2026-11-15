@@ -39,6 +39,8 @@ return [
         'snapshot_days' => (int) env('LEDGER_SNAPSHOT_DAYS', 30),
         'daily_days' => 400,
         'fetch_run_days' => 30,
+        // Hourly price scans from the addon (Forever, Classic): the stats read 60 d.
+        'scan_days' => 90,
 
         // Derived metrics (recent, typical, 60d hist, sold/day) are shown only once an item has
         // this many days of history; below it the UI says "collecting data".

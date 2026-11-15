@@ -12,10 +12,10 @@ use Illuminate\Support\Facades\DB;
  */
 class PricePruner
 {
-    public function __construct(private readonly PriceRollup $rollup) {}
+    public function __construct(private readonly PriceRollup $rollup, private readonly ScanStatsService $scans) {}
 
     /**
-     * @return array{snapshots: int, daily: int, runs: int}
+     * @return array{snapshots: int, daily: int, runs: int, scans: int}
      */
     public function prune(): array
     {
@@ -32,6 +32,7 @@ class PricePruner
             'snapshots' => DB::table('price_snapshots')->where('taken_at', '<', $cutoff)->delete(),
             'daily' => DB::table('price_daily')
                 ->where('day', '<', Utc::day(Utc::daysAgo((int) config('ledger.prices.daily_days'))))->delete(),
+            'scans' => $this->scans->prune((int) config('ledger.prices.scan_days')),
             'runs' => DB::table('fetch_runs')
                 ->where('started_at', '<', Utc::sql(Utc::daysAgo((int) config('ledger.prices.fetch_run_days'))))->delete(),
         ];

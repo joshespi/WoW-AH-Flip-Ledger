@@ -9,6 +9,7 @@ use App\Support\Holding;
 use App\Support\ItemName;
 use App\Support\MarketStats;
 use App\Support\Money;
+use App\Support\Stats;
 use App\Support\Utc;
 use Illuminate\Support\Facades\DB;
 
@@ -53,8 +54,8 @@ class ItemDetailService
 
         $deposits = DB::table('ah_deposits')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->orderBy('at')->limit(self::MAX_EVENTS)->get(['at', 'qty', 'lost_copper']);
 
-        $stat = MarketStats::forItems($user->region, $game, [$itemId])[$itemId] ?? null;
-        $daily = ! Game::hasMarket($game) ? [] : $this->daily($user->region, $itemId, $stat);
+        $stat = MarketStats::forItems($user, $game, [$itemId])[$itemId] ?? null;
+        $daily = $this->daily($user, $game, $itemId, $stat);
         $name = DB::table('items')->where('id', $itemId)->value('name');
 
         if ($trades->isEmpty() && $sales->isEmpty() && $expired->isEmpty() && $cancelled->isEmpty() && $deposits->isEmpty() && $stat === null && $daily === [] && $name === null) {
@@ -206,8 +207,14 @@ class ItemDetailService
      *
      * @return list<array{ts: int, median: int, min: int}>
      */
-    private function daily(string $region, int $itemId, ?object $stat): array
+    private function daily(User $user, string $game, int $itemId, ?object $stat): array
     {
+        if (! Game::hasMarket($game)) {
+            return $this->scanDaily($user, $game, $itemId, $stat);
+        }
+
+        $region = $user->region;
+
         $newest = DB::table('price_daily')->where('region', $region)->where('item_id', $itemId)->max('day');
         $out = [];
 
@@ -219,6 +226,39 @@ class ItemDetailService
                 // Midday UTC, so the point sits inside its day.
                 $out[] = ['ts' => Utc::ts($d->day.' 12:00:00'), 'median' => (int) $d->floor_median, 'min' => (int) $d->floor_min];
             }
+        }
+
+        if ($stat !== null) {
+            $out[] = ['ts' => Utc::ts($stat->taken_at), 'median' => (int) $stat->floor, 'min' => (int) $stat->floor, 'live' => true];
+        }
+
+        return $out;
+    }
+
+    /**
+     * The same chart points from the user's own addon scans: the median and lowest floor of each day with a
+     * scan, and the latest scan as the final point.
+     *
+     * @return list<array{ts: int, median: int, min: int}>
+     */
+    private function scanDaily(User $user, string $game, int $itemId, ?object $stat): array
+    {
+        $scans = fn () => DB::table('scan_prices')->ownedBy($user)->where('region', $user->region)->where('game', $game)->where('item_id', $itemId);
+        $newest = $scans()->max('taken_at');
+        $byDay = [];
+
+        if ($newest !== null) {
+            $from = Utc::day(Utc::daysAgo(self::CHART_DAYS - 1, Utc::ts($newest)));
+
+            foreach ($scans()->where('taken_at', '>=', $from.' 00:00:00')->orderBy('taken_at')->pluck('floor', 'taken_at') as $at => $floor) {
+                $byDay[substr((string) $at, 0, 10)][] = (int) $floor;
+            }
+        }
+
+        $out = [];
+
+        foreach ($byDay as $day => $floors) {
+            $out[] = ['ts' => Utc::ts($day.' 12:00:00'), 'median' => Stats::median($floors), 'min' => min($floors)];
         }
 
         if ($stat !== null) {
