@@ -189,6 +189,17 @@ class IngestService
             $touched += array_fill_keys(array_column($rows, 'item_id'), true);
         }
 
+        // Deposits forfeited on expiries: TSM has none, so no span filter.
+        if ($addon && $data->rows('csvDeposits') !== []) {
+            $deposit = static function (array $r, array $c): ?array {
+                $lost = Bounds::count($r['deposit'] ?? null, Bounds::MAX_COST);
+
+                return $lost === null || $lost < 1 ? null : ['lost_copper' => $lost, 'at' => $c['at']];
+            };
+            $rows = $this->rows($base, $keyPrefix.'deposit', 'dedupe_key', $data->rows('csvDeposits'), $deposit, $skipped);
+            $counts['deposits'] = ['seen' => count($rows), 'new' => Bulk::insertOrIgnore('ah_deposits', $rows)];
+        }
+
         if ($addon) {
             $counts['covered_by_tsm'] = $covered;
         } else {
@@ -285,6 +296,11 @@ class IngestService
         // Only addon buys carry an exact total; adding it only then keeps every existing TSM key.
         if (isset($r['total'])) {
             $fields[] = $r['total'];
+        }
+
+        // Same for a deposit's lost copper.
+        if (isset($r['deposit'])) {
+            $fields[] = $r['deposit'];
         }
 
         $base = sha1(implode('|', $fields));

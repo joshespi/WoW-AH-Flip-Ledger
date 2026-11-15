@@ -332,4 +332,27 @@ class AddonIngestTest extends TestCase
 
         $this->assertSame('failed', app(IngestService::class)->ingest($this->user, 'garbage', 'manual')->status);
     }
+
+    public function test_lost_deposits_are_stored_once_and_survive_a_tsm_upload_over_the_same_time(): void
+    {
+        $events = ['deposit|'.(self::T + 1000).'|Area52|238371|60|1200', 'deposit|'.(self::T + 1000).'|Area52|238371|60|1200'];
+        $first = $this->addon($events);
+
+        $this->assertSame(2, $first->counts['deposits']['new'], 'two identical records both count');
+        $this->assertSame(2, $this->rowsOf('ah_deposits', 'addon'));
+        $this->assertSame(0, $this->addon($events)->counts['deposits']['new'], 'a re-upload adds nothing');
+
+        // TSM covers that time now, but it has no deposits: they must not be treated as addon rows it replaces.
+        $this->tsm([['i:'.self::ITEM, 10, 41000, self::T + 1000, 'Auction']]);
+        $this->assertSame(2, $this->rowsOf('ah_deposits'));
+    }
+
+    public function test_undoing_an_upload_removes_its_deposits(): void
+    {
+        $upload = $this->addon(['deposit|'.self::T.'|Area52|238371|60|1200']);
+
+        app(UploadService::class)->undo($this->user, $upload->id, false);
+
+        $this->assertSame(0, $this->rowsOf('ah_deposits'));
+    }
 }

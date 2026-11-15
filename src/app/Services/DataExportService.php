@@ -75,6 +75,11 @@ class DataExportService
                 ],
                 'expired.csv' => $this->listing($user, 'tsm_expired', $iso),
                 'cancelled.csv' => $this->listing($user, 'tsm_cancelled', $iso),
+                'deposits.csv' => [
+                    ['time', 'item', 'item_name', 'qty', 'deposit_lost_copper', 'realm', 'game'],
+                    $this->named($user, 'ah_deposits', 'at', ['at', 'item_id', 'qty', 'lost_copper', 'realm', 'game'])->cursor(),
+                    fn ($r) => [$iso($r->at), 'i:'.$r->item_id, $r->item_name, $r->qty, $r->lost_copper, $r->realm, $r->game],
+                ],
                 'buy_suggestions.csv' => [
                     ['time', 'item', 'item_name', 'qty', 'cost_copper', 'status', 'realm', 'game'],
                     $this->named($user, 'tsm_buy_candidates', 'at', ['at', 'item_id', 'qty', 'cost_copper', 'status', 'realm', 'game'])->cursor(),
@@ -171,6 +176,7 @@ class DataExportService
                                  copper per unit, after the 5% auction house cut.
             expired.csv          Expired auctions.
             cancelled.csv        Cancelled auctions.
+            deposits.csv         Auction deposits lost on expired or cancelled auctions (from the addon).
             buy_suggestions.csv  TSM's own buy log rows, kept only as suggestions to reconcile.
             watchlist.csv        Your watchlist and targets (copper per unit).
             uploads.csv          Your upload history.

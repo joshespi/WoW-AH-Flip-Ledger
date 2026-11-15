@@ -140,7 +140,7 @@ class AddonParser
 
         $want = match ($kind) {
             'expired', 'cancelled' => 5,
-            'buy' => 6,
+            'buy', 'deposit' => 6,
             'sale' => 7,
             default => null,
         };
@@ -172,6 +172,12 @@ class AddonParser
             $net = $gross === null || $cut === null ? null : $gross - $cut;
 
             return $net === null || $net < 1 ? null : ['csvSales', $row + ['source' => TsmData::SOURCE_AUCTION, 'price' => (string) intdiv($net, $qty)]];
+        }
+
+        if ($kind === 'deposit') {
+            $lost = Bounds::count($f[5], Bounds::MAX_COST);
+
+            return $lost === null || $lost < 1 ? null : ['csvDeposits', $row + ['deposit' => (string) $lost]];
         }
 
         return [$kind === 'expired' ? 'csvExpired' : 'csvCancelled', $row];

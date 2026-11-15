@@ -1,7 +1,7 @@
 <x-public-layout :title="__('Privacy')">
     <article class="legal">
         <h1 class="page-title">{{ __('Privacy') }}</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Last updated 7 November 2026</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Last updated 14 November 2026</p>
 
         <p>This explains what {{ config('app.name') }} stores about you, why, and how to get it out or have it deleted.</p>
 
@@ -9,7 +9,7 @@
         <ul class="list-disc ps-5 space-y-2">
             <li><strong>Account:</strong> your name, email address and a hash of your password (never the password), plus your settings: timezone, region, target margin, market share and the stale-data warning time.</li>
             <li><strong>Uploader tokens:</strong> a hash of each token, its name, and when it was last used. Tokens can only upload.</li>
-            <li><strong>From the addon's record or your TradeSkillMaster data:</strong> your auction sales, expired and cancelled auctions, your auction buys (kept only as suggestions) and your inventory counts: item, quantity, price, time and realm. <strong>Buyer and seller names are not stored.</strong> The addon's file also holds an anonymous label per character (a hash, not the name) and item names it has seen; neither is stored. The uploaded file is read in memory and then discarded; it is not kept.</li>
+            <li><strong>From the addon's record or your TradeSkillMaster data:</strong> your auction sales, expired and cancelled auctions (with the deposit lost on each, when the addon recorded it), your auction buys (kept only as suggestions) and your inventory counts: item, quantity, price, time and realm. <strong>Buyer and seller names are not stored.</strong> The addon's file also holds an anonymous label per character (a hash, not the name) and item names it has seen; neither is stored. The uploaded file is read in memory and then discarded; it is not kept.</li>
             <li><strong>What you enter:</strong> your buys, notes, watchlist items, targets and groups.</li>
             <li><strong>Upload history:</strong> when each upload arrived, its size, whether it worked, any error message, the uploader version and a short label derived from your WoW account folder (not the folder name itself).</li>
             <li><strong>Activity:</strong> the days you used the site or uploaded data (the date only, not the time or what you did). Kept {{ config('ledger.stats.activity_days') }} days, then deleted. Used only to count active users.</li>

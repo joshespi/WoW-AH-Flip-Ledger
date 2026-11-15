@@ -169,4 +169,20 @@ WowFlipLedgerDB = {
         $this->assertNull(Game::fromInterface(17001));
         $this->assertNull(Game::fromInterface(19999));
     }
+
+    public function test_it_reads_a_lost_deposit_record(): void
+    {
+        $data = (new AddonParser)->parse(AddonFile::make([
+            'deposit|'.self::T.'|Area52|238371|60|1200',
+            'deposit|'.self::T.'|Area52|238371|60|0',          // nothing lost
+            'deposit|'.self::T.'|Area52|238371|60',            // missing field
+            'deposit|'.self::T.'|Area52|238371|0|1200',        // zero quantity
+        ]));
+
+        $this->assertCount(1, $data->rows('csvDeposits'));
+        $row = $data->rows('csvDeposits')[0];
+        $this->assertSame('1200', $row['deposit']);
+        $this->assertSame('60', $row['quantity']);
+        $this->assertSame('i:238371', $row['itemString']);
+    }
 }

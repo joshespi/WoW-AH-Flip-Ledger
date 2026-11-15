@@ -70,6 +70,9 @@ class UploadService
                 $rows += DB::table($table)->ownedBy($user)->where('upload_id', $upload->id)->delete();
             }
 
+            // Not in LOG_TABLES (no TSM span applies to them), so removed on its own.
+            $rows += DB::table('ah_deposits')->ownedBy($user)->where('upload_id', $upload->id)->delete();
+
             if ($clearInventory) {
                 DB::table('inventory')->ownedBy($user)->inGame($upload->game)->delete();
             }
