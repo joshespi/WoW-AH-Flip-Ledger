@@ -134,6 +134,8 @@ users(+ scoreboard_opt_in, scoreboard_nickname unique)
 user_activity_days(user_id, day)               -- PK both; kept 90 days
 scoreboard_entries(user_id, game, period '7d'|'30d'|'all', pnl_copper, sales_copper, units, flips,
                    computed_at)                -- unique (user_id, game, period); rebuilt hourly
+-- Phase 16: lost AH deposits (addon only, never span-filtered)
+ah_deposits(user_id, game, account, realm, item_id, qty, lost_copper, at, upload_id, dedupe_key)
 ```
 
 - **Idempotent ingest.** `dedupe_key` = hash of (item, time, qty, price, source) plus an occurrence index among identical rows in the file. A re-upload inserts nothing new, and two genuinely identical sales both survive.
@@ -415,6 +417,31 @@ No behaviour change apart from one visual style for cards, toggles and dashes.
 - [x] Tests: `SeedsUserRows`, `CallsApi`, `FakesBlizzard::blizzardUnconfigured`.
 - [ ] Uploader, addon and scripts (separate session).
 - [ ] Left for later, on purpose: `<x-table>` / `<x-chart-card>` / `<x-field>` wrappers, `MarketStats::numbers()`, a shared Reconcile bulk helper (the write-guard test wants `attempt()` in each action), CSV import through `ItemName::idsByName()`, and the remaining test seed helpers (buys, candidates, `price_daily`, addon record builders).
+
+## Phase 16: Lost AH deposits
+
+Today an expiry or cancel books nothing: the stock comes back at average cost (right), but the deposit forfeited on posting is never counted, so realized P/L is too high. TSM's `csvExpired`/`csvCancelled` have no deposit column and its `csvExpense` doesn't log deposits, so only the addon can know.
+
+Decisions (2026-11-14):
+- **Measured by the addon, matched to posts.** The addon records each commodity post with its deposit as an open lot per item (oldest first, account-wide pool: commodities are region-wide). A sale invoice uses up lot quantity with no loss (deposit refunded); an expired or cancelled mail uses it up and books that lot's share of the deposit as lost. Works the same in Retail, Forever and Classic.
+- **Booked as a realized loss on the item**, counted from the item's first tracked buy like sales (deposits for posting gathered stock stay out of flip P/L, like own-stock sales), plus a "Deposits lost" figure on the dashboard. Scoreboard P/L follows through `realizedEvents()`.
+- **No estimates.** Expiries without an addon deposit record (TSM files, addon records from before this phase, posts the addon never saw) book nothing; a note says deposits count only from addon 0.3.0 on.
+
+Design notes:
+- New record kind `deposit|time|realm|item|qty|copper` (copper = deposit lost for those `qty` units), written next to the `expired`/`cancelled` record it belongs to. The `expired`/`cancelled` shape stays as it is, so older parsers and rows are untouched.
+- Own table `ah_deposits` (user, game, account, realm, item, qty, `lost_copper`, at, `upload_id`, `dedupe_key`; `origin` is always addon). **Not span-filtered:** TSM never has deposits, so "TSM wins" has nothing to win, and a TSM upload that widens the span must not delete them. So it is not in `IngestService::LOG_TABLES` (`TsmSpan` widens and rebuilds from that list); undo removes it explicitly.
+- Per-unit deposit depends on the item, duration and quantity, not the price, so taking lots oldest first is close even when mail is collected out of order.
+
+Checklist:
+- [x] Addon: hook `C_AuctionHouse.PostCommodity`; the post is confirmed by `AUCTION_HOUSE_AUCTION_CREATED` and dropped on `AUCTION_HOUSE_POST_ERROR` (both unverified names, see the in-game check). Deposit from `CalculateCommodityDeposit(itemID, duration, qty)` before the post, keep it only on success (event or `GetMoney()` drop; whichever the client gives, see the in-game check). Open lots in `d.lots[item] = { "t|qty|copper", ... }`, capped and pruned after 32 days (mail lives 30, auctions 48h).
+- [x] Addon: sale invoices consume lots by `count` (an unresolved sale consumes when `resolveWaiting()` gives it an id); expired/cancelled attachments consume lots and write a `deposit` record (integer share, the last unit of a lot takes the remainder). Nothing matched: no record, `d.depositMissed` counter, shown in `/wfl recorder`.
+- [x] Addon: version 0.3.0, `CHANGELOG.md` section, harness checks in `addon/tests/recorder.lua` (post then expire, partial sale then expire, cancel, two lots oldest first, unmatched expiry, failed post books nothing, lot pruning).
+- [x] Server: `AddonParser` reads `deposit` (6 fields, `Bounds::MAX_COST`) into a `csvDeposits` section; migration for `ah_deposits` (indexes like the log tables; game-prefixed `addon:deposit` dedupe keys); `IngestService` stores it outside the span filter; `UploadService::undo()` deletes its rows; `UploadGameCheck` unchanged.
+- [x] Ledger: `LedgerService::buildFromSales()` takes an optional deposits iterable; a deposit is a P/L-only event (no stock change, `onPnl(ts, -copper)`), only from the item's first buy, sorted after sales at the same time. `build()` stays in agreement (tested). `ItemDetailService` replays it in step (timeline row "Deposit lost", running profit) and `PositionsService::forUser()` / `realizedEvents()` feed it.
+- [x] Screens (not checked in a browser; no per-game split of the tile in All view, the totals include it): dashboard tile "Deposits lost" (shown when above zero), the item page row, positions P/L includes it; a `.note` on the dashboard and item page: "Deposits are counted from addon 0.3.0 on. TSM doesn't record them."
+- [x] Data rules: `deposits.csv` in the export (and `README.txt`), privacy page line under What we store, account deletion test covers the table, `TenantIsolationTest` unaffected (no new routes).
+- [x] Tests: `AddonParserTest`, `AddonIngestTest` (stored, idempotent, kept when a TSM upload widens the span, removed by undo), `LedgerServiceTest` (loss booked, before first buy ignored, parity of `build()`), item page and dashboard tests, scoreboard P/L still equals `PositionsService`. Done: 650 tests green, Pint clean, addon harness 66+63 checks. Not done: `npm run build` (no JS change), MariaDB smoke, browser check.
+- [ ] In-game check (Retail, then Forever): which event confirms a commodity post; `CalculateCommodityDeposit` vs the gold actually taken; whether a cancel costs more than the deposit (`GetCancelCost`); the sale invoice's deposit field on a partial commodity sale; expired and cancelled mail (not yet seen in game at all, Phase 12).
 
 ## Open items (need me before the phase that uses them)
 
