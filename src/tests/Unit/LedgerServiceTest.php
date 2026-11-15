@@ -228,4 +228,28 @@ class LedgerServiceTest extends TestCase
         $this->assertSame(100_000, $a['cost']);
         $this->assertSame(0, $a['pnl']);
     }
+
+    public function test_a_lost_deposit_is_a_loss_with_no_stock_change_from_the_first_buy_on(): void
+    {
+        $pnl = [];
+        $out = (new LedgerService)->buildFromSales(
+            [['ts' => 100, 'item' => 1, 'qty' => 10, 'cost' => 1000]],
+            [['item' => 1, 'ts' => 200, 'qty' => 4, 'unit_price' => 150]],
+            function (int $ts, int $c) use (&$pnl): void {
+                $pnl[] = [$ts, $c];
+            },
+            [
+                ['item' => 1, 'ts' => 50, 'lost' => 999],   // before the first buy: not counted
+                ['item' => 1, 'ts' => 300, 'lost' => 40],
+                ['item' => 2, 'ts' => 300, 'lost' => 77],   // never bought
+            ],
+        );
+
+        // 4 sold at 150 against an average cost of 100 = +200, then -40.
+        $this->assertSame(160, $out[1]['pnl']);
+        $this->assertSame(6, $out[1]['inv']);
+        $this->assertSame(600, $out[1]['cost'], 'stock and cost are untouched');
+        $this->assertSame([[200, 200], [300, -40]], $pnl);
+        $this->assertArrayNotHasKey(2, $out);
+    }
 }

@@ -21,6 +21,9 @@ use App\Support\ItemName;
  */
 class LedgerService
 {
+    /** Event side of a lost deposit: moves realized P/L only, after every sale and correction at its time. */
+    public const DEPOSIT = 99;
+
     /**
      * From TSM csvSales rows, as parsed (string fields). Malformed rows are skipped.
      *
@@ -65,10 +68,11 @@ class LedgerService
      *
      * @param  list<array{ts: int, item: int|string, qty: int, cost: int, correction?: string}>  $trades
      * @param  iterable<array{item: int|string, ts: int, qty: int, unit_price: int}>  $sales  unit_price after the AH cut; may be a generator
-     * @param  (callable(int, int): void)|null  $onPnl  called with (ts, copper) for every sale or write-off that moves realized P/L
+     * @param  (callable(int, int): void)|null  $onPnl  called with (ts, copper) for every sale, write-off or lost deposit that moves realized P/L
+     * @param  iterable<array{item: int|string, ts: int, lost: int}>  $deposits  deposit forfeited on an expired or cancelled auction: a loss, no stock change; counts only from the item's first buy, like a sale
      * @return array<int|string, array{bq: int, bc: int, sq: int, sr: int, pnl: int, oq: int, orev: int, inv: int, cost: int}>
      */
-    public function buildFromSales(array $trades, iterable $sales, ?callable $onPnl = null): array
+    public function buildFromSales(array $trades, iterable $sales, ?callable $onPnl = null, iterable $deposits = []): array
     {
         $events = [];
         $corrections = [];
@@ -101,6 +105,12 @@ class LedgerService
             $events[$k][] = [$s['ts'], 1, $s['qty'], $s['qty'] * $s['unit_price']];
         }
 
+        foreach ($deposits as $d) {
+            if ($d['lost'] > 0 && isset($first[$d['item']]) && $d['ts'] >= $first[$d['item']]) {
+                $events[$d['item']][] = [$d['ts'], self::DEPOSIT, 0, $d['lost']];
+            }
+        }
+
         $out = [];
 
         foreach ($events as $k => $list) {
@@ -126,6 +136,13 @@ class LedgerService
                 $h->buy($q, $c);
                 $a['bq'] += $q;
                 $a['bc'] += $c;
+
+                continue;
+            }
+
+            if ($side === self::DEPOSIT) {
+                $a['pnl'] -= $c;
+                $onPnl($ts, -$c);
 
                 continue;
             }

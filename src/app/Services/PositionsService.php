@@ -38,7 +38,8 @@ class PositionsService
         $ids = array_keys($firstBuy);
         $newest = new SplMinHeap;
         $events = [];
-        $ledger = $this->replay($user, $game, $trades, $adjustments, $firstBuy, $newest, $events);
+        $lost = 0;
+        $ledger = $this->replay($user, $game, $trades, $adjustments, $firstBuy, $newest, $events, $lost);
 
         $names = $this->names($ids);
         $inventory = DB::table('inventory')->ownedBy($user)->inGame($game)->pluck('qty', 'item_id')->all();
@@ -55,6 +56,7 @@ class PositionsService
             <=> [$b->closed(), $a->costBasis, $a->realized, $b->name]);
 
         $summary = $this->summary($rows, $game);
+        $summary['deposits_lost'] = $lost;
 
         return new Portfolio($rows, $summary, $this->concentration($rows, $summary['stock_cost']), $this->recent($trades, $newest, $names), $events);
     }
@@ -83,12 +85,12 @@ class PositionsService
      * @param  array<int, int>  $firstBuy
      * @param  list<array{0: int, 1: int}>  $events
      */
-    private function replay(User $user, string $game, array $trades, array $adjustments, array $firstBuy, SplMinHeap $newest, array &$events): array
+    private function replay(User $user, string $game, array $trades, array $adjustments, array $firstBuy, SplMinHeap $newest, array &$events, int &$lost = 0): array
     {
         return $this->ledger->buildFromSales([...$trades, ...$adjustments], $this->sales($user, $game, $firstBuy, $newest),
             function (int $ts, int $pnl) use (&$events): void {
                 $events[] = [$ts, $pnl];
-            });
+            }, $this->deposits($user, $game, $firstBuy, $lost));
     }
 
     /** @return array<int, int> item id => first buy time */
@@ -194,11 +196,11 @@ class PositionsService
      * Floor value and unrealized P/L are null for a game with no price feed: there is no floor.
      *
      * @param  list<PositionRow>  $rows
-     * @return array{realized: int, stock_cost: int, stock_at_floor: ?int, unrealized: ?int, own_stock_sales: int, unpriced_items: int}
+     * @return array{realized: int, stock_cost: int, stock_at_floor: ?int, unrealized: ?int, own_stock_sales: int, unpriced_items: int, deposits_lost: int}
      */
     private function summary(array $rows, string $game): array
     {
-        $s = ['realized' => 0, 'stock_cost' => 0, 'stock_at_floor' => 0, 'unrealized' => 0, 'own_stock_sales' => 0, 'unpriced_items' => 0];
+        $s = ['realized' => 0, 'stock_cost' => 0, 'stock_at_floor' => 0, 'unrealized' => 0, 'own_stock_sales' => 0, 'unpriced_items' => 0, 'deposits_lost' => 0];
 
         foreach ($rows as $r) {
             $s['realized'] += $r->realized;
@@ -287,6 +289,29 @@ class PositionsService
         }
 
         return [$buys, $adjustments];
+    }
+
+    /**
+     * Deposits lost on expired or cancelled auctions of traded items. $lost gets the total of the
+     * ones the ledger counts (on or after the item's first buy).
+     *
+     * @param  array<int, int>  $firstBuy  item id => first buy timestamp
+     * @return \Generator<int, array{item: int, ts: int, lost: int}>
+     */
+    private function deposits(User $user, string $game, array $firstBuy, int &$lost): \Generator
+    {
+        $rows = DB::table('ah_deposits')->ownedBy($user)->inGame($game)->whereIn('item_id', array_keys($firstBuy))
+            ->select('item_id', 'lost_copper', 'at')->cursor();
+
+        foreach ($rows as $r) {
+            $d = ['item' => (int) $r->item_id, 'ts' => Utc::ts($r->at), 'lost' => (int) $r->lost_copper];
+
+            if ($d['ts'] >= $firstBuy[$d['item']]) {
+                $lost += $d['lost'];
+            }
+
+            yield $d;
+        }
     }
 
     /**

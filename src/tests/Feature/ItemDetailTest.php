@@ -195,4 +195,24 @@ class ItemDetailTest extends TestCase
         $this->actingAs($user)->get('/trades')->assertSee(route('items.show', 100), false);
         $this->get('/positions')->assertSee(route('items.show', 100), false);
     }
+
+    public function test_a_lost_deposit_is_a_loss_row_and_agrees_with_the_ledger(): void
+    {
+        $user = $this->user();
+        app(TradesService::class)->add($user, 100, 100, 100_000, self::T, null);
+        $this->sale($user, self::T + 200, 50, 2000);
+        DB::table('ah_deposits')->insert([
+            ['user_id' => $user->id, 'realm' => 'R', 'item_id' => 100, 'qty' => 10, 'lost_copper' => 1500, 'at' => Utc::sql(self::T + 300), 'dedupe_key' => sha1('a')],
+            ['user_id' => $user->id, 'realm' => 'R', 'item_id' => 100, 'qty' => 10, 'lost_copper' => 999, 'at' => Utc::sql(self::T - 10), 'dedupe_key' => sha1('b')],
+        ]);
+
+        $d = app(ItemDetailService::class)->forUser($user, 100);
+        $row = collect(app(PositionsService::class)->forUser($user)->positions)->firstWhere('itemId', 100);
+
+        $this->assertSame(['deposit', 'sale', 'buy', 'deposit'], array_column($d['timeline'], 'kind'));
+        $this->assertSame([-1500, 50_000, null, null], array_column($d['timeline'], 'pnl'));
+        $this->assertFalse($d['timeline'][3]['tracked'], 'before the first buy');
+        $this->assertSame($row->realized, $d['position']['realized']);
+        $this->assertSame(48_500, $d['position']['realized']);
+    }
 }

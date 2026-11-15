@@ -24,7 +24,7 @@
             </div>
         @endif
 
-        <div class="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="grid grid-cols-1 xs:grid-cols-2 {{ $s['deposits_lost'] > 0 ? 'lg:grid-cols-6' : 'lg:grid-cols-5' }} gap-4">
             <x-stat-tile :label="__('Realized P/L')" :hint="__('Net of the :cut% AH cut', ['cut' => \App\Support\Money::AH_CUT * 100])">
                 <x-money :copper="$s['realized']" pnl />
             </x-stat-tile>
@@ -41,6 +41,11 @@
             <x-stat-tile :label="__('Own-stock sales')" :hint="__('Not counted in flip P/L')">
                 <x-money :copper="$s['own_stock_sales']" />
             </x-stat-tile>
+            @if ($s['deposits_lost'] > 0)
+                <x-stat-tile :label="__('Deposits lost')" :hint="__('Expired or cancelled; already in realized P/L')">
+                    <x-money :copper="-$s['deposits_lost']" pnl />
+                </x-stat-tile>
+            @endif
         </div>
 
         <div class="card p-4 sm:p-6 text-gray-600 dark:text-gray-300"

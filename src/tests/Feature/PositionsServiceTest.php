@@ -6,7 +6,9 @@ use App\Models\User;
 use App\Services\PositionRow;
 use App\Services\PositionsService;
 use App\Services\TradesImportService;
+use App\Services\TradesService;
 use App\Support\Money;
+use App\Support\Utc;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\LoadsLedgerFixture;
@@ -356,5 +358,22 @@ class PositionsServiceTest extends TestCase
         }
 
         app(TradesImportService::class)->import($user, $csv);
+    }
+
+    public function test_lost_deposits_lower_realized_pl_and_are_reported(): void
+    {
+        $user = User::factory()->create();
+        $this->seedItem(100, 'Practically Pork');
+        app(TradesService::class)->add($user, 100, 100, 100_000, 1_791_823_860, null);
+        DB::table('ah_deposits')->insert([
+            'user_id' => $user->id, 'realm' => 'R', 'item_id' => 100, 'qty' => 10, 'lost_copper' => 1500,
+            'at' => Utc::sql(1_791_823_900), 'dedupe_key' => sha1('a'),
+        ]);
+
+        $p = app(PositionsService::class)->forUser($user);
+
+        $this->assertSame(-1500, $p->summary['realized']);
+        $this->assertSame(1500, $p->summary['deposits_lost']);
+        $this->assertSame(-1500, array_sum(array_column(app(PositionsService::class)->realizedEvents($user), 1)));
     }
 }

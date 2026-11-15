@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Everything the item page shows for one commodity: the user's own timeline (buys, sales,
- * expiries, cancellations), the running position after each buy and sale, the market numbers
+ * expiries, cancellations, lost deposits), the running position after each buy and sale, the market numbers
  * and the daily price series. The position replay is the ledger's own rule (weighted average
  * cost, buys before sells at the same instant, sales before the first buy ignored), kept in
  * step by a test against LedgerService.
@@ -51,11 +51,13 @@ class ItemDetailService
         $expired = DB::table('tsm_expired')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->orderBy('at')->limit(self::MAX_EVENTS)->get(['at', 'qty']);
         $cancelled = DB::table('tsm_cancelled')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->orderBy('at')->limit(self::MAX_EVENTS)->get(['at', 'qty']);
 
+        $deposits = DB::table('ah_deposits')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->orderBy('at')->limit(self::MAX_EVENTS)->get(['at', 'qty', 'lost_copper']);
+
         $stat = MarketStats::forItems($user->region, $game, [$itemId])[$itemId] ?? null;
         $daily = ! Game::hasMarket($game) ? [] : $this->daily($user->region, $itemId, $stat);
         $name = DB::table('items')->where('id', $itemId)->value('name');
 
-        if ($trades->isEmpty() && $sales->isEmpty() && $expired->isEmpty() && $cancelled->isEmpty() && $stat === null && $daily === [] && $name === null) {
+        if ($trades->isEmpty() && $sales->isEmpty() && $expired->isEmpty() && $cancelled->isEmpty() && $deposits->isEmpty() && $stat === null && $daily === [] && $name === null) {
             return null;
         }
 
@@ -78,6 +80,11 @@ class ItemDetailService
             foreach ($rows as $r) {
                 $events[] = ['ts' => Utc::ts($r->at), 'order' => 2, 'kind' => $kind, 'qty' => (int) $r->qty, 'total' => null];
             }
+        }
+
+        // Last at its time, like the ledger's: a loss, no stock change. 'total' is the copper lost.
+        foreach ($deposits as $r) {
+            $events[] = ['ts' => Utc::ts($r->at), 'order' => LedgerService::DEPOSIT, 'kind' => 'deposit', 'qty' => (int) $r->qty, 'total' => (int) $r->lost_copper];
         }
 
         usort($events, fn ($a, $b) => [$a['ts'], $a['order']] <=> [$b['ts'], $b['order']]);
@@ -137,11 +144,17 @@ class ItemDetailService
         $timeline = $steps = [];
 
         foreach ($events as $e) {
-            $row = $e + ['unit' => $e['total'] === null ? null : Money::unit($e['total'], $e['qty']), 'pnl' => null, 'tracked' => true];
+            $deposit = $e['kind'] === 'deposit';
+            // A deposit's total is the loss, not a price: no per-unit figure.
+            $row = $e + ['unit' => $e['total'] === null || $deposit ? null : Money::unit($e['total'], $e['qty']), 'pnl' => null, 'tracked' => true];
             $moves = $e['kind'] === 'buy' || $e['kind'] === 'sale' || in_array($e['kind'], Trade::CORRECTIONS, true);
 
             if ($e['kind'] === 'buy') {
                 $h->buy($e['qty'], $e['total']);
+            } elseif ($deposit) {
+                // Counts from the first buy, like a sale; before it the row is shown but not booked.
+                $row['tracked'] = $first !== null && $e['ts'] >= $first;
+                $row['pnl'] = $row['tracked'] ? -$e['total'] : null;
             } elseif ($moves && ($first === null || $e['ts'] < $first)) {
                 $row['tracked'] = false;
             } elseif ($e['kind'] === 'sale') {

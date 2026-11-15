@@ -73,7 +73,7 @@
                             <tr>
                                 <td><x-time :at="$e['ts']" /></td>
                                 <td>
-                                    {{ match ($e['kind']) { 'buy' => __('Bought'), 'sale' => __('Sold'), 'expired' => __('Expired'), 'cancelled' => __('Cancelled'), default => \App\Models\Trade::correctionLabel($e['kind']) } }}
+                                    {{ match ($e['kind']) { 'buy' => __('Bought'), 'sale' => __('Sold'), 'expired' => __('Expired'), 'cancelled' => __('Cancelled'), 'deposit' => __('Deposit lost'), default => \App\Models\Trade::correctionLabel($e['kind']) } }}
                                     @if (! $e['tracked'])<span class="text-xs text-gray-400 dark:text-gray-500" title="{{ __('Before your first tracked buy, so not in the ledger.') }}">({{ __('untracked') }})</span>@endif
                                 </td>
                                 <td class="num">{{ number_format($e['qty']) }}</td>
@@ -86,6 +86,7 @@
                     </tbody>
                 </table>
             </div>
+            <p class="mt-3 note">{{ __('Lost deposits are counted from addon 0.3.0 on, matched to the post they came from. TradeSkillMaster does not record them.') }}</p>
             @if ($d['timeline_total'] > count($d['timeline']))
                 <p class="mt-3 note">{{ __('Showing the newest :n of :total events.', ['n' => count($d['timeline']), 'total' => number_format($d['timeline_total'])]) }}</p>
             @endif
