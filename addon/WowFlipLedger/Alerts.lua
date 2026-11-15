@@ -72,6 +72,7 @@ SlashCmdList["WOWFLIPLEDGER"] = function(msg)
         ns.print((ns.freshness()))
     elseif msg == "recorder" then
         ns.print(ns.recorderStatus())
+        ns.print(ns.priceStatus())
     else
         ns.print("/wfl opens the panel, /wfl alerts lists alerts, /wfl status shows how old the data is, /wfl recorder shows what is being recorded.")
         ns.print("Data refreshes on /reload; the uploader writes it in the background. Your buys and sales are saved at logout or /reload.")

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+- Records the auction house prices you see in World of Warcraft: Forever and Classic (lowest price, quantity, listings; at most one per item per hour), so the site can show your floors, history and "vs typical" there. Your scans are used for your account only. Retail is unchanged: its prices come from Blizzard.
+- `/wfl recorder` reports how many price scans are recorded.
+
 ## 0.3.0
 
 - Records the deposit you lose when an auction expires or is cancelled (matched to the post it came from, so the site can count it as a loss). Auctions posted before this version have no deposit on record.

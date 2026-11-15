@@ -4,6 +4,11 @@ local ADDON, ns = ...
 
 ns.STALE_AFTER = 24 * 3600
 
+-- Rounds to a whole number; non-numbers are 0.
+function ns.whole(n)
+    return math.floor((tonumber(n) or 0) + 0.5)
+end
+
 ns.COLOR = {
     green = { 0.3, 1, 0.3 },
     red = { 1, 0.3, 0.3 },

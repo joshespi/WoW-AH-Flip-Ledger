@@ -69,7 +69,7 @@ end
 -- Load the addon the way WoW does: every file gets the addon name and a shared table -----------
 
 dofile(DATA)
-local ns = T.load(ADDON_DIR, { "Core.lua", "Recorder.lua", "Inventory.lua", "Tooltip.lua", "Panel.lua", "Alerts.lua" })
+local ns = T.load(ADDON_DIR, { "Core.lua", "Recorder.lua", "Prices.lua", "Inventory.lua", "Tooltip.lua", "Panel.lua", "Alerts.lua" })
 
 check(type(WFL_FEED) == "table", "Data.lua defines WFL_FEED")
 eq(WFL_FEED.schema, 1, "schema")

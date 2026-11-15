@@ -103,9 +103,7 @@ end
 
 -- Records ------------------------------------------------------------------------------------
 
-local function whole(n)
-    return floor((tonumber(n) or 0) + 0.5)
-end
+local whole = ns.whole
 
 local function join(...)
     local parts = { ... }

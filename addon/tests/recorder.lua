@@ -106,7 +106,7 @@ C_Container = {
 
 -- Load ----------------------------------------------------------------------------------------
 
-local FILES = { "Core.lua", "Recorder.lua", "Inventory.lua" }
+local FILES = { "Core.lua", "Recorder.lua", "Prices.lua", "Inventory.lua" }
 local ns = T.load(ADDON_DIR, FILES)
 
 -- A record string as the recorder writes it (realm fixed).

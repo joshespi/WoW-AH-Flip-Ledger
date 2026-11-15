@@ -19,4 +19,5 @@ alpine_run '
     echo "syntax ok"
     lua5.1 addon/tests/run.lua addon/tests/out/Data.lua addon/WowFlipLedger
     lua5.1 addon/tests/recorder.lua addon/WowFlipLedger addon/tests/out/WowFlipLedger.lua
+    lua5.1 addon/tests/prices.lua addon/WowFlipLedger
 '
