@@ -59,7 +59,7 @@ class DataExportService
                 'trades.csv' => [
                     [...self::TRADE_COLUMNS, 'item_name', 'source', 'game'],
                     $this->named($user, 'trades', 'traded_at', ['traded_at', 'item_id', 'qty', 'cost_copper', 'note', 'source', 'game'])
-                        ->where('trades.side', Trade::SIDE_BUY)->cursor(),
+                        ->where('trades.side', Trade::SIDE_BUY)->whereNull('trades.craft_id')->cursor(),
                     fn ($r) => [...self::tradeFields($user, $r), $r->item_name, $r->source, $r->game],
                 ],
                 'corrections.csv' => [
@@ -67,6 +67,14 @@ class DataExportService
                     $this->named($user, 'trades', 'traded_at', ['traded_at', 'item_id', 'qty', 'side', 'note', 'game', 'cost_copper'])
                         ->whereIn('trades.side', Trade::CORRECTIONS)->cursor(),
                     fn ($r) => [$iso($r->traded_at), 'i:'.$r->item_id, $r->qty, $r->side, $r->note, $r->item_name, $r->game, Trade::proceeds($r->side, (int) $r->cost_copper)],
+                ],
+                'crafts.csv' => [
+                    ['craft', 'time', 'item', 'item_name', 'kind', 'qty', 'cost_copper', 'note', 'game'],
+                    $this->named($user, 'trades', 'traded_at', ['craft_id', 'traded_at', 'item_id', 'side', 'qty', 'cost_copper', 'note', 'game'])
+                        ->whereNotNull('trades.craft_id')->cursor(),
+                    fn ($r) => [$r->craft_id, $iso($r->traded_at), 'i:'.$r->item_id, $r->item_name, match ($r->side) {
+                        Trade::SIDE_CRAFTIN => 'made', Trade::SIDE_CRAFTOUT => 'used', default => 'bought'
+                    }, $r->qty, $r->side === Trade::SIDE_BUY ? $r->cost_copper : null, $r->note, $r->game],
                 ],
                 'sales.csv' => [
                     ['time', 'item', 'item_name', 'qty', 'unit_price_after_cut_copper', 'realm', 'source', 'game'],
@@ -108,6 +116,7 @@ class DataExportService
                     ['field', 'value'],
                     [
                         ['name', $user->name], ['email', $user->email], ['timezone', $user->timezone], ['region', $user->region],
+                        ['default_game', $user->default_game],
                         ['target_margin_pct', $user->target_margin_pct], ['market_share_pct', $user->market_share_pct],
                         ['stale_minutes', $user->stale_minutes], ['created', $iso($user->created_at)],
                         ['scoreboard_opt_in', $user->scoreboard_opt_in ? 1 : 0], ['scoreboard_nickname', $user->scoreboard_nickname],
@@ -180,6 +189,9 @@ class DataExportService
             corrections.csv      Stock you removed from a position: kind "adjust" (the ledger was
                                  wrong, no profit or loss), "writeoff" (booked as a loss) or
                                  "vendor" (sold to a vendor; proceeds_copper is the total received).
+            crafts.csv           Your crafts: per craft, "made" (the product), "used" (an ingredient taken
+                                 from your stock at its average cost) and "bought" (a vendor ingredient;
+                                 cost_copper is the lot total). Not part of trades.csv.
             sales.csv            Auction sales read from your TradeSkillMaster data. Prices are
                                  copper per unit, after the 5% auction house cut.
             expired.csv          Expired auctions.

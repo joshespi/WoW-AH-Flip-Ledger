@@ -82,7 +82,7 @@ class ReconcileService
         $trades += array_fill_keys($new, []);
 
         // Buys only: a correction (a vendor sale shares its buy's qty and time) is not a recorded buy.
-        foreach (DB::table('trades')->ownedBy($user)->inGame($game)->whereIn('item_id', $new)->where('side', Trade::SIDE_BUY)
+        foreach (DB::table('trades')->ownedBy($user)->inGame($game)->whereIn('item_id', $new)->where('side', Trade::SIDE_BUY)->whereNull('craft_id')
             ->select('item_id', 'traded_at', 'qty', 'cost_copper', 'source')->cursor() as $t) {
             $trades[(int) $t->item_id][] = [Utc::ts($t->traded_at), (int) $t->qty, (int) $t->cost_copper / max(1, (int) $t->qty), $t->source];
         }

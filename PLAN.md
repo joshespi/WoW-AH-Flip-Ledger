@@ -461,6 +461,14 @@ Decisions:
 - [ ] In-game check on Forever: `COMMODITY_SEARCH_RESULTS_UPDATED`/`_ADDED`, `HasFullCommoditySearchResults` and `GetNumCommoditySearchResults`/`GetCommoditySearchResultInfo`, `AUCTION_HOUSE_BROWSE_RESULTS_UPDATED`/`GetBrowseResults` (`minPrice`, `totalQuantity`, `GetItemCommodityStatus`), whether Forever's AH is per realm. Classic Era may still use the old auction house API (`QueryAuctionItems`), which `Prices.lua` does not read: check before relying on Classic prices.
 - [ ] Left: Market, Scan and Calculator pages stay Retail-only (watchlist and alerts need per-game support).
 
+## Phase 18: Crafting
+
+- [x] **Data:** `trades.craft_id` groups a craft; sides `craftout` (ingredient used, no P/L) and `craftin` (product made, cost derived). Vendor ingredients are `buy` rows with `source = craft` in the same group.
+- [x] **Ledger:** `LedgerService::buildFromSales()` takes crafts and replays every item in one time-ordered pass (buy, use, product, sale, correction, deposit); the product costs the sum of the ingredients' average cost at that moment; the product's first craft counts as its first buy. `PositionsService::held()` and `craftCosts()`, `ItemDetailService` and `Holding::consume()` stay in step.
+- [x] **Entry:** `TradesService::addCraft()` / `deleteCraft()`; "Record a craft" card on /trades (held or vendor ingredients, quantity made); craft rows delete as a group.
+- [x] **Data rules:** `crafts.csv` in the export; craft rows stay out of `trades.csv`, reconcile matching and scan averages.
+- [x] **Tests:** `CraftTest`; 675 green, Pint clean.
+
 ## Open items (need me before the phase that uses them)
 
 - **Brevo sender** (Phase 2, before real signups): verify a sender on `wowledger.joshespi.com` (`.env.example` assumes `noreply@wowledger.joshespi.com`) and create the SMTP key. The DNS record for the hostname itself is also mine to add.

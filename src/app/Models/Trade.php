@@ -6,7 +6,7 @@ use App\Models\Concerns\OwnedByUser;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['user_id', 'game', 'item_id', 'traded_at', 'qty', 'cost_copper', 'side', 'note', 'source', 'tsm_ref', 'import_key'])]
+#[Fillable(['user_id', 'game', 'item_id', 'traded_at', 'qty', 'cost_copper', 'side', 'note', 'source', 'tsm_ref', 'import_key', 'craft_id'])]
 class Trade extends Model
 {
     use OwnedByUser;
@@ -39,6 +39,17 @@ class Trade extends Model
     /** What the Correct holdings form books (no proceeds); a vendor sale goes through TradesService::vendor(). */
     public const HOLDING_CORRECTIONS = [self::SIDE_ADJUST, self::SIDE_WRITEOFF];
 
+    /** An ingredient used up in a craft: removes units at average cost, no P/L; its cost goes into the product (`craft_id` groups the rows). */
+    public const SIDE_CRAFTOUT = 'craftout';
+
+    /** What a craft made: adds units costing the sum of the group's ingredient costs (derived at replay; `cost_copper` is 0). */
+    public const SIDE_CRAFTIN = 'craftin';
+
+    public const CRAFT_SIDES = [self::SIDE_CRAFTOUT, self::SIDE_CRAFTIN];
+
+    /** Buys a craft form wrote for vendor ingredients (`source`). */
+    public const SOURCE_CRAFT = 'craft';
+
     /** A correction's place in CORRECTIONS: its replay order in LedgerService and ItemDetailService. */
     public static function correctionRank(string $side): int
     {
@@ -63,6 +74,8 @@ class Trade extends Model
         return match ($side) {
             self::SIDE_WRITEOFF => __('Written off'),
             self::SIDE_VENDOR => __('Vendored'),
+            self::SIDE_CRAFTOUT => __('Used in craft'),
+            self::SIDE_CRAFTIN => __('Crafted'),
             default => __('Corrected'),
         };
     }

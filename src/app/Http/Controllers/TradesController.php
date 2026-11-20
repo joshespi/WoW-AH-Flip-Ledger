@@ -19,7 +19,7 @@ class TradesController extends Controller
         return Csv::download(
             'trades.csv',
             DataExportService::TRADE_COLUMNS,
-            DB::table('trades')->ownedBy($user)->inGame($user->activeGame())->where('side', Trade::SIDE_BUY)
+            DB::table('trades')->ownedBy($user)->inGame($user->activeGame())->where('side', Trade::SIDE_BUY)->whereNull('craft_id')
                 ->orderBy('traded_at')->orderBy('id')->cursor(),
             fn (object $t) => DataExportService::tradeFields($user, $t),
         );

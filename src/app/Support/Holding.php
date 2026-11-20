@@ -52,11 +52,11 @@ final class Holding
     }
 
     /**
-     * Takes up to $qty units out at average cost.
+     * Takes up to $qty units out at average cost, no P/L (a craft's ingredients: the cost goes into the product).
      *
      * @return array{int, int} [units taken, their cost]
      */
-    private function take(int $qty): array
+    public function take(int $qty): array
     {
         $m = min($qty, $this->held);
         $cost = $this->held > 0 ? Num::mulDiv($this->cost, $m, $this->held) : 0;

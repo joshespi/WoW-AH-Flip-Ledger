@@ -29,6 +29,8 @@ class ItemDetailService
     /** Per-table cap on rows read, so a pathological history cannot exhaust memory. */
     private const MAX_EVENTS = 5000;
 
+    public function __construct(private PositionsService $positions) {}
+
     /**
      * Null when the user has no history with the item and no prices exist for it either.
      *
@@ -52,13 +54,16 @@ class ItemDetailService
         $expired = DB::table('tsm_expired')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->orderBy('at')->limit(self::MAX_EVENTS)->get(['at', 'qty']);
         $cancelled = DB::table('tsm_cancelled')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->orderBy('at')->limit(self::MAX_EVENTS)->get(['at', 'qty']);
 
+        $crafts = DB::table('trades')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->whereIn('side', Trade::CRAFT_SIDES)
+            ->orderBy('traded_at')->orderBy('id')->limit(self::MAX_EVENTS)->get(['side', 'traded_at', 'qty', 'craft_id']);
+
         $deposits = DB::table('ah_deposits')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->orderBy('at')->limit(self::MAX_EVENTS)->get(['at', 'qty', 'lost_copper']);
 
         $stat = MarketStats::forItems($user, $game, [$itemId])[$itemId] ?? null;
         $daily = $this->daily($user, $game, $itemId, $stat);
         $name = DB::table('items')->where('id', $itemId)->value('name');
 
-        if ($trades->isEmpty() && $sales->isEmpty() && $expired->isEmpty() && $cancelled->isEmpty() && $deposits->isEmpty() && $stat === null && $daily === [] && $name === null) {
+        if ($trades->isEmpty() && $crafts->isEmpty() && $sales->isEmpty() && $expired->isEmpty() && $cancelled->isEmpty() && $deposits->isEmpty() && $stat === null && $daily === [] && $name === null) {
             return null;
         }
 
@@ -70,16 +75,24 @@ class ItemDetailService
 
         // Kind is the side; same order as the ledger's. Only a vendor sale has a total: the gold received.
         foreach ($corrections as $t) {
-            $events[] = ['ts' => Utc::ts($t->traded_at), 'order' => 3 + Trade::correctionRank($t->side), 'kind' => $t->side, 'qty' => (int) $t->qty, 'total' => Trade::proceeds($t->side, (int) $t->cost_copper)];
+            $events[] = ['ts' => Utc::ts($t->traded_at), 'order' => 5 + Trade::correctionRank($t->side), 'kind' => $t->side, 'qty' => (int) $t->qty, 'total' => Trade::proceeds($t->side, (int) $t->cost_copper)];
+        }
+
+        // After the buys, before the sales at the same time, like the ledger. A craft's cost comes from the whole ledger.
+        $costs = $crafts->isEmpty() ? [] : $this->positions->craftCosts($user, $game);
+
+        foreach ($crafts as $t) {
+            $made = $t->side === Trade::SIDE_CRAFTIN;
+            $events[] = ['ts' => Utc::ts($t->traded_at), 'order' => $made ? 2 : 1, 'kind' => $t->side, 'qty' => (int) $t->qty, 'total' => $made ? ($costs[(int) $t->craft_id] ?? 0) : null];
         }
 
         foreach ($sales as $s) {
-            $events[] = ['ts' => Utc::ts($s->sold_at), 'order' => 1, 'kind' => 'sale', 'qty' => (int) $s->qty, 'total' => (int) $s->qty * (int) $s->unit_price_copper];
+            $events[] = ['ts' => Utc::ts($s->sold_at), 'order' => 3, 'kind' => 'sale', 'qty' => (int) $s->qty, 'total' => (int) $s->qty * (int) $s->unit_price_copper];
         }
 
         foreach ([['expired', $expired], ['cancelled', $cancelled]] as [$kind, $rows]) {
             foreach ($rows as $r) {
-                $events[] = ['ts' => Utc::ts($r->at), 'order' => 2, 'kind' => $kind, 'qty' => (int) $r->qty, 'total' => null];
+                $events[] = ['ts' => Utc::ts($r->at), 'order' => 4, 'kind' => $kind, 'qty' => (int) $r->qty, 'total' => null];
             }
         }
 
@@ -134,7 +147,7 @@ class ItemDetailService
         $first = null;
 
         foreach ($events as $e) {
-            if ($e['kind'] === 'buy') {
+            if (in_array($e['kind'], ['buy', Trade::SIDE_CRAFTIN], true)) {
                 $first = $e['ts'];
                 break;
             }
@@ -148,9 +161,9 @@ class ItemDetailService
             $deposit = $e['kind'] === 'deposit';
             // A deposit's total is the loss, not a price: no per-unit figure.
             $row = $e + ['unit' => $e['total'] === null || $deposit ? null : Money::unit($e['total'], $e['qty']), 'pnl' => null, 'tracked' => true];
-            $moves = $e['kind'] === 'buy' || $e['kind'] === 'sale' || in_array($e['kind'], Trade::CORRECTIONS, true);
+            $moves = in_array($e['kind'], ['buy', 'sale', ...Trade::CORRECTIONS, ...Trade::CRAFT_SIDES], true);
 
-            if ($e['kind'] === 'buy') {
+            if ($e['kind'] === 'buy' || $e['kind'] === Trade::SIDE_CRAFTIN) {
                 $h->buy($e['qty'], $e['total']);
             } elseif ($deposit) {
                 // Counts from the first buy, like a sale; before it the row is shown but not booked.
@@ -158,6 +171,8 @@ class ItemDetailService
                 $row['pnl'] = $row['tracked'] ? -$e['total'] : null;
             } elseif ($moves && ($first === null || $e['ts'] < $first)) {
                 $row['tracked'] = false;
+            } elseif ($e['kind'] === Trade::SIDE_CRAFTOUT) {
+                $h->take($e['qty']);
             } elseif ($e['kind'] === 'sale') {
                 [$m, $rev, $cogs] = $h->sell($e['qty'], $e['total']);
 

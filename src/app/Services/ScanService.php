@@ -85,7 +85,7 @@ class ScanService
      */
     private function winnerIds(User $user): array
     {
-        $buys = DB::table('trades')->ownedBy($user)->inGame(Game::RETAIL)->where('side', Trade::SIDE_BUY)->where('qty', '>', 0)
+        $buys = DB::table('trades')->ownedBy($user)->inGame(Game::RETAIL)->where('side', Trade::SIDE_BUY)->whereNull('craft_id')->where('qty', '>', 0)
             ->groupBy('item_id')->selectRaw('item_id, sum(cost_copper) * 1.0 / sum(qty) as unit')->pluck('unit', 'item_id');
 
         $sales = DB::table('tsm_sales')->ownedBy($user)->inGame(Game::RETAIL)->where('source', TsmData::SOURCE_AUCTION)->where('qty', '>', 0)

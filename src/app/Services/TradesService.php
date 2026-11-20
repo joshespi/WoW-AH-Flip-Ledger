@@ -106,6 +106,72 @@ class TradesService
         return $this->create($user, $side, $itemId, $current - $held, 0, time(), $note, Trade::SOURCE_MANUAL, null, $game);
     }
 
+    /**
+     * Records a craft: each ingredient is used up at its average cost (no P/L) and $qtyMade of
+     * $productId come in at the sum (see LedgerService). A vendor ingredient (a unit price in
+     * copper) is bought in the same step; any other must already be held in full. All or nothing.
+     *
+     * @param  list<array{item: int, qty: int, vendor: ?int}>  $ingredients
+     *
+     * @throws InvalidArgumentException
+     */
+    public function addCraft(User $user, int $productId, int $qtyMade, array $ingredients, int $ts, ?string $note = null, string $game = Game::RETAIL): Trade
+    {
+        if ($ingredients === []) {
+            throw new InvalidArgumentException('Add at least one ingredient.');
+        }
+
+        if (count($ingredients) > 20) {
+            throw new InvalidArgumentException('A craft can have at most 20 ingredients.');
+        }
+
+        $items = array_column($ingredients, 'item');
+
+        if (in_array($productId, $items, true) || count($items) !== count(array_unique($items))) {
+            throw new InvalidArgumentException('List each ingredient once, and not the item you are making.');
+        }
+
+        // Checked before anything is written, so a bad row leaves nothing behind.
+        $this->attributes($productId, $qtyMade, 0, $ts, $note);
+
+        foreach ($ingredients as $i) {
+            if ($i['vendor'] !== null && ! Bounds::validPrice($i['vendor'])) {
+                throw new InvalidArgumentException('Enter the vendor price of each ingredient, at most '.Bounds::gold(Bounds::MAX_PRICE).' gold.');
+            }
+
+            $this->attributes($i['item'], $i['qty'], ($i['vendor'] ?? 0) * $i['qty'], $ts, null);
+
+            if ($i['vendor'] === null && $this->positions->held($user, $i['item'], $game) < $i['qty']) {
+                throw new InvalidArgumentException('You hold fewer than '.number_format($i['qty']).' of item '.$i['item'].'. Buy the rest first, or mark it a vendor item.');
+            }
+        }
+
+        return DB::transaction(function () use ($user, $productId, $qtyMade, $ingredients, $ts, $note, $game) {
+            $made = $this->create($user, Trade::SIDE_CRAFTIN, $productId, $qtyMade, 0, $ts, $note, Trade::SOURCE_MANUAL, null, $game);
+            $made->update(['craft_id' => $made->id]);
+
+            foreach ($ingredients as $i) {
+                if ($i['vendor'] !== null) {
+                    $this->create($user, Trade::SIDE_BUY, $i['item'], $i['qty'], $i['vendor'] * $i['qty'], $ts, null, Trade::SOURCE_CRAFT, null, $game, $made->id);
+                }
+
+                $this->create($user, Trade::SIDE_CRAFTOUT, $i['item'], $i['qty'], 0, $ts, null, Trade::SOURCE_MANUAL, null, $game, $made->id);
+            }
+
+            return $made;
+        });
+    }
+
+    /** Takes the whole craft: what it made, what it used and the vendor buys it brought in. */
+    public function deleteCraft(User $user, int $craftId): void
+    {
+        $rows = Trade::ownedBy($user)->where('craft_id', $craftId);
+
+        abort_unless($rows->exists(), 404);
+
+        $rows->delete();
+    }
+
     public function deleteCorrection(User $user, int $id): void
     {
         Trade::ownedBy($user)->whereIn('side', Trade::CORRECTIONS)->findOrFail($id)->delete();
@@ -128,6 +194,10 @@ class TradesService
                 throw new InvalidArgumentException('Only buys can be edited.');
             }
 
+            if ($trade->craft_id !== null) {
+                throw new InvalidArgumentException('This belongs to a craft. Delete the whole craft.');
+            }
+
             if (($vendor = $this->vendorOf($user, $trade)) !== null) {
                 // vendor() stored unit x qty, so this division is exact.
                 $unit = Money::unit((int) $vendor->cost_copper, (int) $vendor->qty);
@@ -145,6 +215,10 @@ class TradesService
     {
         DB::transaction(function () use ($user, $id) {
             $trade = Trade::ownedBy($user)->findOrFail($id);
+
+            if ($trade->craft_id !== null) {
+                throw new InvalidArgumentException('This belongs to a craft. Delete the whole craft.');
+            }
             $this->vendorOf($user, $trade)?->delete();
             $trade->delete();
         });
@@ -196,9 +270,10 @@ class TradesService
     }
 
     /** @throws InvalidArgumentException */
-    private function create(User $user, string $side, int $itemId, int $qty, int $cost, int $ts, ?string $note, string $source, ?string $tsmRef = null, string $game = Game::RETAIL): Trade
+    private function create(User $user, string $side, int $itemId, int $qty, int $cost, int $ts, ?string $note, string $source, ?string $tsmRef = null, string $game = Game::RETAIL, ?int $craftId = null): Trade
     {
         return Trade::create($this->attributes($itemId, $qty, $cost, $ts, $note) + [
+            'craft_id' => $craftId,
             'tsm_ref' => $tsmRef,
             'user_id' => $user->id,
             'game' => $game,

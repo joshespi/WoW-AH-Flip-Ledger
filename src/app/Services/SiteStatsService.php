@@ -51,7 +51,7 @@ class SiteStatsService
         // One row per user and day (the primary key), so a day's count is its active users.
         $activeByDay = $series('user_activity_days', 'day');
         $sales = $series('tsm_sales', 'sold_at');
-        $buys = $series('trades', 'traded_at', fn ($q) => $q->where('trades.side', Trade::SIDE_BUY));
+        $buys = $series('trades', 'traded_at', fn ($q) => $q->where('trades.side', Trade::SIDE_BUY)->whereNull('trades.craft_id'));
         $uploads = $series('uploads', 'received_at', fn ($q) => $q->where('uploads.status', Upload::STATUS_OK));
 
         $active = $this->counted('user_activity_days')->where('user_activity_days.day', '>=', $from)

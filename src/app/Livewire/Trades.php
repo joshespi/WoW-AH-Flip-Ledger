@@ -39,12 +39,27 @@ class Trades extends Component
 
     public string $pasted = '';
 
+    private const MAX_INGREDIENTS = 20;
+
+    // Record-a-craft form: what is made, and each ingredient (a vendor one has a unit price in gold).
+    public string $product = '';
+
+    public string $made = '';
+
+    public string $craftTime = '';
+
+    public string $craftNote = '';
+
+    /** @var list<array{item: string, qty: string, vendor: bool, price: string}> */
+    public array $ingredients = [];
+
     #[Url(as: 'q', except: '')]
     public string $search = '';
 
     public function mount(): void
     {
-        $this->time = auth()->user()->inputTime();
+        $this->time = $this->craftTime = auth()->user()->inputTime();
+        $this->ingredients = [self::blankIngredient()];
     }
 
     public function updatingSearch(): void
@@ -111,7 +126,7 @@ class Trades extends Component
 
     public function edit(int $id): void
     {
-        $t = Trade::ownedBy(auth()->id())->where('side', Trade::SIDE_BUY)->findOrFail($id);
+        $t = Trade::ownedBy(auth()->id())->where('side', Trade::SIDE_BUY)->whereNull('craft_id')->findOrFail($id);
 
         $this->resetErrorBag();
         $this->message = null;
@@ -141,6 +156,78 @@ class Trades extends Component
         $this->message = __('Deleted.');
     }
 
+    public function addCraftRow(): void
+    {
+        $this->attempt('craft', function () {
+            if (count($this->ingredients) >= self::MAX_INGREDIENTS) {
+                throw new InvalidArgumentException('A craft can have at most '.self::MAX_INGREDIENTS.' ingredients.');
+            }
+
+            $this->ingredients[] = self::blankIngredient();
+        });
+    }
+
+    public function removeCraftRow(int $i): void
+    {
+        $this->attempt('craft', function () use ($i) {
+            unset($this->ingredients[$i]);
+            $this->ingredients = array_values($this->ingredients ?: [self::blankIngredient()]);
+        });
+    }
+
+    public function saveCraft(TradesService $trades): void
+    {
+        $user = auth()->user();
+
+        $saved = $this->attempt('craft', function () use ($trades, $user) {
+            $rows = [];
+
+            if (count($this->ingredients) > self::MAX_INGREDIENTS) {
+                throw new InvalidArgumentException('A craft can have at most '.self::MAX_INGREDIENTS.' ingredients.');
+            }
+
+            foreach ($this->ingredients as $n => $i) {
+                $line = $n + 1;
+                $i = (array) $i + self::blankIngredient();
+                $i['item'] = (string) $i['item'];
+                $i['qty'] = (string) $i['qty'];
+                $i['price'] = (string) $i['price'];
+
+                try {
+                    $rows[] = [
+                        'item' => $trades->resolveItem($i['item']),
+                        'qty' => Bounds::quantityInput($i['qty']),
+                        'vendor' => $i['vendor'] ? Money::parseGold($i['price']) : null,
+                    ];
+                } catch (InvalidArgumentException $e) {
+                    throw new InvalidArgumentException("Ingredient {$line}: ".$e->getMessage());
+                }
+            }
+
+            $trades->addCraft($user, $trades->resolveItem($this->product), Bounds::quantityInput($this->made), $rows,
+                $user->parseInputTime($this->craftTime), $this->craftNote, $user->activeGame());
+            $this->message = __('Craft recorded.');
+        });
+
+        if ($saved) {
+            $this->reset('product', 'made', 'craftNote');
+            $this->ingredients = [self::blankIngredient()];
+            $this->craftTime = $user->inputTime();
+        }
+    }
+
+    public function deleteCraft(int $craftId, TradesService $trades): void
+    {
+        if ($this->attempt('form', fn () => $trades->deleteCraft(auth()->user(), $craftId))) {
+            $this->message = __('Craft deleted.');
+        }
+    }
+
+    private static function blankIngredient(): array
+    {
+        return ['item' => '', 'qty' => '', 'vendor' => false, 'price' => ''];
+    }
+
     public function addPasted(TradesService $trades): void
     {
         $added = 0;
@@ -168,7 +255,7 @@ class Trades extends Component
             ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w->whereRaw('lower(items.name) like ?', [Sql::like($q)])
                 ->when($id !== null && Bounds::validItemId($id), fn ($w) => $w->orWhere('trades.item_id', $id))))
             ->orderByDesc('trades.traded_at')->orderByDesc('trades.id')
-            ->select('trades.id', 'trades.item_id', 'trades.traded_at', 'trades.qty', 'trades.cost_copper', 'trades.note', 'trades.source', 'trades.side', 'items.name')
+            ->select('trades.id', 'trades.item_id', 'trades.traded_at', 'trades.qty', 'trades.cost_copper', 'trades.note', 'trades.source', 'trades.side', 'trades.craft_id', 'items.name')
             // A reconciled buy with a vendor sale (same tsm_ref), so the delete warning can say so.
             ->selectSub(DB::table('trades as v')->whereColumn('v.user_id', 'trades.user_id')->whereColumn('v.game', 'trades.game')
                 ->whereColumn('v.tsm_ref', 'trades.tsm_ref')->where('v.side', Trade::SIDE_VENDOR)->selectRaw('count(*)'), 'vendored')

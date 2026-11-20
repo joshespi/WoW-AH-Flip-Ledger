@@ -28,18 +28,18 @@ class PositionsService
 
     public function forUser(User $user, string $game = Game::RETAIL): Portfolio
     {
-        [$trades, $adjustments] = $this->trades($user, $game);
+        [$trades, $adjustments, $crafts] = $this->trades($user, $game);
 
         if ($trades === []) {
             return new Portfolio([], $this->summary([], $game), null, []);
         }
 
-        $firstBuy = $this->firstBuys($trades);
+        $firstBuy = $this->firstBuys($trades, $crafts);
         $ids = array_keys($firstBuy);
         $newest = new SplMinHeap;
         $events = [];
         $lost = 0;
-        $ledger = $this->replay($user, $game, $trades, $adjustments, $firstBuy, $newest, $events, $lost);
+        $ledger = $this->replay($user, $game, $trades, $adjustments, $crafts, $firstBuy, $newest, $events, $lost);
 
         $names = $this->names($ids);
         $inventory = DB::table('inventory')->ownedBy($user)->inGame($game)->pluck('qty', 'item_id')->all();
@@ -69,11 +69,11 @@ class PositionsService
      */
     public function realizedEvents(User $user, string $game = Game::RETAIL): array
     {
-        [$trades, $adjustments] = $this->trades($user, $game);
+        [$trades, $adjustments, $crafts] = $this->trades($user, $game);
         $events = [];
 
         if ($trades !== []) {
-            $this->replay($user, $game, $trades, $adjustments, $this->firstBuys($trades), new SplMinHeap, $events);
+            $this->replay($user, $game, $trades, $adjustments, $crafts, $this->firstBuys($trades, $crafts), new SplMinHeap, $events);
         }
 
         return $events;
@@ -85,29 +85,57 @@ class PositionsService
      * @param  array<int, int>  $firstBuy
      * @param  list<array{0: int, 1: int}>  $events
      */
-    private function replay(User $user, string $game, array $trades, array $adjustments, array $firstBuy, SplMinHeap $newest, array &$events, int &$lost = 0): array
+    private function replay(User $user, string $game, array $trades, array $adjustments, array $crafts, array $firstBuy, SplMinHeap $newest, array &$events, int &$lost = 0, ?array &$craftCosts = null): array
     {
         return $this->ledger->buildFromSales([...$trades, ...$adjustments], $this->sales($user, $game, $firstBuy, $newest),
             function (int $ts, int $pnl) use (&$events): void {
                 $events[] = [$ts, $pnl];
-            }, $this->deposits($user, $game, $firstBuy, $lost));
+            }, $this->deposits($user, $game, $firstBuy, $lost), $crafts, $craftCosts);
     }
 
     /** @return array<int, int> item id => first buy time */
-    private function firstBuys(array $trades): array
+    private function firstBuys(array $trades, array $crafts = []): array
     {
         $first = [];
 
-        foreach ($trades as $t) {
+        foreach ([...$trades, ...array_filter($crafts, fn (array $c): bool => $c['kind'] === 'in')] as $t) {
             $first[$t['item']] = min($first[$t['item']] ?? PHP_INT_MAX, $t['ts']);
         }
 
         return $first;
     }
 
+    /**
+     * What each of the user's crafts cost (craft id => copper), from the whole ledger's replay.
+     *
+     * @return array<int, int>
+     */
+    public function craftCosts(User $user, string $game = Game::RETAIL): array
+    {
+        [$trades, $adjustments, $crafts] = $this->trades($user, $game);
+        $events = [];
+        $lost = 0;
+        $costs = [];
+
+        if ($crafts !== []) {
+            $this->replay($user, $game, $trades, $adjustments, $crafts, $this->firstBuys($trades, $crafts), new SplMinHeap, $events, $lost, $costs);
+        }
+
+        return $costs;
+    }
+
     /** Units of one item the ledger says the user holds, by the same rule as forUser(). */
     public function held(User $user, int $itemId, string $game = Game::RETAIL): int
     {
+        $events = [];
+
+        // A craft ties items together, so an item in one is held by the whole ledger's replay.
+        if (DB::table('trades')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->whereIn('side', Trade::CRAFT_SIDES)->exists()) {
+            [$trades, $adjustments, $crafts] = $this->trades($user, $game);
+
+            return $this->replay($user, $game, $trades, $adjustments, $crafts, $this->firstBuys($trades, $crafts), new SplMinHeap, $events)[$itemId]['inv'] ?? 0;
+        }
+
         [$trades, $adjustments] = $this->trades($user, $game, $itemId);
 
         if ($trades === []) {
@@ -274,21 +302,25 @@ class PositionsService
     {
         $buys = [];
         $adjustments = [];
+        $crafts = [];
 
-        foreach (DB::table('trades')->ownedBy($user)->inGame($game)->whereIn('side', [Trade::SIDE_BUY, ...Trade::CORRECTIONS])
+        foreach (DB::table('trades')->ownedBy($user)->inGame($game)->whereIn('side', [Trade::SIDE_BUY, ...Trade::CORRECTIONS, ...Trade::CRAFT_SIDES])
             ->when($itemId !== null, fn ($q) => $q->where('item_id', $itemId))
-            ->get(['side', 'item_id', 'traded_at', 'qty', 'cost_copper']) as $r) {
+            ->get(['side', 'item_id', 'traded_at', 'qty', 'cost_copper', 'craft_id']) as $r) {
             // LedgerService reads a correction's cost only as its proceeds.
             $row = ['ts' => Utc::ts($r->traded_at), 'item' => (int) $r->item_id, 'qty' => (int) $r->qty, 'cost' => (int) $r->cost_copper];
 
-            if ($r->side !== Trade::SIDE_BUY) {
+            if (in_array($r->side, Trade::CRAFT_SIDES, true)) {
+                $crafts[] = ['ts' => $row['ts'], 'item' => $row['item'], 'qty' => $row['qty'], 'craft' => (int) $r->craft_id,
+                    'kind' => $r->side === Trade::SIDE_CRAFTIN ? 'in' : 'out'];
+            } elseif ($r->side !== Trade::SIDE_BUY) {
                 $adjustments[] = $row + ['correction' => $r->side];
             } else {
                 $buys[] = $row;
             }
         }
 
-        return [$buys, $adjustments];
+        return [$buys, $adjustments, $crafts];
     }
 
     /**

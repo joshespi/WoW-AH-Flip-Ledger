@@ -69,7 +69,58 @@
         </form>
     </x-section>
 
-    <div class="card p-4 sm:p-6 transition-opacity" wire:loading.class="opacity-60" wire:target="search,delete,gotoPage,nextPage,previousPage">
+    <x-section :title="__('Record a craft')" width="max-w-none"
+               :description="__('Ingredients you hold are used up at their average cost, vendor ones are bought at the price you give, and the result costs the sum, so selling it shows the right profit.')">
+        <form wire:submit="saveCraft" class="mt-4 space-y-4">
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="lg:col-span-2">
+                    <x-input-label for="product" :value="__('Makes')" />
+                    <input id="product" type="text" wire:model="product" autocomplete="off" spellcheck="false"
+                           placeholder="{{ __('Name or i:ID') }}" class="mt-1 block w-full field text-sm">
+                </div>
+                <div>
+                    <x-input-label for="made" :value="__('Quantity made')" />
+                    <input id="made" type="text" inputmode="numeric" wire:model="made" class="mt-1 block w-full field text-sm">
+                </div>
+                <div>
+                    <x-input-label for="craftTime" :value="__('When')" />
+                    <input id="craftTime" type="datetime-local" wire:model="craftTime" class="mt-1 block w-full field text-sm">
+                </div>
+            </div>
+
+            <fieldset class="space-y-2">
+                <legend class="dl-label">{{ __('Ingredients') }}</legend>
+                @foreach ($ingredients as $n => $ing)
+                    <div class="grid gap-2 sm:grid-cols-12 items-end" wire:key="ing{{ $n }}">
+                        <input type="text" wire:model="ingredients.{{ $n }}.item" autocomplete="off" spellcheck="false"
+                               placeholder="{{ __('Name or i:ID') }}" aria-label="{{ __('Ingredient') }}" class="field text-sm sm:col-span-5">
+                        <input type="text" inputmode="numeric" wire:model="ingredients.{{ $n }}.qty"
+                               placeholder="{{ __('Qty used') }}" aria-label="{{ __('Quantity used') }}" class="field text-sm sm:col-span-2">
+                        <label class="flex items-center gap-2 text-sm sm:col-span-2">
+                            <input type="checkbox" wire:model.live="ingredients.{{ $n }}.vendor"> {{ __('From vendor') }}
+                        </label>
+                        @if ($ing['vendor'])
+                            <input type="text" wire:model="ingredients.{{ $n }}.price"
+                                   placeholder="{{ __('Price each (gold)') }}" aria-label="{{ __('Vendor price each') }}" class="field text-sm sm:col-span-2">
+                        @else
+                            <span class="sm:col-span-2"></span>
+                        @endif
+                        <button type="button" wire:click="removeCraftRow({{ $n }})" class="link-danger text-sm text-start sm:col-span-1">{{ __('Remove') }}</button>
+                    </div>
+                @endforeach
+                <button type="button" wire:click="addCraftRow" class="link text-sm">{{ __('Add ingredient') }}</button>
+            </fieldset>
+
+            <div>
+                <x-input-label for="craftNote" :value="__('Note')" />
+                <input id="craftNote" type="text" wire:model="craftNote" maxlength="255" class="mt-1 block w-full sm:w-96 field text-sm">
+            </div>
+            <x-input-error :messages="$errors->get('craft')" />
+            <x-secondary-button type="submit" wire:loading.attr="disabled" wire:target="saveCraft">{{ __('Record craft') }}</x-secondary-button>
+        </form>
+    </x-section>
+
+    <div class="card p-4 sm:p-6 transition-opacity" wire:loading.class="opacity-60" wire:target="search,delete,deleteCraft,gotoPage,nextPage,previousPage">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <input type="search" wire:model.live.debounce.300ms="search" placeholder="{{ __('Filter by item') }}" aria-label="{{ __('Filter by item') }}"
                    class="w-full sm:w-64 field text-sm">
@@ -103,6 +154,7 @@
                                 <td><x-time :at="$t->traded_at" /></td>
                                 <td><x-item-link :id="$t->item_id" :name="$t->name" /></td>
                                 @php($buy = $t->side === \App\Models\Trade::SIDE_BUY)
+                                @php($craft = $t->craft_id !== null)
                                 @if ($buy)
                                     <td class="num">{{ number_format($t->qty) }}</td>
                                     <td class="num"><x-money :copper="$t->cost_copper" /></td>
@@ -110,7 +162,7 @@
                                 @else
                                     {{-- A correction removes stock at average cost; only a vendor sale has a price: the gold received. --}}
                                     @php($proceeds = \App\Models\Trade::proceeds($t->side, (int) $t->cost_copper))
-                                    <td class="num">−{{ number_format($t->qty) }}</td>
+                                    <td class="num">{{ $t->side === \App\Models\Trade::SIDE_CRAFTIN ? '+' : '−' }}{{ number_format($t->qty) }}</td>
                                     @if ($proceeds !== null)
                                         <td class="num"><x-money :copper="$proceeds" /></td>
                                     @endif
@@ -118,10 +170,10 @@
                                 @endif
                                 <td class="text-gray-600 dark:text-gray-400">{{ $t->note }}</td>
                                 <td class="whitespace-nowrap text-end">
-                                    @if ($buy)
+                                    @if ($buy && ! $craft)
                                         <button type="button" wire:click="edit({{ $t->id }})" class="link text-sm">{{ __('Edit') }}</button>
                                     @endif
-                                    <button type="button" wire:click="delete({{ $t->id }})" wire:confirm="{{ ! $buy ? __('Undo this correction?') : ((int) $t->vendored > 0 ? __('Delete this buy? A vendor sale booked with it is deleted too.') : __('Delete this buy?')) }}"
+                                    <button type="button" wire:click="{{ $craft ? 'deleteCraft('.$t->craft_id.')' : 'delete('.$t->id.')' }}" wire:confirm="{{ $craft ? __('Delete this whole craft? Its ingredient use and any vendor buys it added are deleted too.') : (! $buy ? __('Undo this correction?') : ((int) $t->vendored > 0 ? __('Delete this buy? A vendor sale booked with it is deleted too.') : __('Delete this buy?'))) }}"
                                             class="ms-3 link-danger text-sm">{{ __('Delete') }}</button>
                                 </td>
                             </tr>
