@@ -13,7 +13,7 @@ class GameController extends Controller
     public function switch(Request $request): RedirectResponse
     {
         $user = $request->user();
-        $view = $request->validate(['game' => ['required', Rule::in([...$user->enabledGames(), Game::ALL])]])['game'];
+        $view = $request->validate(['game' => ['required', Rule::in($user->gameViews())]])['game'];
 
         $user->setGameView($view);
 

@@ -40,6 +40,29 @@ class GameViewTest extends TestCase
         $this->assertSame('forever', $user->fresh()->activeGame());
     }
 
+    public function test_the_default_game_wins_over_the_last_switch_in_a_new_session(): void
+    {
+        $user = $this->user(['retail', 'forever']);
+        $user->forceFill(['game_view' => 'retail'])->save();
+
+        $this->actingAs($user)->patch(route('settings.update'), [
+            'timezone' => $user->timezone, 'region' => $user->region,
+            'default_game_form' => 1, 'default_game' => 'forever',
+        ])->assertSessionHasNoErrors();
+        $this->assertSame('forever', $user->fresh()->gameView());
+
+        $this->patch(route('settings.update'), [
+            'timezone' => $user->timezone, 'region' => $user->region,
+            'default_game_form' => 1, 'default_game' => 'all',
+        ]);
+        $this->assertSame('all', $user->fresh()->gameView());
+
+        $this->patch(route('settings.update'), [
+            'timezone' => $user->timezone, 'region' => $user->region,
+            'default_game_form' => 1, 'default_game' => 'classic',
+        ])->assertSessionHasErrors('default_game');
+    }
+
     public function test_an_unknown_game_is_rejected(): void
     {
         $this->actingAs($this->user())->post(route('game.switch'), ['game' => 'wotlk'])->assertSessionHasErrors('game');

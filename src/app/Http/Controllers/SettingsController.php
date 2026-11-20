@@ -50,6 +50,18 @@ class SettingsController extends Controller
             $request->user()->setEnabledGames($games);
         }
 
+        // Empty = remember the last choice; a changed default also takes effect now.
+        if ($request->has('default_game_form')) {
+            $user = $request->user();
+            $default = $request->validate([
+                'default_game' => ['nullable', Rule::in($user->gameViews())],
+            ])['default_game'] ?? null;
+            $data['default_game'] = $default;
+            if ($default !== null) {
+                session()->forget('game_view');
+            }
+        }
+
         $request->user()->update($data);
 
         return back()->with('status', 'settings-updated');

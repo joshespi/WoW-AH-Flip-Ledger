@@ -54,6 +54,22 @@
                 <x-input-error class="mt-2" :messages="$errors->get('games')" />
             </fieldset>
 
+            <div>
+                <x-input-label for="default_game" :value="__('Default game')" />
+                <input type="hidden" name="default_game_form" value="1">
+                <select id="default_game" name="default_game" class="field mt-1 block w-full">
+                    <option value="">{{ __('Last one I picked') }}</option>
+                    @foreach ($user->enabledGames() as $game)
+                        <option value="{{ $game }}" @selected(old('default_game', $user->default_game) === $game)>{{ \App\Support\Game::label($game) }}</option>
+                    @endforeach
+                    @if ($user->playsSeveral())
+                        <option value="{{ \App\Support\Game::ALL }}" @selected(old('default_game', $user->default_game) === \App\Support\Game::ALL)>{{ __('All games') }}</option>
+                    @endif
+                </select>
+                <p class="mt-1 note">{{ __('What every screen opens on when you sign in. The sidebar switch still changes it for the session.') }}</p>
+                <x-input-error class="mt-2" :messages="$errors->get('default_game')" />
+            </div>
+
             @foreach ($numbers as $name => [$label, $hint])
                 @php([, $min, $max, $step] = $limits[$name])
                 <div>

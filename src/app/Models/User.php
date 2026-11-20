@@ -19,7 +19,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'timezone', 'region', 'target_margin_pct', 'stale_minutes', 'market_share_pct', 'alerts_enabled', 'alert_buy_target', 'alert_sell_target', 'alert_profit'])]
+#[Fillable(['name', 'email', 'password', 'timezone', 'region', 'target_margin_pct', 'stale_minutes', 'market_share_pct', 'alerts_enabled', 'alert_buy_target', 'alert_sell_target', 'alert_profit', 'default_game'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -168,6 +168,12 @@ class User extends Authenticatable implements MustVerifyEmail
         return Game::normalize(explode(',', (string) $this->enabled_games));
     }
 
+    /** Every value the game switch accepts. @return list<string> */
+    public function gameViews(): array
+    {
+        return [...$this->enabledGames(), Game::ALL];
+    }
+
     public function playsSeveral(): bool
     {
         return count($this->enabledGames()) > 1;
@@ -193,7 +199,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function gameView(): string
     {
-        $view = session('game_view', $this->game_view);
+        $view = session('game_view', $this->default_game ?? $this->game_view);
         $enabled = $this->enabledGames();
 
         return match (true) {
