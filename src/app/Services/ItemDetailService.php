@@ -63,7 +63,7 @@ class ItemDetailService
 
         $stat = MarketStats::forItems($user, $game, [$itemId])[$itemId] ?? null;
         $daily = $this->daily($user, $game, $itemId, $stat);
-        $name = DB::table('items')->where('id', $itemId)->value('name');
+        $name = ItemName::forUser($user, $game, [$itemId])[$itemId] ?? null;
 
         if ($trades->isEmpty() && $crafts->isEmpty() && $sales->isEmpty() && $expired->isEmpty() && $cancelled->isEmpty() && $deposits->isEmpty() && $stat === null && $daily === [] && $name === null) {
             return null;

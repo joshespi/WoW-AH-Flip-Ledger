@@ -101,6 +101,11 @@ class DataExportService
                             'scan_prices.quantity', 'scan_prices.num_auctions', 'scan_prices.region', 'scan_prices.game')->cursor(),
                     fn ($r) => [$iso($r->taken_at), 'i:'.$r->item_id, $r->item_name, $r->floor, $r->quantity, $r->num_auctions, $r->region, $r->game],
                 ],
+                'item_names.csv' => [
+                    ['item', 'item_name', 'game'],
+                    DB::table('user_item_names')->ownedBy($user)->orderBy('game')->orderBy('item_id')->select('item_id', 'name', 'game')->cursor(),
+                    fn ($r) => ['i:'.$r->item_id, $r->name, $r->game],
+                ],
                 'buy_suggestions.csv' => [
                     ['time', 'item', 'item_name', 'qty', 'cost_copper', 'status', 'realm', 'game'],
                     $this->named($user, 'tsm_buy_candidates', 'at', ['at', 'item_id', 'qty', 'cost_copper', 'status', 'realm', 'game'])->cursor(),
@@ -206,6 +211,7 @@ class DataExportService
             deposits.csv         Auction deposits lost on expired or cancelled auctions (from the addon).
             price_scans.csv      Auction house prices your addon saw in Forever and Classic, one row per
                                  item per hour (listings is 0 when only the browse list was seen).
+            item_names.csv       Item names your addon learned in Forever and Classic (kept for your account only).
             buy_suggestions.csv  TSM's own buy log rows, kept only as suggestions to reconcile.
             watchlist.csv        Your watchlist and targets (copper per unit).
             uploads.csv          Your upload history.

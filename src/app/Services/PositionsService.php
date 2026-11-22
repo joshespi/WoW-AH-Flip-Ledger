@@ -41,7 +41,7 @@ class PositionsService
         $lost = 0;
         $ledger = $this->replay($user, $game, $trades, $adjustments, $crafts, $firstBuy, $newest, $events, $lost);
 
-        $names = $this->names($ids);
+        $names = $this->names($user, $game, $ids);
         $inventory = DB::table('inventory')->ownedBy($user)->inGame($game)->pluck('qty', 'item_id')->all();
         $hasSnapshot = $inventory !== [];
         $stats = MarketStats::forItems($user, $game, $ids);
@@ -417,9 +417,9 @@ class PositionsService
      * @param  list<int>  $ids
      * @return array<int, string>
      */
-    private function names(array $ids): array
+    private function names(User $user, string $game, array $ids): array
     {
-        $raw = DB::table('items')->whereIn('id', $ids)->pluck('name', 'id');
+        $raw = ItemName::forUser($user, $game, $ids);
         $names = [];
 
         foreach ($ids as $id) {

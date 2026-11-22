@@ -3,9 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\ItemDetailService;
 use App\Services\PositionsService;
+use App\Services\ReconcileService;
 use App\Services\TradesService;
 use App\Support\Game;
+use App\Support\ItemName;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\IngestsFiles;
@@ -48,6 +51,31 @@ class GameIngestTest extends TestCase
         $this->assertSame(0, $second->counts['sales']['new']);
         $this->assertSame(1, $this->rowsOf('tsm_sales', game: Game::FOREVER));
         $this->assertSame(0, $this->rowsOf('tsm_sales', game: Game::RETAIL));
+    }
+
+    public function test_forever_item_names_come_from_the_users_own_addon(): void
+    {
+        $this->addon(['buy|'.(self::T + 100).'|Area52|238371|5|5000'], game: Game::FOREVER);
+
+        $this->assertSame('Wyrmfish', DB::table('user_item_names')->where('user_id', $this->user->id)->where('game', Game::FOREVER)->value('name'));
+        $this->assertNull(DB::table('items')->where('id', 238371)->value('name'));
+
+        $pending = app(ReconcileService::class)->pending($this->user, Game::FOREVER);
+        $this->assertSame('Wyrmfish', $pending[0]['name']);
+
+        app(TradesService::class)->add($this->user, 238371, 1, 100, self::T, null, game: Game::FOREVER);
+        $this->assertSame('Wyrmfish', app(PositionsService::class)->forUser($this->user, Game::FOREVER)->positions[0]->name);
+        $this->assertSame('Wyrmfish', app(ItemDetailService::class)->forUser($this->user, 238371, Game::FOREVER)['name']);
+    }
+
+    public function test_forever_names_never_borrow_the_retail_catalog(): void
+    {
+        $this->seedItem(238371, 'Arcane Wyrmfish');
+        app(TradesService::class)->add($this->user, 238371, 1, 100, self::T, null, game: Game::FOREVER);
+
+        $this->assertSame('Item #238371', app(PositionsService::class)->forUser($this->user, Game::FOREVER)->positions[0]->name);
+        $this->assertSame([238371 => 'Arcane Wyrmfish'], ItemName::forUser($this->user, Game::RETAIL, [238371]));
+        $this->assertSame([], ItemName::forUser($this->user, Game::FOREVER, [238371]));
     }
 
     public function test_the_upload_records_its_game(): void

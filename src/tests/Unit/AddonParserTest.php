@@ -39,7 +39,7 @@ class AddonParserTest extends TestCase
         $this->assertSame('15', $data->rows('csvCancelled')[0]['quantity']);
         $this->assertSame(['i:238371' => 132, 'i:5' => 1], $data->inventory);
         $this->assertSame(self::T + 3600, $data->takenAt);
-        $this->assertSame([], $data->names);
+        $this->assertSame(['i:238371' => 'Wyrmfish'], $data->names);
     }
 
     public function test_it_skips_invalid_records_and_ignores_other_sections(): void
@@ -60,6 +60,16 @@ class AddonParserTest extends TestCase
         $this->assertCount(1, $data->rows('csvSales'));
         $this->assertCount(1, $data->rows('csvBuys'));
         $this->assertSame(['i:238371' => 5], $data->inventory);
+    }
+
+    public function test_it_skips_learned_names_with_escapes_or_control_characters(): void
+    {
+        $file = AddonFile::make();
+
+        foreach (['["Wyr\"mfish"]', "[\"Wyr\x01mfish\"]", '["Wyr\\mfish"]'] as $bad) {
+            $data = (new AddonParser)->parse(str_replace('["Wyrmfish"]', $bad, $file));
+            $this->assertSame([], $data->names, $bad);
+        }
     }
 
     public function test_a_file_without_a_last_time_has_no_snapshot_time(): void

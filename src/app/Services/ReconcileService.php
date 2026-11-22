@@ -6,6 +6,7 @@ use App\Models\Trade;
 use App\Models\User;
 use App\Support\Bulk;
 use App\Support\Game;
+use App\Support\ItemName;
 use App\Support\Money;
 use App\Support\Utc;
 use Illuminate\Database\Query\Builder;
@@ -53,11 +54,13 @@ class ReconcileService
 
         // A long TSM history has many candidates, mostly hidden by matching buys, so they are read
         // a page at a time until LIMIT are shown, with trades loaded only for the items on each page.
-        DB::table('tsm_buy_candidates')
-            ->leftJoin('items', 'items.id', '=', 'tsm_buy_candidates.item_id')
-            ->ownedBy($user, 'tsm_buy_candidates.user_id')->inGame($game, 'tsm_buy_candidates.game')->where('status', self::PENDING)
-            ->orderByDesc('at')->orderByDesc('tsm_buy_candidates.id')
-            ->select('tsm_buy_candidates.id', 'tsm_buy_candidates.item_id', 'qty', 'cost_copper', 'at', 'items.name')
+        ItemName::joinUser(
+            DB::table('tsm_buy_candidates')
+                ->leftJoin('items', 'items.id', '=', 'tsm_buy_candidates.item_id')
+                ->ownedBy($user, 'tsm_buy_candidates.user_id')->inGame($game, 'tsm_buy_candidates.game')->where('status', self::PENDING)
+                ->orderByDesc('at')->orderByDesc('tsm_buy_candidates.id')
+                ->select('tsm_buy_candidates.id', 'tsm_buy_candidates.item_id', 'qty', 'cost_copper', 'at'),
+            $user, $game, 'tsm_buy_candidates.item_id')
             ->chunk(self::PAGE, function ($page) use ($user, $game, &$out, &$trades) {
                 $this->loadTrades($user, $game, $page->pluck('item_id')->map(fn ($id) => (int) $id)->unique()->all(), $trades);
 

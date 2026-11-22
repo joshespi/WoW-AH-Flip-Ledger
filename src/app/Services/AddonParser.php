@@ -12,8 +12,8 @@ use App\Support\Game;
  *
  * The addon writes one record per string ("kind|time|realm|item|qty|a|b"), which WoW's serializer
  * puts on its own line. Only the `events`, `prices` and `inv` lists, the `last` time and the client's
- * `interface` number (which game wrote the file) are read; everything else in the file
- * (per-character snapshots, learned names) is skipped.
+ * `interface` number (which game wrote the file) and the learned item `names` are read;
+ * everything else in the file (per-character snapshots) is skipped.
  */
 class AddonParser
 {
@@ -33,6 +33,13 @@ class AddonParser
     private const PRICE = '/^(\d{9,12})\|(\d{1,9})\|(\d{1,12})\|(\d{1,12})\|(\d{1,9})$/D';
 
     private const MAX_PRICE_ROWS = 100_000;
+
+    // `["Rough Stone"] = {` then one id per line. Names with escapes or control characters are skipped.
+    private const NAME_KEY = '/^\["([^"\\\\\p{C}|]{1,120})"\] = \{$/Du';
+
+    private const NAME_ID = '/^(\d{1,9}),(?: -- \[\d+\])?$/D';
+
+    private const MAX_NAMES = 50_000;
 
     private const REALM = '/^[A-Za-z0-9\' -]{1,64}$/Du';
 
@@ -62,6 +69,8 @@ class AddonParser
 
         $csv = [];
         $inventory = [];
+        $names = [];
+        $nameKey = null;
         $last = null;
         $interface = null;
         $mode = null;
@@ -79,9 +88,19 @@ class AddonParser
             $opens = str_ends_with($line, '{');
             $closes = $line[0] === '}';
 
-            if ($mode !== null && $depth === 2) {
+            if ($mode === 'names' && $depth === 3) {
+                // The ids a learned name belongs to: "2835," under ["Rough Stone"] = {
+                if (preg_match(self::NAME_ID, $line, $m) && $nameKey !== null && count($names) < self::MAX_NAMES) {
+                    $id = (int) $m[1];
+                    if (Bounds::validItemId($id)) {
+                        $names['i:'.$id] = $nameKey;
+                    }
+                }
+            } elseif ($mode !== null && $depth === 2) {
                 if ($closes) {
                     $mode = null;
+                } elseif ($mode === 'names') {
+                    $nameKey = preg_match(self::NAME_KEY, $line, $m) ? $m[1] : null;
                 } elseif (preg_match(self::ENTRY, $line, $m)) {
                     if ($mode === 'prices') {
                         if (preg_match(self::PRICE, $m[1], $p) && ++$priceRows <= self::MAX_PRICE_ROWS) {
@@ -109,6 +128,9 @@ class AddonParser
                     $mode = 'prices';
                 } elseif ($line === '["inv"] = {') {
                     $mode = 'inv';
+                } elseif ($line === '["names"] = {') {
+                    $mode = 'names';
+                    $nameKey = null;
                 } elseif (preg_match(self::LAST, $line, $m)) {
                     $last = (int) $m[1];
                 } elseif (preg_match(self::INTERFACE, $line, $m)) {
@@ -125,7 +147,7 @@ class AddonParser
 
         // When the addon last saved (logout or /reload): the inventory snapshot is as of then.
         return new TsmData(
-            [], $csv, $inventory,
+            $names, $csv, $inventory,
             origin: TsmData::ORIGIN_ADDON,
             takenAt: $last !== null && Bounds::plausibleTime($last) ? $last : null,
             game: $interface === null ? null : Game::fromInterface($interface),

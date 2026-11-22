@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Models\User;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 final class ItemName
@@ -39,6 +41,50 @@ final class ItemName
     public static function display(?string $name, int $id): string
     {
         return $name ?? 'Item #'.$id;
+    }
+
+    /**
+     * Join the user's own learned names onto a query that already joins `items`, and select the
+     * result as `name` (see nameSql()). Same precedence as forUser().
+     */
+    public static function joinUser(Builder $query, User $user, string $game, string $itemColumn): Builder
+    {
+        return $query
+            ->leftJoin('user_item_names as uin', fn ($j) => $j->on('uin.item_id', '=', $itemColumn)
+                ->where('uin.user_id', $user->id)->where('uin.game', $game))
+            ->selectRaw(self::nameSql($game).' as name');
+    }
+
+    /** The name column after joinUser(): the user's own first, then the retail catalog (no catalog for other games). */
+    public static function nameSql(string $game): string
+    {
+        return Game::hasMarket($game) ? 'coalesce(uin.name, items.name)' : 'uin.name';
+    }
+
+    /**
+     * Names for items: the user's own addon-learned names for the game first, then (retail only)
+     * the shared catalog. Ids without a name are absent.
+     *
+     * @param  list<int>  $ids
+     * @return array<int, string>
+     */
+    public static function forUser(User $user, string $game, array $ids): array
+    {
+        $names = [];
+
+        foreach (array_chunk(array_values(array_unique($ids)), Bulk::CHUNK) as $chunk) {
+            if (Game::hasMarket($game)) {
+                foreach (DB::table('items')->whereIn('id', $chunk)->whereNotNull('name')->pluck('name', 'id') as $id => $name) {
+                    $names[(int) $id] = $name;
+                }
+            }
+
+            foreach (DB::table('user_item_names')->ownedBy($user)->inGame($game)->whereIn('item_id', $chunk)->pluck('name', 'item_id') as $id => $name) {
+                $names[(int) $id] = $name;
+            }
+        }
+
+        return $names;
     }
 
     /**
