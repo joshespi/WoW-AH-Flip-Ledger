@@ -5,7 +5,7 @@
 # Needs CURSEFORGE_TOKEN (an API token, never commit it); CURSEFORGE_PROJECT_ID defaults to ours (1783753).
 # Game version ids are looked up by name, so GAME_VERSIONS must match names CurseForge lists
 # (see https://wow.curseforge.com/api/game/versions with your token).
-#   GAME_VERSIONS="12.1.5"          comma separated, defaults to that
+#   GAME_VERSIONS="12.1.5,1.60.1"   comma separated, defaults to that
 set -eu
 
 cd "$(dirname "$0")/.."
@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 : "${CURSEFORGE_TOKEN:?set CURSEFORGE_TOKEN}"
 CURSEFORGE_PROJECT_ID="${CURSEFORGE_PROJECT_ID:-1783753}"
 TYPE="${1:-release}"
-GAME_VERSIONS="${GAME_VERSIONS:-12.1.5}"
+GAME_VERSIONS="${GAME_VERSIONS:-12.1.5,1.60.1}"
 
 . scripts/addon-version.sh
 VERSION=$ADDON_VERSION

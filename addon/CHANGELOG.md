@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.3
+
+- Republished so the CurseForge listing also covers the Forever client (1.60.1). No addon changes.
+
 ## 0.4.2
 
 - Fixes a sale going missing when two of your characters collect an identical auction mail (same item, quantity and price) around the same time, as with bank alts. Each character's mail is now counted on its own.

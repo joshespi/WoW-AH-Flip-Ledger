@@ -33,5 +33,5 @@ jobs:
         env:
           CURSEFORGE_TOKEN: ${{ secrets.CF_API_KEY }}
           CURSEFORGE_PROJECT_ID: '1783753'
-          GAME_VERSIONS: '12.1.5'
+          GAME_VERSIONS: '12.1.5,1.60.1'
         run: sh scripts/publish-curseforge.sh "${{ inputs.type || 'release' }}"
