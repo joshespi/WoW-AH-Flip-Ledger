@@ -111,9 +111,23 @@
                 <button type="button" wire:click="addCraftRow" class="link text-sm">{{ __('Add ingredient') }}</button>
             </fieldset>
 
-            <div>
-                <x-input-label for="craftNote" :value="__('Note')" />
-                <input id="craftNote" type="text" wire:model="craftNote" maxlength="255" class="mt-1 block w-full sm:w-96 field text-sm">
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <x-input-label for="craftNote" :value="__('Note')" />
+                    <input id="craftNote" type="text" wire:model="craftNote" maxlength="255" class="mt-1 block w-full field text-sm">
+                </div>
+                @if ($recipes->isNotEmpty())
+                    <div>
+                        <x-input-label for="craftRecipe" :value="__('Recipe')" />
+                        <select id="craftRecipe" wire:model="craftRecipe" class="mt-1 block w-full field text-sm">
+                            <option value="">{{ __('Automatic (the recipe for this item)') }}</option>
+                            <option value="none">{{ __('None') }}</option>
+                            @foreach ($recipes as $r)
+                                <option value="{{ $r->id }}">{{ $r->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
             </div>
             <x-input-error :messages="$errors->get('craft')" />
             <x-secondary-button type="submit" wire:loading.attr="disabled" wire:target="saveCraft">{{ __('Record craft') }}</x-secondary-button>

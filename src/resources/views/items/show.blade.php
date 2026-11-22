@@ -73,10 +73,10 @@
                             <tr>
                                 <td><x-time :at="$e['ts']" /></td>
                                 <td>
-                                    {{ match ($e['kind']) { 'buy' => __('Bought'), 'sale' => __('Sold'), 'expired' => __('Expired'), 'cancelled' => __('Cancelled'), 'deposit' => __('Deposit lost'), default => \App\Models\Trade::correctionLabel($e['kind']) } }}
+                                    {{ match ($e['kind']) { 'buy' => __('Bought'), 'sale' => __('Sold'), 'expired' => __('Expired'), 'cancelled' => __('Cancelled'), 'deposit' => __('Deposit lost'), 'recipe' => __('Recipe bought'), default => \App\Models\Trade::correctionLabel($e['kind']) } }}
                                     @if (! $e['tracked'])<span class="text-xs text-gray-400 dark:text-gray-500" title="{{ __('Before your first tracked buy, so not in the ledger.') }}">({{ __('untracked') }})</span>@endif
                                 </td>
-                                <td class="num">{{ number_format($e['qty']) }}</td>
+                                <td class="num">{{ $e['kind'] === 'recipe' ? '' : number_format($e['qty']) }}</td>
                                 <td class="num"><x-money :copper="$e['unit']" /></td>
                                 <td class="num"><x-money :copper="$e['pnl']" pnl /></td>
                                 <td class="num">{{ isset($e['held']) ? number_format($e['held']) : '' }}</td>

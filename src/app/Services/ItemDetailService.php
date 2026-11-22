@@ -59,6 +59,8 @@ class ItemDetailService
 
         $deposits = DB::table('ah_deposits')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->orderBy('at')->limit(self::MAX_EVENTS)->get(['at', 'qty', 'lost_copper']);
 
+        $recipes = DB::table('recipes')->ownedBy($user)->inGame($game)->where('item_id', $itemId)->orderBy('bought_at')->limit(self::MAX_EVENTS)->get(['bought_at', 'cost_copper']);
+
         $stat = MarketStats::forItems($user, $game, [$itemId])[$itemId] ?? null;
         $daily = $this->daily($user, $game, $itemId, $stat);
         $name = DB::table('items')->where('id', $itemId)->value('name');
@@ -99,6 +101,11 @@ class ItemDetailService
         // Last at its time, like the ledger's: a loss, no stock change. 'total' is the copper lost.
         foreach ($deposits as $r) {
             $events[] = ['ts' => Utc::ts($r->at), 'order' => LedgerService::DEPOSIT, 'kind' => 'deposit', 'qty' => (int) $r->qty, 'total' => (int) $r->lost_copper];
+        }
+
+        // A recipe's cost is a loss on its product, booked once the item is tracked at all (even if bought before the first craft).
+        foreach ($recipes as $r) {
+            $events[] = ['ts' => Utc::ts($r->bought_at), 'order' => LedgerService::DEPOSIT, 'kind' => 'recipe', 'qty' => 0, 'total' => (int) $r->cost_copper];
         }
 
         usort($events, fn ($a, $b) => [$a['ts'], $a['order']] <=> [$b['ts'], $b['order']]);
@@ -158,7 +165,7 @@ class ItemDetailService
         $timeline = $steps = [];
 
         foreach ($events as $e) {
-            $deposit = $e['kind'] === 'deposit';
+            $deposit = in_array($e['kind'], ['deposit', 'recipe'], true);
             // A deposit's total is the loss, not a price: no per-unit figure.
             $row = $e + ['unit' => $e['total'] === null || $deposit ? null : Money::unit($e['total'], $e['qty']), 'pnl' => null, 'tracked' => true];
             $moves = in_array($e['kind'], ['buy', 'sale', ...Trade::CORRECTIONS, ...Trade::CRAFT_SIDES], true);
@@ -167,7 +174,7 @@ class ItemDetailService
                 $h->buy($e['qty'], $e['total']);
             } elseif ($deposit) {
                 // Counts from the first buy, like a sale; before it the row is shown but not booked.
-                $row['tracked'] = $first !== null && $e['ts'] >= $first;
+                $row['tracked'] = $first !== null && ($e['kind'] === 'recipe' || $e['ts'] >= $first);
                 $row['pnl'] = $row['tracked'] ? -$e['total'] : null;
             } elseif ($moves && ($first === null || $e['ts'] < $first)) {
                 $row['tracked'] = false;

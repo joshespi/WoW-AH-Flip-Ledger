@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Recipe;
 use App\Models\Trade;
 use App\Models\User;
 use App\Support\Bounds;
@@ -115,8 +116,12 @@ class TradesService
      *
      * @throws InvalidArgumentException
      */
-    public function addCraft(User $user, int $productId, int $qtyMade, array $ingredients, int $ts, ?string $note = null, string $game = Game::RETAIL): Trade
+    public function addCraft(User $user, int $productId, int $qtyMade, array $ingredients, int $ts, ?string $note = null, string $game = Game::RETAIL, ?int $recipeId = null): Trade
     {
+        if ($recipeId !== null && ! Recipe::ownedBy($user)->inGame($game)->where('item_id', $productId)->whereKey($recipeId)->exists()) {
+            throw new InvalidArgumentException('Pick one of your recipes for this item.');
+        }
+
         if ($ingredients === []) {
             throw new InvalidArgumentException('Add at least one ingredient.');
         }
@@ -146,9 +151,9 @@ class TradesService
             }
         }
 
-        return DB::transaction(function () use ($user, $productId, $qtyMade, $ingredients, $ts, $note, $game) {
+        return DB::transaction(function () use ($user, $productId, $qtyMade, $ingredients, $ts, $note, $game, $recipeId) {
             $made = $this->create($user, Trade::SIDE_CRAFTIN, $productId, $qtyMade, 0, $ts, $note, Trade::SOURCE_MANUAL, null, $game);
-            $made->update(['craft_id' => $made->id]);
+            $made->update(['craft_id' => $made->id, 'recipe_id' => $recipeId]);
 
             foreach ($ingredients as $i) {
                 if ($i['vendor'] !== null) {

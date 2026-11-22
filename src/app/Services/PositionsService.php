@@ -85,12 +85,46 @@ class PositionsService
      * @param  array<int, int>  $firstBuy
      * @param  list<array{0: int, 1: int}>  $events
      */
-    private function replay(User $user, string $game, array $trades, array $adjustments, array $crafts, array $firstBuy, SplMinHeap $newest, array &$events, int &$lost = 0, ?array &$craftCosts = null): array
+    private function replay(User $user, string $game, array $trades, array $adjustments, array $crafts, array $firstBuy, SplMinHeap $newest, array &$events, int &$lost = 0, ?array &$craftCosts = null, ?array &$recipeStats = null): array
     {
         return $this->ledger->buildFromSales([...$trades, ...$adjustments], $this->sales($user, $game, $firstBuy, $newest),
             function (int $ts, int $pnl) use (&$events): void {
                 $events[] = [$ts, $pnl];
-            }, $this->deposits($user, $game, $firstBuy, $lost), $crafts, $craftCosts);
+            }, $this->deposits($user, $game, $firstBuy, $lost), $crafts, $craftCosts, $this->recipes($user, $game), $recipeStats);
+    }
+
+    /**
+     * Recipe purchases (a loss on the item each makes, see LedgerService).
+     *
+     * @return list<array{item: int, ts: int, cost: int}>
+     */
+    private function recipes(User $user, string $game): array
+    {
+        return DB::table('recipes')->ownedBy($user)->inGame($game)->get(['item_id', 'bought_at', 'cost_copper'])
+            ->map(fn ($r): array => ['item' => (int) $r->item_id, 'ts' => Utc::ts($r->bought_at), 'cost' => (int) $r->cost_copper])->all();
+    }
+
+    /**
+     * Per recipe id: units of its crafts sold and the profit on them before the recipe's cost, from the whole ledger's replay.
+     *
+     * @return array<int, array{sold: int, profit: int}>
+     */
+    public function recipeStats(User $user, string $game = Game::RETAIL): array
+    {
+        [$trades, $adjustments, $crafts] = $this->trades($user, $game);
+
+        if (! array_filter($crafts, fn (array $c): bool => ! empty($c['recipe']))) {
+            return [];
+        }
+
+        $events = [];
+        $lost = 0;
+        $costs = [];
+        $stats = [];
+
+        $this->replay($user, $game, $trades, $adjustments, $crafts, $this->firstBuys($trades, $crafts), new SplMinHeap, $events, $lost, $costs, $stats);
+
+        return $stats;
     }
 
     /** @return array<int, int> item id => first buy time */
@@ -306,13 +340,13 @@ class PositionsService
 
         foreach (DB::table('trades')->ownedBy($user)->inGame($game)->whereIn('side', [Trade::SIDE_BUY, ...Trade::CORRECTIONS, ...Trade::CRAFT_SIDES])
             ->when($itemId !== null, fn ($q) => $q->where('item_id', $itemId))
-            ->get(['side', 'item_id', 'traded_at', 'qty', 'cost_copper', 'craft_id']) as $r) {
+            ->get(['side', 'item_id', 'traded_at', 'qty', 'cost_copper', 'craft_id', 'recipe_id']) as $r) {
             // LedgerService reads a correction's cost only as its proceeds.
             $row = ['ts' => Utc::ts($r->traded_at), 'item' => (int) $r->item_id, 'qty' => (int) $r->qty, 'cost' => (int) $r->cost_copper];
 
             if (in_array($r->side, Trade::CRAFT_SIDES, true)) {
                 $crafts[] = ['ts' => $row['ts'], 'item' => $row['item'], 'qty' => $row['qty'], 'craft' => (int) $r->craft_id,
-                    'kind' => $r->side === Trade::SIDE_CRAFTIN ? 'in' : 'out'];
+                    'kind' => $r->side === Trade::SIDE_CRAFTIN ? 'in' : 'out', 'recipe' => (int) $r->recipe_id];
             } elseif ($r->side !== Trade::SIDE_BUY) {
                 $adjustments[] = $row + ['correction' => $r->side];
             } else {

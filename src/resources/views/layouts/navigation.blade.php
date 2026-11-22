@@ -7,6 +7,7 @@
         [__('Ledger'), [
             [__('Positions'), 'positions.index', 'positions.*', 'chart'],
             [__('Trades'), 'trades.index', 'trades.*', 'swap'],
+            [__('Recipes'), 'recipes.index', 'recipes.*', 'book'],
             [__('Reconcile'), 'reconcile.index', 'reconcile.*', 'check'],
         ]],
         [__('Market'), [
@@ -32,6 +33,7 @@
         'chart' => 'M3 3v18h18M7 14l4-4 3 3 5-6',
         'swap' => 'M7 7h13m0 0-4-4m4 4-4 4M17 17H4m0 0 4-4m-4 4 4 4',
         'check' => 'm9 12 2 2 4-4M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z',
+        'book' => 'M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2V5zM6 18h13v3H6a2 2 0 0 1-2-2',
         'eye' => 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
         'search' => 'm21 21-4.35-4.35M17 11a6 6 0 1 1-12 0 6 6 0 0 1 12 0z',
         'calc' => 'M7 3h10a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM9 7h6M9 12h.01M12 12h.01M15 12h.01M9 16h.01M12 16h.01M15 16h.01',

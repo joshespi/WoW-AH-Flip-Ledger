@@ -469,6 +469,14 @@ Decisions:
 - [x] **Data rules:** `crafts.csv` in the export; craft rows stay out of `trades.csv`, reconcile matching and scan averages.
 - [x] **Tests:** `CraftTest`; 675 green, Pint clean.
 
+## Phase 19: Recipes and ROI
+
+- [x] **Data:** `recipes` (user, game, product item, name, cost, bought_at, note); `trades.recipe_id` on a craft's `craftin` row links the craft to its recipe.
+- [x] **Ledger:** the cost is a realized loss on the product (a `DEPOSIT`-order event, counted once the item is tracked, even if bought before the first craft). Units crafted with a recipe are tagged and sold oldest stock first; their P/L is credited to the recipe (`recipeStats`).
+- [x] **UI:** `/recipes` (add, edit, delete, ROI table: cost, crafts, made, sold, profit, net, ROI, payback); recipe select on "Record a craft" (automatic when the item has one recipe); `recipe` row on the item page.
+- [x] **Data rules:** `recipes.csv` and `crafts.csv` `recipe_id` in the export, privacy page, README.txt.
+- [x] **Tests:** `RecipeTest`.
+
 ## Open items (need me before the phase that uses them)
 
 - **Brevo sender** (Phase 2, before real signups): verify a sender on `wowledger.joshespi.com` (`.env.example` assumes `noreply@wowledger.joshespi.com`) and create the SMTP key. The DNS record for the hostname itself is also mine to add.

@@ -37,7 +37,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/positions', [PositionsController::class, 'index'])->name('positions.index');
 
-    foreach (['trades' => ['Trades', AppLayout::GAMES_ONE], 'reconcile' => ['Reconcile', AppLayout::GAMES_ONE], 'market' => ['Market', AppLayout::GAMES_MARKET], 'scan' => ['Scan', AppLayout::GAMES_MARKET], 'calculator' => ['Calculator', AppLayout::GAMES_MARKET]] as $page => [$title, $games]) {
+    foreach (['trades' => ['Trades', AppLayout::GAMES_ONE], 'reconcile' => ['Reconcile', AppLayout::GAMES_ONE], 'recipes' => ['Recipes', AppLayout::GAMES_ONE], 'market' => ['Market', AppLayout::GAMES_MARKET], 'scan' => ['Scan', AppLayout::GAMES_MARKET], 'calculator' => ['Calculator', AppLayout::GAMES_MARKET]] as $page => [$title, $games]) {
         Route::view("/{$page}", 'livewire-page', ['title' => $title, 'livewire' => $page, 'games' => $games])->name("{$page}.index");
     }
 

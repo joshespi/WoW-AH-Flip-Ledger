@@ -3,7 +3,9 @@
 namespace App\Livewire;
 
 use App\Livewire\Concerns\ReportsErrors;
+use App\Models\Recipe;
 use App\Models\Trade;
+use App\Models\User;
 use App\Services\TradesService;
 use App\Support\Bounds;
 use App\Support\ItemName;
@@ -49,6 +51,9 @@ class Trades extends Component
     public string $craftTime = '';
 
     public string $craftNote = '';
+
+    /** '' picks the one recipe for the product, if any; 'none', or a recipe id. */
+    public string $craftRecipe = '';
 
     /** @var list<array{item: string, qty: string, vendor: bool, price: string}> */
     public array $ingredients = [];
@@ -204,13 +209,20 @@ class Trades extends Component
                 }
             }
 
-            $trades->addCraft($user, $trades->resolveItem($this->product), Bounds::quantityInput($this->made), $rows,
-                $user->parseInputTime($this->craftTime), $this->craftNote, $user->activeGame());
+            $productId = $trades->resolveItem($this->product);
+            $recipeId = match ($this->craftRecipe) {
+                'none' => null,
+                '' => $this->onlyRecipeFor($user, $productId),
+                default => Bounds::wholeNumber($this->craftRecipe) ?? throw new InvalidArgumentException('Pick one of your recipes.'),
+            };
+
+            $trades->addCraft($user, $productId, Bounds::quantityInput($this->made), $rows,
+                $user->parseInputTime($this->craftTime), $this->craftNote, $user->activeGame(), $recipeId);
             $this->message = __('Craft recorded.');
         });
 
         if ($saved) {
-            $this->reset('product', 'made', 'craftNote');
+            $this->reset('product', 'made', 'craftNote', 'craftRecipe');
             $this->ingredients = [self::blankIngredient()];
             $this->craftTime = $user->inputTime();
         }
@@ -221,6 +233,14 @@ class Trades extends Component
         if ($this->attempt('form', fn () => $trades->deleteCraft(auth()->user(), $craftId))) {
             $this->message = __('Craft deleted.');
         }
+    }
+
+    /** The user's recipe for the product when there is exactly one in this game, else null. */
+    private function onlyRecipeFor(User $user, int $productId): ?int
+    {
+        $ids = Recipe::ownedBy($user)->inGame($user->activeGame())->where('item_id', $productId)->limit(2)->pluck('id');
+
+        return $ids->count() === 1 ? (int) $ids[0] : null;
     }
 
     private static function blankIngredient(): array
@@ -261,7 +281,9 @@ class Trades extends Component
                 ->whereColumn('v.tsm_ref', 'trades.tsm_ref')->where('v.side', Trade::SIDE_VENDOR)->selectRaw('count(*)'), 'vendored')
             ->paginate(self::PER_PAGE);
 
-        return view('livewire.trades', ['rows' => $rows, 'user' => $user]);
+        $recipes = Recipe::ownedBy($user)->inGame($user->activeGame())->orderBy('name')->get(['id', 'name']);
+
+        return view('livewire.trades', ['rows' => $rows, 'user' => $user, 'recipes' => $recipes]);
     }
 
     private function resetForm(): void

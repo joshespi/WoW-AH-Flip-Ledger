@@ -82,9 +82,10 @@ class LedgerService
      * @param  (callable(int, int): void)|null  $onPnl  called with (ts, copper) for every sale, write-off or lost deposit that moves realized P/L
      * @param  iterable<array{item: int|string, ts: int, lost: int}>  $deposits  deposit forfeited on an expired or cancelled auction: a loss, no stock change; counts only from the item's first buy, like a sale
      * @param  list<array{ts: int, item: int|string, qty: int, craft: int, kind: 'in'|'out'}>  $crafts  one craft's rows share `craft`: `out` rows use qty units of an ingredient at its average cost (no P/L), the `in` row adds the product at the summed cost. The product counts from its first `in` row, like a first buy; an ingredient used before its first buy is ignored.
+     * @param  list<array{item: int|string, ts: int, cost: int}>  $recipes  a recipe bought: its cost is a loss on its product from `ts`, once the item is tracked. A craft row's `recipe` id credits the units it made, and the P/L when they sell (oldest stock first), to `$recipeStats[recipe] = [sold, profit]`.
      * @return array<int|string, array{bq: int, bc: int, sq: int, sr: int, pnl: int, oq: int, orev: int, inv: int, cost: int}>
      */
-    public function buildFromSales(array $trades, iterable $sales, ?callable $onPnl = null, iterable $deposits = [], array $crafts = [], ?array &$craftCosts = null): array
+    public function buildFromSales(array $trades, iterable $sales, ?callable $onPnl = null, iterable $deposits = [], array $crafts = [], ?array &$craftCosts = null, array $recipes = [], ?array &$recipeStats = null): array
     {
         $onPnl ??= static function (): void {};
         $flat = [];
@@ -137,10 +138,26 @@ class LedgerService
             }
         }
 
+        // A recipe's cost is a loss on its product from the day it was bought, even before the first
+        // craft; it counts once the item is tracked at all.
+        foreach ($recipes as $r) {
+            if (isset($first[$r['item']])) {
+                $flat[] = [$r['ts'], self::DEPOSIT, 0, $r['cost'], 0, $r['item']];
+            }
+        }
+
+        $recipeOf = [];
+
+        foreach ($crafts as $c) {
+            if ($c['kind'] === 'in' && ! empty($c['recipe'])) {
+                $recipeOf[$c['craft']] = $c['recipe'];
+            }
+        }
+
         // One pass over every item's events by time, so a craft sees its ingredients' cost at that moment.
         usort($flat, static fn (array $a, array $b): int => $a <=> $b);
 
-        return $this->replay($flat, array_keys($first), $onPnl, $craftCosts);
+        return $this->replay($flat, array_keys($first), $onPnl, $craftCosts, $recipeOf, $recipeStats);
     }
 
     /**
@@ -149,17 +166,48 @@ class LedgerService
      * @param  callable(int, int): void  $onPnl
      * @return array<int|string, array{bq: int, bc: int, sq: int, sr: int, pnl: int, oq: int, orev: int, inv: int, cost: int}>
      */
-    private function replay(array $events, array $items, callable $onPnl, ?array &$crafted = null): array
+    private function replay(array $events, array $items, callable $onPnl, ?array &$crafted = null, array $recipeOf = [], ?array &$recipeStats = null): array
     {
         $acc = [];
         $hold = [];
+        // Units in stock oldest first, each lot tagged with the recipe it was crafted with (0: none), so a sale's P/L can be credited to recipes.
+        $lots = [];
+        $track = $recipeOf !== [];
 
         foreach ($items as $k) {
             $acc[$k] = ['bq' => 0, 'bc' => 0, 'sq' => 0, 'sr' => 0, 'pnl' => 0, 'oq' => 0, 'orev' => 0];
             $hold[$k] = new Holding;
+            $lots[$k] = new \SplQueue;
         }
 
         $crafted = [];
+        $recipeStats = [];
+
+        // Takes $m units off the item's oldest lots; credits $pnl across the recipes they came from.
+        $consume = static function (int|string $k, int $m, int $pnl, bool $sale) use (&$lots, &$recipeStats, $track): void {
+            if (! $track) {
+                return;
+            }
+
+            $left = $m;
+
+            while ($left > 0 && ! $lots[$k]->isEmpty()) {
+                [$recipe, $units] = $lots[$k]->dequeue();
+                $use = min($units, $left);
+
+                if ($use < $units) {
+                    $lots[$k]->unshift([$recipe, $units - $use]);
+                }
+
+                if ($recipe !== 0) {
+                    $recipeStats[$recipe] ??= ['sold' => 0, 'profit' => 0];
+                    $recipeStats[$recipe]['profit'] += (int) round($pnl * $use / $m);
+                    $sale && $recipeStats[$recipe]['sold'] += $use;
+                }
+
+                $left -= $use;
+            }
+        };
 
         foreach ($events as [$ts, $side, $q, $c, $craft, $k]) {
             $a = &$acc[$k];
@@ -167,27 +215,34 @@ class LedgerService
 
             if ($side === self::BUY) {
                 $h->buy($q, $c);
+                $track && $lots[$k]->enqueue([0, $q]);
                 $a['bq'] += $q;
                 $a['bc'] += $c;
             } elseif ($side === self::CRAFT_OUT) {
-                $crafted[$craft] = ($crafted[$craft] ?? 0) + $h->take($q)[1];
+                [$m, $cost] = $h->take($q);
+                $crafted[$craft] = ($crafted[$craft] ?? 0) + $cost;
+                $m > 0 && $consume($k, $m, 0, false);
             } elseif ($side === self::CRAFT_IN) {
                 $cost = $crafted[$craft] ?? 0;
                 $h->buy($q, $cost);
+                $track && $lots[$k]->enqueue([$recipeOf[$craft] ?? 0, $q]);
                 $a['bq'] += $q;
                 $a['bc'] += $cost;
             } elseif ($side === self::DEPOSIT) {
                 $a['pnl'] -= $c;
                 $onPnl($ts, -$c);
             } elseif ($side >= self::CORRECTION) {
+                $before = $h->held;
                 $gain = $h->correct(Trade::CORRECTIONS[$side - self::CORRECTION], $q, $c);
                 $a['pnl'] += $gain ?? 0;
                 $gain && $onPnl($ts, $gain);
+                ($m = min($q, $before)) > 0 && $consume($k, $m, $gain ?? 0, false);
             } else {
                 [$m, $rev, $cogs] = $h->sell($q, $c);
 
                 $a['pnl'] += $rev - $cogs;
                 $rev !== $cogs && $onPnl($ts, $rev - $cogs);
+                $m > 0 && $consume($k, $m, $rev - $cogs, true);
 
                 $a['sq'] += $m;
                 $a['sr'] += $rev;

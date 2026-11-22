@@ -69,12 +69,17 @@ class DataExportService
                     fn ($r) => [$iso($r->traded_at), 'i:'.$r->item_id, $r->qty, $r->side, $r->note, $r->item_name, $r->game, Trade::proceeds($r->side, (int) $r->cost_copper)],
                 ],
                 'crafts.csv' => [
-                    ['craft', 'time', 'item', 'item_name', 'kind', 'qty', 'cost_copper', 'note', 'game'],
-                    $this->named($user, 'trades', 'traded_at', ['craft_id', 'traded_at', 'item_id', 'side', 'qty', 'cost_copper', 'note', 'game'])
+                    ['craft', 'time', 'item', 'item_name', 'kind', 'qty', 'cost_copper', 'note', 'game', 'recipe_id'],
+                    $this->named($user, 'trades', 'traded_at', ['craft_id', 'traded_at', 'item_id', 'side', 'qty', 'cost_copper', 'note', 'game', 'recipe_id'])
                         ->whereNotNull('trades.craft_id')->cursor(),
                     fn ($r) => [$r->craft_id, $iso($r->traded_at), 'i:'.$r->item_id, $r->item_name, match ($r->side) {
                         Trade::SIDE_CRAFTIN => 'made', Trade::SIDE_CRAFTOUT => 'used', default => 'bought'
-                    }, $r->qty, $r->side === Trade::SIDE_BUY ? $r->cost_copper : null, $r->note, $r->game],
+                    }, $r->qty, $r->side === Trade::SIDE_BUY ? $r->cost_copper : null, $r->note, $r->game, $r->recipe_id],
+                ],
+                'recipes.csv' => [
+                    ['recipe_id', 'time', 'name', 'item', 'item_name', 'cost_copper', 'note', 'game'],
+                    $this->named($user, 'recipes', 'bought_at', ['id', 'bought_at', 'name', 'item_id', 'cost_copper', 'note', 'game'])->cursor(),
+                    fn ($r) => [$r->id, $iso($r->bought_at), $r->name, 'i:'.$r->item_id, $r->item_name, $r->cost_copper, $r->note, $r->game],
                 ],
                 'sales.csv' => [
                     ['time', 'item', 'item_name', 'qty', 'unit_price_after_cut_copper', 'realm', 'source', 'game'],
@@ -191,7 +196,9 @@ class DataExportService
                                  "vendor" (sold to a vendor; proceeds_copper is the total received).
             crafts.csv           Your crafts: per craft, "made" (the product), "used" (an ingredient taken
                                  from your stock at its average cost) and "bought" (a vendor ingredient;
-                                 cost_copper is the lot total). Not part of trades.csv.
+                                 cost_copper is the lot total). Not part of trades.csv. recipe_id, on
+                                 the "made" row, is the recipe the craft was linked to.
+            recipes.csv          Recipes you bought: cost_copper is a loss on the item it makes.
             sales.csv            Auction sales read from your TradeSkillMaster data. Prices are
                                  copper per unit, after the 5% auction house cut.
             expired.csv          Expired auctions.
