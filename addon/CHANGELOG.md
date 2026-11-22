@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.2
+
+- Fixes a sale going missing when two of your characters collect an identical auction mail (same item, quantity and price) around the same time, as with bank alts. Each character's mail is now counted on its own.
+
+## 0.4.1
+
+- Fixes purchases, sales and expiries going missing from the site. The game sometimes reports an empty realm name, and records saved without a realm were dropped on upload. The addon now keeps the last known realm and, on load, fills in the realm of records already saved without one (when your records name a single realm).
+
 ## 0.4.0
 
 - Records the auction house prices you see in World of Warcraft: Forever and Classic (lowest price, quantity, listings; at most one per item per hour), so the site can show your floors, history and "vs typical" there. Your scans are used for your account only. Retail is unchanged: its prices come from Blizzard.

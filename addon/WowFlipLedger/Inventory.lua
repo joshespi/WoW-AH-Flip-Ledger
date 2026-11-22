@@ -24,6 +24,8 @@ local function charKey()
     return key or computeKey()
 end
 
+ns.charKey = charKey
+
 local function add(map, id, qty)
     map[id] = (map[id] or 0) + (qty or 1)
 end

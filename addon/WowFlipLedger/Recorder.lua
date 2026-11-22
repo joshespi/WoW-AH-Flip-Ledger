@@ -31,8 +31,54 @@ local function clean(s)
     return (tostring(s):gsub("[|%c]", " "))
 end
 
+-- The client sometimes answers "" (truthy in Lua) before the realm is known, which used to stamp
+-- records with no realm; the server drops those. Skip empty answers and fall back to the last good one.
+local function realmName(fn)
+    local r = fn and fn()
+    if type(r) == "string" and r ~= "" then
+        return clean(r)
+    end
+end
+
 function ns.realm()
-    return clean((GetNormalizedRealmName and GetNormalizedRealmName()) or (GetRealmName and GetRealmName()) or "")
+    local d = ns.db()
+    local r = realmName(GetNormalizedRealmName) or realmName(GetRealmName)
+    if r then
+        if d.realm ~= r then
+            d.realm = r
+        end
+        return r
+    end
+
+    return d.realm or ""
+end
+
+-- Records written without a realm get the one realm the other records name (none if there are
+-- several: not guessed). Runs once per load.
+function ns.repairRealms(d)
+    local found, n = nil, 0
+    for _, list in ipairs({ d.events, d.unresolved }) do
+        for _, s in ipairs(list) do
+            local realm = s:match("^[^|]*|[^|]*|([^|]+)|")
+            if realm and realm ~= found then
+                found, n = realm, n + 1
+            end
+        end
+    end
+
+    found = n == 1 and found or (n == 0 and d.realm) or nil
+    if not found or found == "" then
+        return
+    end
+
+    for _, list in ipairs({ d.events, d.unresolved }) do
+        for i, s in ipairs(list) do
+            local kind, t, rest = s:match("^([^|]*)|([^|]*)||(.*)$")
+            if kind then
+                list[i] = kind .. "|" .. t .. "|" .. found .. "|" .. rest
+            end
+        end
+    end
 end
 
 -- Items by name -------------------------------------------------------------------------------
@@ -362,6 +408,11 @@ local function subjectIs(subject, fmt)
     return (p and type(subject) == "string" and subject:find(p) ~= nil) or false
 end
 
+-- A mail's identity: the character first, since two alts can collect identical mails (the db is account-wide).
+local function mailSig(kind, ...)
+    return table.concat({ kind, ns.charKey and ns.charKey() or "", ... }, "|")
+end
+
 -- True the first time a mail is seen (it may be touched by several hooks, or again next session).
 local function firstSight(d, sig, t)
     local bucket = floor(t / 600)
@@ -425,7 +476,7 @@ function ns.onMailTaken(index)
         if not gross or gross <= 0 or count < 1 then
             return
         end
-        if not firstSight(d, "sale|" .. clean(name) .. "|" .. count .. "|" .. gross, t) then
+        if not firstSight(d, mailSig("sale", clean(name), count, gross), t) then
             return
         end
 
@@ -450,7 +501,7 @@ function ns.onMailTaken(index)
     end
 
     -- TakeInboxItem fires once per attachment: dedupe before reading all the slots.
-    if not hasItem or not firstSight(d, kind .. "|" .. clean(subject) .. "|" .. (money or 0), t) then
+    if not hasItem or not firstSight(d, mailSig(kind, clean(subject), money or 0), t) then
         return
     end
 

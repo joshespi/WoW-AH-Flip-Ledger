@@ -283,6 +283,13 @@ fire("PLAYER_LOGIN")
 fire("PLAYER_LOGOUT")
 eq(invMap(d)[238371], 233, "a second character adds its own stock; the warband bank is not doubled")
 
+-- An identical sale collected on another character is its own sale; the same mail is still booked once.
+local before = #d.events
+sellerMail("Wyrmfish", { money = 1900000, daysLeft = 25, bid = 2000000, buyout = 0, deposit = 5000, cut = 100000, count = 50 })
+eq(#d.events, before + 1, "the same sale on a second character is booked")
+TakeInboxMoney(1)
+eq(#d.events, before + 1, "and that mail seen again adds nothing")
+
 -- Deposits -----------------------------------------------------------------------------------
 
 local function post(id, qty, confirm)
@@ -421,6 +428,24 @@ if FIXTURE then
     local f = assert(io.open(FIXTURE, "w"))
     f:write("WowFlipLedgerDB = ", dump(d), "\n")
     f:close()
+end
+
+-- An empty realm answer falls back to the last good realm; saved records without one are repaired.
+ns.realm()
+function GetNormalizedRealmName() return "" end
+eq(ns.realm(), "Area52", "empty realm answer uses the last known realm")
+function GetNormalizedRealmName() return "Area52" end
+
+do
+    local d = { events = { "buy|100||5|2|50", "sale|101|Area52|5|1|40|2" }, unresolved = { "sale|102||Foo|1|9|0" } }
+    ns.repairRealms(d)
+    eq(d.events[1], "buy|100|Area52|5|2|50", "empty realm filled from the other records")
+    eq(d.events[2], "sale|101|Area52|5|1|40|2", "records with a realm are untouched")
+    eq(d.unresolved[1], "sale|102|Area52|Foo|1|9|0", "unresolved sales are repaired too")
+
+    local two = { events = { "buy|1||5|2|50", "buy|2|A|5|1|40", "buy|3|B|5|1|40" }, unresolved = {} }
+    ns.repairRealms(two)
+    eq(two.events[1], "buy|1||5|2|50", "several realms: not guessed")
 end
 
 T.done()

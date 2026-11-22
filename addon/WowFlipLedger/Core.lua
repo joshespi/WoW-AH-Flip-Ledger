@@ -285,6 +285,9 @@ function ns.db()
     d.interface = tonumber(toc) or d.interface
 
     ready = d
+    if ns.repairRealms then
+        ns.repairRealms(d)
+    end
     return d
 end
 
