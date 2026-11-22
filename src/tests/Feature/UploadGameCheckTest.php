@@ -111,6 +111,15 @@ class UploadGameCheckTest extends TestCase
         $this->upload($this->tsmFile('Area 52'), Game::RETAIL)->assertSessionHas('status', 'upload-ok');
     }
 
+    public function test_forever_addon_realms_do_not_block_a_first_tsm_upload(): void
+    {
+        // Forever addon realms ("CAMWOW...") never match TSM's ("Normal"), so they prove nothing.
+        $addon = AddonFile::make(['sale|'.self::T.'|CAMWOWUS1Realm7PvE|2318|1|1000|50'], interface: 16001);
+        $this->assertSame('ok', app(IngestService::class)->ingest($this->user, $addon, 'uploader', self::T + self::DAY, game: Game::FOREVER)->status);
+
+        $this->upload($this->tsmFile('Normal'), Game::FOREVER)->assertSessionHas('status', 'upload-ok');
+    }
+
     public function test_a_game_that_is_switched_off_points_to_settings(): void
     {
         $this->store('Whisperwind', Game::RETAIL);

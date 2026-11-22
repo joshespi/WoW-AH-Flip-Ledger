@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Support\Bounds;
 use App\Support\Game;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -97,6 +98,7 @@ class UploadGameCheck
 
         foreach (array_keys(IngestService::LOG_TABLES) as $table) {
             $rows = DB::table($table)->ownedBy($user)->whereIn(DB::raw(Bounds::realmKeySql('realm')), $keys)
+                ->where(self::comparable(...))
                 ->distinct()->get(['game', 'realm']);
 
             foreach ($rows as $r) {
@@ -107,10 +109,19 @@ class UploadGameCheck
         return $known;
     }
 
+    /**
+     * Rows whose realm names are TSM's: Retail addon realms are normalized to match, but Forever and
+     * Classic addon realms ("CAMWOW...") never match TSM's ("Normal"), so they prove nothing.
+     */
+    private static function comparable(Builder $q): void
+    {
+        $q->where('origin', TsmData::ORIGIN_TSM)->orWhere('game', Game::RETAIL);
+    }
+
     private function hasRows(User $user, string $game): bool
     {
         foreach (array_keys(IngestService::LOG_TABLES) as $table) {
-            if (DB::table($table)->ownedBy($user)->inGame($game)->exists()) {
+            if (DB::table($table)->ownedBy($user)->inGame($game)->where(self::comparable(...))->exists()) {
                 return true;
             }
         }
