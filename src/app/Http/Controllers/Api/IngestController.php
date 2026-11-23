@@ -11,7 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * POST /api/v1/ingest, called by the companion uploader. Body is the raw TradeSkillMaster.lua,
+ * POST /api/v1/ingest, called by API clients. Body is the raw TradeSkillMaster.lua,
  * gzipped or not (or a multipart `file`). Headers: X-File-Mtime (epoch seconds),
  * X-Client-Version, X-Wow-Account, X-Wow-Game (retail|forever|classic, default retail). Auth is a Sanctum token with the `ingest` ability.
  */
@@ -29,11 +29,11 @@ class IngestController extends Controller
             return response()->json(['status' => Upload::STATUS_FAILED, 'message' => 'The upload was empty.'], 422);
         }
 
-        // Unknown games are refused, never filed as retail (the uploader drops a 422 until the file changes).
+        // Unknown games are refused, never filed as retail (a client drops a 422 until the file changes).
         $game = $request->header('X-Wow-Game') ?? Game::RETAIL;
 
         if (! Game::valid($game)) {
-            return response()->json(['status' => Upload::STATUS_FAILED, 'message' => 'Unknown game. Update the uploader.'], 422);
+            return response()->json(['status' => Upload::STATUS_FAILED, 'message' => 'Unknown game. Update your client.'], 422);
         }
 
         $upload = $ingest->ingest(
@@ -53,7 +53,7 @@ class IngestController extends Controller
             'counts' => $upload->counts,
             'min_client_version' => config('ledger.min_client_version'),
         ], ...match (true) {
-            // The uploader retries a 503 but drops a 422 until the file changes.
+            // A client retries a 503 but drops a 422 until the file changes.
             $upload->retryable => [503, ['Retry-After' => 60]],
             $upload->failed() => [422],
             default => [200],

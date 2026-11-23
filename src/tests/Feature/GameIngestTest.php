@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Upload;
 use App\Models\User;
+use App\Services\IngestService;
 use App\Services\ItemDetailService;
 use App\Services\PositionsService;
 use App\Services\ReconcileService;
@@ -13,6 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\IngestsFiles;
 use Tests\Support\SeedsMarketData;
+use Tests\Support\TsmFile;
 use Tests\TestCase;
 
 class GameIngestTest extends TestCase
@@ -76,6 +79,28 @@ class GameIngestTest extends TestCase
         $this->assertSame('Item #238371', app(PositionsService::class)->forUser($this->user, Game::FOREVER)->positions[0]->name);
         $this->assertSame([238371 => 'Arcane Wyrmfish'], ItemName::forUser($this->user, Game::RETAIL, [238371]));
         $this->assertSame([], ItemName::forUser($this->user, Game::FOREVER, [238371]));
+    }
+
+    public function test_an_addon_upload_can_name_an_older_trade_without_sending_its_rows_again(): void
+    {
+        app(TradesService::class)->add($this->user, 238371, 1, 100, self::T, null, game: Game::FOREVER);
+
+        $this->addon([], game: Game::FOREVER);
+
+        $this->assertSame('Wyrmfish', app(PositionsService::class)->forUser($this->user, Game::FOREVER)->positions[0]->name);
+    }
+
+    public function test_a_tsm_upload_only_names_items_recorded_in_that_upload(): void
+    {
+        $file = TsmFile::make(
+            sales: [['i:2835', 5, 1000, self::T, 'Auction']],
+            names: ['i:2835' => 'Rough Stone', 'i:2770' => 'Copper Ore'],
+        );
+
+        $upload = app(IngestService::class)->ingest($this->user, $file, Upload::SOURCE_MANUAL, game: Game::CLASSIC);
+
+        $this->assertSame(1, $upload->counts['names_added']);
+        $this->assertSame([2835 => 'Rough Stone'], ItemName::forUser($this->user, Game::CLASSIC, [2835, 2770]));
     }
 
     public function test_the_upload_records_its_game(): void

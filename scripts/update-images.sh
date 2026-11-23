@@ -15,7 +15,7 @@ docker compose build --pull
 
 # Helper images run through `docker run` by scripts, which compose never sees.
 echo "==> helper images"
-for img in $(grep -rhoE '(golang|alpine):[A-Za-z0-9._-]+' scripts/*.sh | sort -u); do
+for img in $(grep -rhoE '(alpine):[A-Za-z0-9._-]+' scripts/*.sh | sort -u); do
     docker pull "$img"
 done
 

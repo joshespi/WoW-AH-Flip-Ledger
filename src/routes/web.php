@@ -5,7 +5,6 @@ use App\Http\Controllers\AlertUnsubscribeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DataExportController;
 use App\Http\Controllers\DemoController;
-use App\Http\Controllers\DownloadController;
 use App\Http\Controllers\GameController;
 use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\ItemController;
@@ -42,10 +41,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     }
 
     Route::get('/setup', [SetupController::class, 'show'])->name('setup.show');
-    Route::post('/setup/token', [SetupController::class, 'token'])->name('setup.token');
-    Route::get('/download/SHA256SUMS', [DownloadController::class, 'sums'])->name('download.sums');
-    Route::get('/download/addon', [DownloadController::class, 'addon'])->name('download.addon');
-    Route::get('/download/{platform}', [DownloadController::class, 'build'])->name('download.build');
     Route::get('/items/{item}', [ItemController::class, 'show'])->whereNumber('item')->name('items.show');
     Route::get('/trades/export', [TradesController::class, 'export'])->middleware('not.impersonating')->name('trades.export');
     Route::get('/trades/import', [TradesImportController::class, 'create'])->name('trades.import.create');

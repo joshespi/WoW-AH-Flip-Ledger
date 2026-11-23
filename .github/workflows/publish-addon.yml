@@ -1,7 +1,7 @@
 name: Publish addon to CurseForge
 
 # Run by hand from the Actions tab (choose the release type), or push a tag like addon-v0.2.0.
-# Builds the same reproducible zip the site serves, then uploads it with scripts/publish-curseforge.sh.
+# Builds the reproducible addon zip, then uploads it with scripts/publish-curseforge.sh.
 # Needs the repository secret CF_API_KEY (a CurseForge API token).
 on:
   workflow_dispatch:
@@ -27,7 +27,7 @@ jobs:
         run: sh addon/tests/run.sh
 
       - name: Build the addon zip
-        run: sh scripts/build-uploader.sh
+        run: sh scripts/build-addon.sh
 
       - name: Upload to CurseForge
         env:

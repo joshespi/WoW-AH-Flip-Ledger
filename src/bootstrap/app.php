@@ -61,7 +61,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // The demo account and impersonating admins can only read.
         // Web requests count as activity; on the API only an upload does (routes/api.php), not the
-        // uploader's background ping and feed polls.
+        // background ping and feed polls of API clients.
         $middleware->web(append: [ReadOnlySession::class, RecordActivity::class]);
 
         // After TrustProxies/TrustHosts, so the scheme and host it judges are the real ones.
@@ -71,7 +71,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Per-IP limit on the ingest path that must run before authentication.
         $middleware->append(LimitIngestByIp::class);
 
-        // Sanctum token ability checks and the uploader version gate for the API routes.
+        // Sanctum token ability checks and the client version gate for the API routes.
         $middleware->alias([
             'admin' => EnsureAdmin::class,
             'not.impersonating' => BlockWhenImpersonating::class,

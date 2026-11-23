@@ -1,6 +1,6 @@
 # WoW Flip Ledger
 
-Track World of Warcraft auction house flips. Sign up, send your data (companion uploader or manual upload), and see realized P/L, positions and market prices for commodities (US region).
+Track World of Warcraft auction house flips. Sign up, send your data (manual upload), and see realized P/L, positions and market prices for commodities (US region).
 
 - **Data:** your TradeSkillMaster `SavedVariables`, or the in-game addon (`addon/`, no TSM needed). Where both cover the same time, TSM wins.
 - **Games:** Retail, Forever and Classic, each its own ledger, plus an All view. Blizzard AH prices are Retail only.
@@ -33,11 +33,10 @@ docker compose exec app ./vendor/bin/pint
 ```
 docker-compose.yml   app (php-fpm), scheduler, nginx, db (MariaDB), backup
 docker/              image, nginx and backup config
-scripts/             setup, backup/restore, uploader and addon build, CurseForge publish
+scripts/             setup, backup/restore, addon build, CurseForge publish
 src/                 the Laravel app
 addon/               in-game recorder addon (Lua); see addon/CURSEFORGE.md
 legacy/              original Python CLI, kept as a test oracle
-uploader/            companion uploader (Go); see uploader/README.md
 ```
 
 ## Deploy
@@ -69,12 +68,10 @@ The same `docker-compose.yml` serves local and production; only `.env` differs. 
 
    ```bash
    docker compose exec app php artisan admin:grant you@example.com   # register on the site first
-   scripts/build-uploader.sh                                         # uploader for /setup
    docker compose exec app php artisan demo:seed                     # optional read-only demo
    docker compose exec app php artisan prices:probe                  # check Blizzard credentials
    ```
 
-   The addon zip publishes itself on start when its TOC version is new (a changed addon without a version bump is refused). Re-run `build-uploader.sh` only for a new uploader release; bump `LEDGER_MIN_CLIENT_VERSION` only to refuse old uploaders.
 
 5. **Update.** `git pull && docker compose up -d --build`. Back up first if the release has migrations.
 

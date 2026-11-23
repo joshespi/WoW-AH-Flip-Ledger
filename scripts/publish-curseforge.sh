@@ -1,5 +1,5 @@
 #!/bin/sh
-# Uploads the addon zip that scripts/build-uploader.sh produced to CurseForge.
+# Uploads the addon zip that scripts/build-addon.sh produced to CurseForge.
 #   CURSEFORGE_TOKEN=... scripts/publish-curseforge.sh [release|beta|alpha]
 #
 # Needs CURSEFORGE_TOKEN (an API token, never commit it); CURSEFORGE_PROJECT_ID defaults to ours (1783753).
@@ -18,8 +18,8 @@ GAME_VERSIONS="${GAME_VERSIONS:-12.1.5,1.60.1}"
 . scripts/addon-version.sh
 VERSION=$ADDON_VERSION
 CHANGELOG=$ADDON_CHANGELOG
-ZIP="src/storage/app/uploader/$ADDON_ZIP"
-[ -f "$ZIP" ] || { echo "missing $ZIP: run scripts/build-uploader.sh first" >&2; exit 1; }
+ZIP="addon/dist/$ADDON_ZIP"
+[ -f "$ZIP" ] || { echo "missing $ZIP: run scripts/build-addon.sh first" >&2; exit 1; }
 
 API="https://wow.curseforge.com/api"
 

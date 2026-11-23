@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Tells uploaders older than ledger.min_client_version to update (HTTP 426). The uploader treats
+ * Tells clients older than ledger.min_client_version to update (HTTP 426). A client treats
  * this status as fatal, so it is the one place that decides it. A missing or malformed version
  * header passes (browsers, curl).
  */

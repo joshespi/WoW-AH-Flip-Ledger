@@ -8,7 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * GET /api/v1/ping: lets the uploader check its token and version (setup, status) without
+ * GET /api/v1/ping: lets an API client check its token and version (setup, status) without
  * uploading anything. Same auth, ability and version gate as ingest.
  */
 class PingController extends Controller

@@ -236,7 +236,7 @@ class IngestService
         $counts['inventory'] = $this->replaceInventory($user, $game, $data->inventory, $takenAt, $trustedTime, $touched, $addon);
         $counts['names_added'] = Game::hasMarket($game)
             ? $this->fillNames($data->names, array_keys($touched))
-            : $this->storeUserNames($user, $game, $data->names, array_keys($touched));
+            : $this->storeUserNames($user, $game, $data->names, $addon ? null : $touched);
         $counts['skipped'] = $skipped;
 
         $user->enableGame($game);
@@ -456,31 +456,31 @@ class IngestService
     }
 
     /**
-     * Games with no shared catalog (Forever, Classic): the names the user's addon learned, kept
-     * per user and only for items their own data mentions, so they never reach anyone else.
+     * Keep names private to the user and game. The addon can name older buys, while TSM names
+     * are limited to items in the current upload.
      *
      * @param  array<string, string>  $names
-     * @param  list<int>  $ids
+     * @param  array<int, true>|null  $touched  null allows all names from the addon's bounded list
      */
-    private function storeUserNames(User $user, string $game, array $names, array $ids): int
+    private function storeUserNames(User $user, string $game, array $names, ?array $touched): int
     {
         $rows = [];
 
-        foreach ($ids as $id) {
-            $name = isset($names['i:'.$id]) ? ItemName::sanitize($names['i:'.$id]) : null;
+        foreach ($names as $base => $raw) {
+            $id = ItemName::numericId($base);
+
+            if ($id === null || ! Bounds::validItemId($id) || ($touched !== null && ! isset($touched[$id]))) {
+                continue;
+            }
+
+            $name = ItemName::sanitize($raw);
 
             if ($name !== null) {
                 $rows[] = ['user_id' => $user->id, 'game' => $game, 'item_id' => $id, 'name' => $name];
             }
         }
 
-        if ($rows === []) {
-            return 0;
-        }
-
-        Bulk::upsert('user_item_names', $rows, ['user_id', 'game', 'item_id'], ['name']);
-
-        return count($rows);
+        return Bulk::upsert('user_item_names', $rows, ['user_id', 'game', 'item_id'], ['name']);
     }
 
     /** A file's mtime is trusted less than row times: one day of clock skew, not two. */

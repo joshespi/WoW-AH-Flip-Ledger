@@ -12,15 +12,14 @@ No TradeSkillMaster needed. The addon quietly notes:
 - what your auctions sell for (after the 5% cut), and what expires or is cancelled,
 - what you hold across your characters (bags, bank, warband bank, auctions, mail).
 
-It saves this in a file in your WoW folder when you log out or `/reload`. Addons cannot send data anywhere, so you send the file yourself: install the free uploader (it sends the file for you after each logout) or upload it by hand on the site. Nothing leaves your computer until you do.
+It saves this in a file in your WoW folder when you log out or `/reload`. Addons cannot send data anywhere, so you upload the file yourself on the site. Nothing leaves your computer until you do.
 
-In game you also get your cost, break-even and profit on item tooltips (including the auction house), a `/wfl` panel with your positions and watchlist, and a login alert when a watched item hits its target. That part needs the uploader, which refreshes the addon's data file.
 
 **Commands:** `/wfl` panel, `/wfl alerts`, `/wfl status`, `/wfl recorder` (what has been recorded).
 
 **Privacy:** the file holds item ids, quantities, prices, times and your realm. It has no character names (characters are an anonymous hash), and the site never stores the raw file.
 
-Site, uploader and help: https://wowledger.joshespi.com
+Site and help: https://wowledger.joshespi.com
 
 Not affiliated with Blizzard Entertainment or TradeSkillMaster. World of Warcraft is a trademark of Blizzard Entertainment.
 
@@ -34,10 +33,10 @@ Not affiliated with Blizzard Entertainment or TradeSkillMaster. World of Warcraf
 
 ## Each release
 
-1. Bump `## Version:` in `WowFlipLedger.toc` and add a matching `## x.y.z` section to `CHANGELOG.md` (`scripts/build-uploader.sh` refuses to build without it).
+1. Bump `## Version:` in `WowFlipLedger.toc` and add a matching `## x.y.z` section to `CHANGELOG.md` (`scripts/build-addon.sh` refuses to build without it).
 2. Check the `## Interface:` numbers against the live clients (`/dump (select(4, GetBuildInfo()))`).
-3. `addon/tests/run.sh`, then `scripts/build-uploader.sh`. It writes the zip the site serves, `src/storage/app/uploader/wowflipledger-addon-<version>.zip`. (On the server the app builds the same bytes by itself on start, `addon:package`, so a deploy alone publishes it.)
-4. Upload that same zip to CurseForge so the site and CurseForge ship identical bytes: `scripts/publish-curseforge.sh` (or upload it in the web form). Then deploy the site so `/setup` offers the new version.
+3. `addon/tests/run.sh`, then `scripts/build-addon.sh`. It writes `addon/dist/wowflipledger-addon-<version>.zip`.
+4. Upload it: `scripts/publish-curseforge.sh`, the Publish addon workflow, or the web form. `/setup` links to the project (`LEDGER_ADDON_URL`), so no deploy is needed.
 
 ## Game versions
 

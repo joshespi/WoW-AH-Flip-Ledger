@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 
 /**
  * GET /api/v1/addon-feed: the token owner's positions, watchlist and active alerts, for the
- * uploader to write into the in-game addon. Same auth, ability and version gate as ingest.
+a client can write into the in-game addon. Same auth, ability and version gate as ingest.
  */
 class AddonFeedController extends Controller
 {

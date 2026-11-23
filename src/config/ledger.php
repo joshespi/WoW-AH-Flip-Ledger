@@ -30,7 +30,7 @@ return [
     'version' => env('LEDGER_VERSION') ?: 'dev',
     'issues_url' => env('LEDGER_ISSUES_URL') ?: 'https://github.com/joshespi/WoW-AH-Flip-Ledger/issues',
 
-    // Uploaders older than this are told to update (HTTP 426). Raise it when the ingest
+    // Clients older than this are told to update (HTTP 426). Raise it when the ingest
     // contract changes in a way old clients can't satisfy.
     'min_client_version' => env('LEDGER_MIN_CLIENT_VERSION', '0.0.0'),
 
@@ -92,14 +92,14 @@ return [
     ],
 
     'addon' => [
-        // The uploader polls every few minutes; this leaves room for retries and restarts.
+        // Feed polls per token per hour (the feed has no client now; kept for API users).
         'per_token_per_hour' => (int) env('LEDGER_ADDON_FEED_PER_HOUR', 60),
 
         // Open positions in the feed; the rest are dropped and `truncated` is set.
         'max_positions' => 300,
 
-        // The repo's addon/ folder, mounted read-only (docker-compose.yml); addon:package zips it on app start.
-        'source' => env('LEDGER_ADDON_SOURCE', '/var/www/addon'),
+        // Where /setup sends people to install the addon: our CurseForge project (the /projects/<id> link redirects to its page).
+        'url' => env('LEDGER_ADDON_URL', 'https://www.curseforge.com/projects/1783753'),
     ],
 
     'ingest' => [
@@ -107,7 +107,7 @@ return [
         // PHP post_max_size / upload_max_filesize (docker/php/zz-app.ini).
         'max_request_bytes' => 50 * 1024 * 1024,
 
-        // Uploader pushes after each /reload, so this is generous for normal use.
+        // Generous for normal use: one ingest per upload.
         'per_token_per_hour' => (int) env('LEDGER_INGEST_PER_HOUR', 30),
         'per_ip_per_minute' => (int) env('LEDGER_INGEST_PER_IP_MINUTE', 60),
         'manual_per_user_per_hour' => (int) env('LEDGER_MANUAL_UPLOAD_PER_HOUR', 20),

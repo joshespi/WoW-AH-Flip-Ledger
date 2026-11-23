@@ -39,7 +39,7 @@ server {
     # new IP when `app` is recreated on deploy, instead of holding a stale one until restart.
     resolver 127.0.0.11 valid=10s;
 
-    # Uploader endpoint and manual upload page (POST /api/v1/ingest, POST /uploads). Must match
+    # API ingest endpoint and manual upload page (POST /api/v1/ingest, POST /uploads). Must match
     # the route paths and ledger.ingest.max_request_bytes. It fastcgi_passes straight to
     # index.php because client_max_body_size follows the final location, not the original URI.
     location ~ ^/(api/v1/ingest|uploads)$ {

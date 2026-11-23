@@ -12,7 +12,7 @@ class SettingsTest extends TestCase
 
     public function test_the_page_renders_for_a_verified_user(): void
     {
-        $this->actingAs(User::factory()->create())->get('/settings')->assertOk()->assertSee('Uploader tokens');
+        $this->actingAs(User::factory()->create())->get('/settings')->assertOk()->assertSee('API tokens');
     }
 
     public function test_timezone_and_region_can_be_updated(): void

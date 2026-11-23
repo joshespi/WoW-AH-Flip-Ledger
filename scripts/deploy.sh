@@ -78,8 +78,6 @@ app npm run build
 echo "==> migrate"
 app php artisan migrate --force
 
-echo "==> addon:package"
-app php artisan addon:package || echo "addon:package refused; the published addon zip is unchanged" >&2
 
 echo "==> optimize:clear"
 app php artisan optimize:clear

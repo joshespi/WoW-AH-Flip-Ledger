@@ -11,7 +11,7 @@ use Illuminate\Support\Arr;
  * right now, and how fresh the prices are. Read-only and built from the same services as the
  * screens, so the numbers match; derived fields stay null until an item has enough history.
  *
- * The uploader turns this into the addon's Data.lua. Money is copper (per unit for prices).
+ * A client can turn this into the addon's Data.lua. Money is copper (per unit for prices).
  * Free text (watchlist notes) is left out on purpose.
  */
 class AddonFeedService

@@ -8,10 +8,10 @@
         </x-success>
     @else
         <p class="text-sm text-gray-600 dark:text-gray-400">
-            <span class="inline-block h-2 w-2 rounded-full bg-amber-500 animate-pulse align-middle me-2" aria-hidden="true"></span>{{ __('Waiting for your first upload. Run the uploader, then /reload in game. This page updates by itself.') }}
+            <span class="inline-block h-2 w-2 rounded-full bg-amber-500 animate-pulse align-middle me-2" aria-hidden="true"></span>{{ __('Waiting for your first upload. Log out or /reload in game, then upload your file. This page updates by itself.') }}
         </p>
         @if ($failed)
-            <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ __('The last upload was rejected: :error', ['error' => $failed->error]) }}</p>
+            <p class="mt-2 text-sm text-loss">{{ __('The last upload was rejected: :error', ['error' => $failed->error]) }}</p>
         @endif
     @endif
 </div>
