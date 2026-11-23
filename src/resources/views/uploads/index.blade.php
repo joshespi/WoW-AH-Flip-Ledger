@@ -62,8 +62,8 @@
         </form>
 
         <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">
-            {{ __('Prefer automatic uploads?') }}
-            <a class="underline" href="{{ route('setup.show') }}">{{ __('Set up the uploader') }}</a>.
+            {{ __('Not sure where the files are?') }}
+            <a class="underline" href="{{ route('setup.show') }}">{{ __('See the setup steps') }}</a>.
         </p>
     </x-section>
 
@@ -72,7 +72,7 @@
         @if ($uploads->isEmpty())
             <p class="empty">{{ __('Nothing uploaded yet.') }}</p>
         @else
-            <div class="mt-4 overflow-x-auto">
+            <x-table-scroll class="mt-4" :label="__('Upload history')">
                 <table class="data-table">
                     <caption class="sr-only">{{ __('Your uploads, newest first.') }}</caption>
                     <thead>
@@ -120,7 +120,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
         @endif
     </x-section>
 </x-app-layout>

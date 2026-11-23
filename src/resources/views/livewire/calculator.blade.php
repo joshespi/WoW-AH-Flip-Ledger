@@ -14,7 +14,7 @@
             </div>
         </div>
         @if ($error)
-            <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $error }}</p>
+            <p class="mt-2 text-sm text-loss">{{ $error }}</p>
         @endif
         @if ($outlay !== null)
             <p class="mt-3 text-sm text-gray-600 dark:text-gray-400">{{ __('Total outlay') }}: <x-money :copper="$outlay" /></p>
@@ -23,7 +23,7 @@
 
     @if ($rows !== [])
         <div class="card p-4 sm:p-6">
-            <div class="overflow-x-auto">
+            <x-table-scroll :label="__('Calculator results')">
                 <table class="data-table">
                     <caption class="sr-only">{{ __('Listing price needed for each margin.') }}</caption>
                     <thead>
@@ -56,7 +56,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
         </div>
     @endif
 </div>

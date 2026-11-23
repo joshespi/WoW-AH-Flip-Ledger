@@ -118,8 +118,8 @@
         </div>
     </x-section>
 
-    <x-section :title="__('Uploader tokens')"
-               :description="__('The companion uploader signs in with a token. A token can only upload your TSM data; it cannot read anything or change your account. Make one per computer so you can revoke them separately.')">
+    <x-section :title="__('API tokens')"
+               :description="__('Use a token to send addon or TradeSkillMaster files through the upload API. Create a separate token for each client so you can revoke them individually.')">
         @if ($newToken)
             <x-success class="mt-4">
                 {{ __('Copy your new token now. It is shown only once.') }}
@@ -157,7 +157,7 @@
                             </p>
                         </div>
                         <form method="post" action="{{ route('settings.tokens.destroy', $token->id) }}"
-                              x-data @submit="confirm(@js(__('Revoke this token? An uploader using it will stop working.'))) || $event.preventDefault()">
+                              x-data @submit="confirm(@js(__('Revoke this token? A client using it will stop working.'))) || $event.preventDefault()">
                             @csrf
                             @method('delete')
                             <x-danger-button>{{ __('Revoke') }}</x-danger-button>

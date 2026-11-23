@@ -16,16 +16,17 @@
         </div>
     @else
         {{-- One card per game and the total: the split. --}}
-        <div @class(['grid grid-cols-1 gap-4', 'lg:grid-cols-4' => count($games) > 2, 'lg:grid-cols-3' => count($games) <= 2])>
+        <div class="metric-grid">
             @foreach ([...$games, 'total'] as $key)
-                <div class="card p-4" @if ($key !== 'total') data-game="{{ $key }}" @endif>
-                    <div class="flex items-center justify-between">
+                <div @class(['card p-4', 'metric-featured' => $key === 'total']) @if ($key !== 'total') data-game="{{ $key }}" @endif>
+                    @if ($key === 'total')
                         <p class="eyebrow">{{ $names[$key] }}</p>
-                        @if ($key !== 'total')<x-game-badge :game="$key" />@endif
-                    </div>
-                    <p class="mt-2 font-mono text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-50"><x-money :copper="$summary[$key]['realized']" pnl /></p>
+                    @else
+                        <x-game-badge :game="$key" />
+                    @endif
+                    <p class="metric-value"><x-money :copper="$summary[$key]['realized']" pnl /></p>
                     <p class="note">{{ __('Realized P/L, net of the AH cut') }}</p>
-                    <dl class="mt-3 space-y-1 text-sm">
+                    <dl class="mt-3 space-y-1.5 border-t pt-3 text-sm">
                         <div class="flex flex-wrap justify-between gap-x-3"><dt class="dl-label">{{ __('Stock at cost') }}</dt><dd class="font-mono text-end"><x-money :copper="$summary[$key]['stock_cost']" /></dd></div>
                         <div class="flex flex-wrap justify-between gap-x-3"><dt class="dl-label">{{ __('Stock at floor') }}</dt><dd class="font-mono text-end"><x-money :copper="$summary[$key]['stock_at_floor']" /></dd></div>
                         <div class="flex flex-wrap justify-between gap-x-3"><dt class="dl-label">{{ __('Unrealized P/L') }}</dt><dd class="font-mono text-end"><x-money :copper="$summary[$key]['unrealized']" pnl /></dd></div>
@@ -38,7 +39,7 @@
         <div class="card p-4 sm:p-6 text-gray-600 dark:text-gray-300"
              x-data="combinedChart(@js(['ranges' => $ranges, 'labels' => $names, 'games' => $games, 'styles' => $styles]))">
             <h3 class="card-title">{{ __('Realized over time, by game') }}</h3>
-            <div class="mt-3 grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-2" role="group" aria-label="{{ __('Chart range') }}">
+            <div class="range-grid mt-4" role="group" aria-label="{{ __('Chart range') }}">
                 @foreach (\App\Services\RealizedRangesService::labels() as $key => [$name])
                     <button type="button" @click="select('{{ $key }}')" :aria-pressed="range === '{{ $key }}'"
                             class="seg block py-2 text-start">
@@ -58,7 +59,7 @@
 
         <div class="card p-4 sm:p-6">
             <h3 class="card-title">{{ __('Games side by side') }}</h3>
-            <div class="mt-3 overflow-x-auto">
+            <x-table-scroll class="mt-3" :label="__('Games side by side')">
                 <table class="data-table">
                     <caption class="sr-only">{{ __('Your games side by side') }}</caption>
                     <thead>
@@ -73,7 +74,7 @@
                         <tr><td title="{{ __('Sales that booked profit or loss, per day, over the last 30 days.') }}">{{ __('Flips per day (30d)') }}</td>@foreach ($games as $g)<td class="num">{{ number_format($compare[$g]['flips_per_day'], 1) }}</td>@endforeach</tr>
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
         </div>
 
         <div class="card p-4 sm:p-6">
@@ -84,7 +85,7 @@
                 @php
                     $cols = [[__('Game'), 'text'], [__('Item'), 'text'], [__('Held'), 'num'], [__('Avg cost'), 'num'], [__('Break-even'), 'num'], [__('Floor'), 'num'], [__('Value'), 'num'], [__('Status'), 'text']];
                 @endphp
-                <div class="mt-3 overflow-x-auto" x-data="sortableTable">
+                <x-table-scroll class="mt-3" :label="__('Open positions, all games')" x-data="sortableTable">
                     <table class="data-table">
                         <caption class="sr-only">{{ __('Open positions from all your games. Use the column buttons to sort.') }}</caption>
                         <thead>
@@ -110,7 +111,7 @@
                             @endforeach
                         </tbody>
                     </table>
-                </div>
+                </x-table-scroll>
                 @if (count($data['rows']) > $rows)
                     <p class="mt-3 note">{{ __('Showing the :n largest of :total.', ['n' => $rows, 'total' => count($data['rows'])]) }}</p>
                 @endif

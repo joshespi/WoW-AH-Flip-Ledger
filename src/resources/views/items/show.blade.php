@@ -54,7 +54,7 @@
         @if ($d['timeline'] === [])
             <p class="empty">{{ __('You have no buys, sales or listings for this item.') }}</p>
         @else
-            <div class="mt-3 overflow-x-auto">
+            <x-table-scroll class="mt-3" :label="__('Timeline')">
                 <table class="data-table">
                     <caption class="sr-only">{{ __('Your buys, sales, expired and cancelled auctions, newest first.') }}</caption>
                     <thead>
@@ -85,7 +85,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
             <p class="mt-3 note">{{ __('Lost deposits are counted from addon 0.3.0 on, matched to the post they came from. TradeSkillMaster does not record them.') }}</p>
             @if ($d['timeline_total'] > count($d['timeline']))
                 <p class="mt-3 note">{{ __('Showing the newest :n of :total events.', ['n' => count($d['timeline']), 'total' => number_format($d['timeline_total'])]) }}</p>

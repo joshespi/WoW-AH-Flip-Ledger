@@ -1,4 +1,5 @@
-<x-shell :title="$title" body-class="font-sans antialiased bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-200">
+<x-shell :title="$title" body-class="ledger-body font-sans antialiased">
+    <a href="#main-content" class="btn-primary sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-[60]">{{ __('Skip to content') }}</a>
     <div class="min-h-screen">
         @include('layouts.navigation')
 
@@ -25,12 +26,12 @@
 
             {{-- Page heading: the header slot, else the title (or a `heading` slot) with an optional `actions` slot --}}
             @if (isset($header) || filled($title))
-                <header class="px-4 pt-8 sm:px-6 lg:px-8">
+                <header class="mx-auto w-full max-w-[100rem] px-4 pt-6 sm:px-6 sm:pt-8 lg:px-8">
                     @isset($header)
                         {{ $header }}
                     @else
-                        <div class="card-head">
-                            <h1 class="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">{{ $heading ?? $title }}</h1>
+                        <div class="card-head page-heading">
+                            <h1 class="page-title">{{ $heading ?? $title }}</h1>
                             {{ $actions ?? '' }}
                         </div>
                     @endisset
@@ -38,13 +39,13 @@
             @endif
 
             {{-- Page Content: every page sits in the same container --}}
-            <main class="grow py-6">
-                <div class="space-y-6 px-4 sm:px-6 lg:px-8">
+            <main id="main-content" tabindex="-1" class="min-w-0 grow scroll-mt-16 py-5 sm:py-6">
+                <div class="mx-auto max-w-[100rem] space-y-5 px-4 sm:space-y-6 sm:px-6 lg:px-8">
                     {{ $slot }}
                 </div>
             </main>
 
-            <footer class="px-4 pb-6 sm:px-6 lg:px-8">
+            <footer class="mx-auto w-full max-w-[100rem] px-4 pb-6 sm:px-6 lg:px-8">
                 <x-site-footer privacy />
             </footer>
         </div>

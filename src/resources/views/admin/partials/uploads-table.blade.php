@@ -1,4 +1,4 @@
-<div class="mt-3 overflow-x-auto">
+<x-table-scroll class="mt-3" :label="__('Uploads')">
     <table class="data-table">
         <caption class="sr-only">{{ __('Uploads, newest first.') }}</caption>
         <thead>
@@ -18,7 +18,7 @@
                     <td><x-time :at="$u->received_at" /></td>
                     <td>{{ $u->email }}</td>
                     <td>{{ $u->source }}</td>
-                    <td><span class="{{ $u->status === 'failed' ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400' }}">{{ $u->status }}</span></td>
+                    <td><span class="{{ $u->status === 'failed' ? 'text-loss' : 'text-green-700 dark:text-green-400' }}">{{ $u->status }}</span></td>
                     <td class="num">{{ \Illuminate\Support\Number::fileSize((int) $u->bytes, 1) }}</td>
                     <td>{{ $u->client_version ?? '—' }}</td>
                     <td class="text-gray-600 dark:text-gray-400 break-words max-w-md">{{ $u->error ?? $u->summary }}</td>
@@ -26,4 +26,4 @@
             @endforeach
         </tbody>
     </table>
-</div>
+</x-table-scroll>

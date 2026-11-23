@@ -44,14 +44,16 @@
     ];
 @endphp
 
-<div x-data="{ open: false }" @keydown.escape.window="open = false">
+<div x-data="{ open: false }" @keydown.escape.window="open = false"
+     @resize.window="if (!$refs.menuToggle.offsetParent) open = false">
     {{-- Mobile top bar --}}
-    <div class="dark lg:hidden sticky top-0 z-30 flex h-14 items-center justify-between border-b border-gray-800 bg-gray-900 px-4">
+    <div class="dark ledger-rail lg:hidden sticky top-0 z-30 flex h-14 items-center justify-between border-b border-gray-800 px-4">
         <a href="{{ route('dashboard') }}" class="flex items-center gap-2 font-semibold text-gray-100">
             <x-application-logo class="h-7 w-7 rounded-md" />
             <span>{{ config('app.name') }}</span>
         </a>
-        <button type="button" @click="open = true" class="-me-2 rounded-lg p-2 text-gray-400 hover:bg-white/5 hover:text-gray-100" aria-label="{{ __('Open menu') }}">
+        <button type="button" x-ref="menuToggle" @click="open = true" :aria-expanded="open.toString()"
+                aria-controls="ledger-navigation" class="-me-2 rounded-lg p-2 text-gray-400 hover:bg-white/5 hover:text-gray-100" aria-label="{{ __('Open menu') }}">
             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
         </button>
     </div>
@@ -59,15 +61,14 @@
     <div x-show="open" x-cloak x-transition.opacity @click="open = false" class="fixed inset-0 z-40 bg-black/60 lg:hidden"></div>
 
     {{-- Sidebar: always dark, whatever the page theme --}}
-    <aside class="dark fixed inset-y-0 left-0 z-50 flex w-64 -translate-x-full flex-col border-e border-gray-800 bg-gray-900 transition-transform duration-200 lg:translate-x-0"
-           :class="{ 'translate-x-0': open }" aria-label="{{ __('Main') }}">
-        <div class="flex h-16 shrink-0 items-center justify-between px-5">
+    <aside id="ledger-navigation" class="dark ledger-rail invisible fixed inset-y-0 left-0 z-50 flex w-64 max-w-[90vw] -translate-x-full flex-col overflow-y-auto border-e border-gray-800 transition-transform duration-200 lg:visible lg:translate-x-0"
+           :class="{ 'invisible -translate-x-full': !open }"
+           x-trap.inert.noscroll="open" :role="open ? 'dialog' : null" :aria-modal="open ? 'true' : null"
+           aria-label="{{ __('Main menu') }}">
+        <div class="flex h-16 shrink-0 items-center justify-between border-b border-gray-800 px-5">
             <a href="{{ route('dashboard') }}" class="flex items-center gap-2.5 text-gray-100">
                 <x-application-logo class="h-8 w-8 rounded-lg" />
-                <span class="leading-tight">
-                    <span class="block text-sm font-semibold tracking-tight">{{ config('app.name') }}</span>
-                    <span class="block text-[10px] uppercase tracking-[0.14em] text-indigo-400">{{ __('AH flips') }}</span>
-                </span>
+                <span class="text-base font-semibold tracking-tight">{{ config('app.name') }}</span>
             </a>
             <button type="button" @click="open = false" class="rounded-lg p-1.5 text-gray-400 hover:bg-white/5 lg:hidden" aria-label="{{ __('Close menu') }}">
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M6 6l12 12M6 18L18 6" /></svg>
@@ -76,7 +77,7 @@
 
         <x-game-switcher />
 
-        <nav class="grow space-y-5 overflow-y-auto px-3 py-3">
+        <nav class="min-h-32 grow space-y-4 overflow-y-auto px-3 py-4" aria-label="{{ __('Main') }}">
             @foreach ($menu as [$section, $links])
                 <div class="space-y-0.5">
                     @if ($section)

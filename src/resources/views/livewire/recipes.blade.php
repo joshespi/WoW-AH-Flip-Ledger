@@ -43,7 +43,7 @@
         @if ($rows === [])
             <p class="empty">{{ __('No recipes yet. Add one above.') }}</p>
         @else
-            <div class="mt-4 overflow-x-auto">
+            <x-table-scroll class="mt-4" :label="__('Recipes')">
                 <table class="data-table">
                     <caption class="sr-only">{{ __('Your recipes and what they have earned.') }}</caption>
                     <thead>
@@ -93,7 +93,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
             <p class="mt-3 note">{{ __('Profit counts units crafted with the recipe, sold oldest stock first, at your average cost. Crafts not linked to a recipe are not counted.') }}</p>
         @endif
     </div>

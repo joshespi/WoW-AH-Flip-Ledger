@@ -13,7 +13,12 @@
             },
             apply: function (pref) {
                 pref = pref || window.theme.pref();
-                document.documentElement.classList.toggle('dark', pref === 'dark' || (pref !== 'light' && media.matches));
+                var dark = pref === 'dark' || (pref !== 'light' && media.matches);
+                var classes = document.documentElement.classList;
+                if (classes.contains('dark') !== dark) {
+                    classes.toggle('dark', dark);
+                    document.dispatchEvent(new Event('ledger-theme-change'));
+                }
             },
         };
 

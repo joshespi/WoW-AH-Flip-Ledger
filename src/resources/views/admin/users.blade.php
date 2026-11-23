@@ -15,7 +15,7 @@
         @if ($users->isEmpty())
             <p class="empty">{{ __('No users match.') }}</p>
         @else
-            <div class="mt-4 overflow-x-auto">
+            <x-table-scroll class="mt-4" :label="__('Users')">
                 <table class="data-table">
                     <caption class="sr-only">{{ __('Accounts, newest first.') }}</caption>
                     <thead>
@@ -39,7 +39,7 @@
                                 </td>
                                 <td><x-time :at="$u->created_at" format="Y-m-d" /></td>
                                 <td>{{ $u->email_verified_at ? __('verified') : __('unverified') }}</td>
-                                <td class="num">{{ $u->uploads_ok }}@if ($u->uploads_failed)<span class="text-red-600 dark:text-red-400"> / {{ $u->uploads_failed }} {{ __('failed') }}</span>@endif</td>
+                                <td class="num">{{ $u->uploads_ok }}@if ($u->uploads_failed)<span class="text-loss"> / {{ $u->uploads_failed }} {{ __('failed') }}</span>@endif</td>
                                 <td><x-time :at="$u->last_upload" /></td>
                                 <td class="num">{{ number_format($u->trades) }}</td>
                                 <td class="text-end whitespace-nowrap">
@@ -54,7 +54,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
             <div class="mt-4">{{ $users->links() }}</div>
         @endif
     </div>

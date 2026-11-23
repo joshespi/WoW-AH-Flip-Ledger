@@ -23,4 +23,4 @@
     [$label, $tone] = $known[$type] ?? [$type, $tone ?? 'gray'];
 @endphp
 
-<span {{ $attributes->class(['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap', $tones[$tone]]) }}>{{ __($label) }}</span>
+<span {{ $attributes->class(['inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold leading-5', $tones[$tone]]) }}>{{ __($label) }}</span>

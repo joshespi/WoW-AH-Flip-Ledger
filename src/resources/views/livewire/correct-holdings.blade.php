@@ -60,7 +60,7 @@
                 <div>
                     <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ __('Your corrections') }}</h4>
                     <x-input-error class="mt-2" :messages="$errors->get('corrections')" />
-                    <div class="mt-2 overflow-x-auto">
+                    <x-table-scroll class="mt-2" :label="__('Holding corrections')">
                         <table class="data-table">
                             <caption class="sr-only">{{ __('Your corrections for this item, newest first.') }}</caption>
                             <thead>
@@ -93,7 +93,7 @@
                                 @endforeach
                             </tbody>
                         </table>
-                    </div>
+                    </x-table-scroll>
                 </div>
             @endif
             </div>

@@ -134,11 +134,12 @@
         </form>
     </x-section>
 
-    <div class="card p-4 sm:p-6 transition-opacity" wire:loading.class="opacity-60" wire:target="search,delete,deleteCraft,gotoPage,nextPage,previousPage">
+    <div class="card p-4 sm:p-6">
+        <x-loading-status target="search,delete,deleteCraft,gotoPage,nextPage,previousPage">{{ __('Updating trades…') }}</x-loading-status>
         <div class="flex flex-wrap items-center justify-between gap-3">
             <input type="search" wire:model.live.debounce.300ms="search" placeholder="{{ __('Filter by item') }}" aria-label="{{ __('Filter by item') }}"
                    class="w-full sm:w-64 field text-sm">
-            <div class="flex gap-4 text-sm">
+            <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm">
                 <a href="{{ route('reconcile.index') }}" class="link">{{ __('Reconcile with TSM') }}</a>
                 <a href="{{ route('trades.import.create') }}" class="link">{{ __('Import CSV') }}</a>
                 <a href="{{ route('trades.export') }}" class="link">{{ __('Export CSV') }}</a>
@@ -148,7 +149,7 @@
         @if ($rows->isEmpty())
             <p class="empty">{{ $search !== '' ? __('No buys match that filter.') : __('No buys yet. Add one above, paste from chat, or import a CSV.') }}</p>
         @else
-            <div class="mt-4 overflow-x-auto">
+            <x-table-scroll class="mt-4" :label="__('Trades')">
                 <table class="data-table">
                     <caption class="sr-only">{{ __('Your buys, newest first.') }}</caption>
                     <thead>
@@ -194,7 +195,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
 
             <div class="mt-4">{{ $rows->links() }}</div>
         @endif

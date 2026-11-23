@@ -12,8 +12,8 @@
 <link rel="icon" href="{{ asset('logo.png') }}" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
 <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
-<meta name="theme-color" content="#1c1d22" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#f6f6f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1015" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f7f6f2" media="(prefers-color-scheme: light)">
 @php($blurb = __('Track your World of Warcraft auction house flips: realized profit and loss, open positions and live market prices, from your own recorded auctions or TradeSkillMaster data.'))
 <meta name="description" content="{{ $blurb }}">
 <meta property="og:site_name" content="{{ config('app.name') }}">

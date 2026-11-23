@@ -2,8 +2,8 @@
      is the reminder to do that and send it. --}}
 @php($f = $freshness)
 
-<div class="border-b border-gray-200 bg-white font-mono text-[11px] text-gray-600 dark:border-gray-800 dark:bg-gray-900/60 dark:text-gray-400">
-    <div class="px-4 py-2 sm:px-6 lg:px-8 flex flex-wrap items-center gap-x-6 gap-y-1">
+<div class="border-b border-gray-200 bg-white text-xs text-gray-600 dark:border-gray-800 dark:bg-gray-900/60 dark:text-gray-400">
+    <div class="mx-auto flex max-w-[100rem] flex-wrap items-center gap-x-6 gap-y-1 px-4 py-2.5 sm:px-6 lg:px-8">
         <span>
             <span class="font-medium text-gray-700 dark:text-gray-300">{{ __('Game saved') }}</span>
             @if ($f->tsmSavedAt === null)

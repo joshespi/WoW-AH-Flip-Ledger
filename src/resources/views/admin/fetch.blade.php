@@ -22,7 +22,7 @@
         @if ($runs->isEmpty())
             <p class="empty">{{ __('No fetches yet. They start once Blizzard credentials are set.') }}</p>
         @else
-            <div class="mt-3 overflow-x-auto">
+            <x-table-scroll class="mt-3" :label="__('Price fetch runs')">
                 <table class="data-table">
                     <caption class="sr-only">{{ __('Price fetch runs, newest first.') }}</caption>
                     <thead>
@@ -42,7 +42,7 @@
                             <tr>
                                 <td><x-time :at="$r->started_at" /></td>
                                 <td>{{ strtoupper($r->region) }}</td>
-                                <td><span class="{{ $r->status === 'failed' ? 'text-red-600 dark:text-red-400' : '' }}">{{ $r->status }}</span></td>
+                                <td><span class="{{ $r->status === 'failed' ? 'text-loss' : '' }}">{{ $r->status }}</span></td>
                                 <td class="num">{{ $r->finished_at ? $r->finished_at->diffInSeconds($r->started_at, true) : '—' }}</td>
                                 <td class="num">{{ number_format($r->items) }}</td>
                                 <td class="num">{{ number_format($r->auctions) }}</td>
@@ -52,7 +52,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
             <div class="mt-4">{{ $runs->links() }}</div>
         @endif
     </div>

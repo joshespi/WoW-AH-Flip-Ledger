@@ -47,7 +47,8 @@
         <x-input-error class="mt-2" :messages="$errors->get('add')" />
     </x-section>
 
-    <div class="card p-4 sm:p-6 transition-opacity" wire:loading.class="opacity-60" wire:target="minDiscount,minSold,minItemId,top,mode,sortBy">
+    <div class="card p-4 sm:p-6">
+        <x-loading-status target="minDiscount,minSold,minItemId,top,mode,sortBy">{{ __('Updating scan results…') }}</x-loading-status>
         @if ($rows === [])
             @if ($days < \App\Support\MarketStats::minDays())
                 <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ __('Still collecting price history.') }}</p>
@@ -56,7 +57,7 @@
                 <p class="empty">{{ __('Nothing matches. Try clearing the filters above, or pick a different ranking.') }}</p>
             @endif
         @else
-            <div class="overflow-x-auto">
+            <x-table-scroll :label="__('Scan results')">
                 <table class="data-table">
                     <caption class="sr-only">{{ __('Items cheapest against their typical price.') }}</caption>
                     <thead>
@@ -95,7 +96,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
         @endif
     </div>
 </div>

@@ -42,7 +42,7 @@
     @else
         <div class="card p-4 sm:p-6">
             {{-- Scrolls both ways inside the card; the heading row and Item column stay in view. --}}
-            <div class="max-h-[75vh] overflow-auto" x-data="sortableTable">
+            <x-table-scroll class="max-h-[75vh]" :label="__('Positions')" x-data="sortableTable">
                 <table class="data-table data-table-sticky">
                     <caption class="sr-only">{{ __('Your positions. Use the column buttons to sort.') }}</caption>
                     <thead>
@@ -94,7 +94,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
 
             <p class="mt-4 note">
                 {{ __('Floor, cost and profit are exact. Recent, typical, 60-day average, sold per day and what is built on them are our own estimates from hourly snapshots of the Blizzard auction house, not TSM\'s numbers, and appear once an item has :days days of history.', ['days' => \App\Support\MarketStats::minDays()]) }}

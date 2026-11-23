@@ -88,7 +88,6 @@ class DemoTest extends TestCase
 
         $this->from('/settings')->patch('/settings', ['timezone' => 'Asia/Tokyo', 'region' => 'us'])->assertRedirect('/settings')->assertSessionHas('read_only_blocked');
         $this->post('/settings/tokens', ['name' => 'x'])->assertSessionHas('read_only_blocked');
-        $this->post('/setup/token', ['name' => 'x'])->assertSessionHas('read_only_blocked');
         $this->post('/trades/import', ['csv_text' => "time,item,qty,cost\n2026-10-12T10:51,i:1,1,1\n"])->assertSessionHas('read_only_blocked');
         $this->delete('/profile', ['password' => 'x'])->assertSessionHas('read_only_blocked');
 

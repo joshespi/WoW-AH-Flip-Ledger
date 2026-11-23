@@ -10,7 +10,7 @@
 
         <h2>Your account and data</h2>
         <ul class="list-disc ps-5 space-y-2">
-            <li>Keep your password and uploader tokens to yourself; you are responsible for activity on your account.</li>
+            <li>Keep your password and API tokens to yourself; you are responsible for activity on your account.</li>
             <li>Your data stays yours. You allow us to store and process it only to run the service for you, as described in the <a class="underline" href="{{ route('privacy') }}">privacy notice</a>. You can export or delete it at any time.</li>
             <li>Only upload data from your own game account.</li>
         </ul>

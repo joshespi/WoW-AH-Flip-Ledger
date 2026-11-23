@@ -22,27 +22,27 @@ export default {
             },
 
             // The whole app is written against `gray` and `indigo`; remapping them reskins every view.
-            // gray: cool ink (900 is the logo tile, #1c1d22). indigo: auction-house gold, the one accent.
+            // Keep the existing utility names for Blade views. Semantic roles live in app.css.
             colors: {
                 gray: {
-                    50: '#f6f6f8',
-                    100: '#eeeff2',
-                    200: '#dcdee4',
-                    300: '#c3c6cf',
-                    400: '#9a9eab',
-                    500: '#737886',
-                    600: '#555a68',
-                    700: '#3b3f4b',
-                    800: '#26282f',
-                    900: '#1c1d22',
-                    950: '#121317',
+                    50: '#f2f0e8',
+                    100: '#eae8e1',
+                    200: '#dbdee4',
+                    300: '#c4cbd4',
+                    400: '#a5adb9',
+                    500: '#667080',
+                    600: '#535d6d',
+                    700: '#3b4555',
+                    800: '#2b3442',
+                    900: '#1b2029',
+                    950: '#0d1015',
                 },
                 indigo: {
                     50: '#fdf8e8',
                     100: '#faedc2',
                     200: '#f5dc8a',
-                    300: '#efc753',
-                    400: '#e6b02c',
+                    300: '#ffd987',
+                    400: '#e9b64e',
                     500: '#d4961a',
                     600: '#b97a12',
                     700: '#965d12',
@@ -50,6 +50,9 @@ export default {
                     900: '#653d16',
                     950: '#3d240c',
                 },
+                amber: { 600: '#80530f' },
+                green: { 400: '#4fd3a0', 600: '#06734f' },
+                red: { 400: '#f07878', 600: '#b42536' },
             },
 
             boxShadow: {

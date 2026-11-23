@@ -10,11 +10,11 @@
         ['sign' => $sign, 'units' => $units] = \App\Support\Money::segments($copper);
         $colors = ['g' => 'text-amber-600 dark:text-indigo-300', 's' => 'text-gray-500 dark:text-gray-300', 'c' => 'text-orange-700 dark:text-orange-400'];
         $mark = match (true) {
-            $sign === '-' => ['−', 'text-red-600 dark:text-red-400'],
+            $sign === '-' => ['−', 'text-loss'],
             $pnl && \App\Support\Money::round($copper) !== 0 => ['+', 'text-green-600 dark:text-green-400'],
             default => null,
         };
         $digits = implode(' ', array_map(fn (array $u) => '<span class="'.$colors[$u[0]].'">'.e($u[1].$u[0]).'</span>', $units));
     @endphp
-    <span {{ $attributes->class(['whitespace-nowrap font-mono tabular-nums']) }} title="{{ \App\Support\Money::fmt($copper) }}">@if ($mark)<span class="{{ $mark[1] }}">{{ $mark[0] }}</span>@endif{!! $digits !!}</span>
+    <span {{ $attributes->class(['money whitespace-nowrap font-mono tabular-nums']) }} title="{{ \App\Support\Money::fmt($copper) }}">@if ($mark)<span class="{{ $mark[1] }}">{{ $mark[0] }}</span>@endif{!! $digits !!}</span>
 @endif

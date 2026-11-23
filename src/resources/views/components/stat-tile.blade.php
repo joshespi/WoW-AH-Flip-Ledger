@@ -1,9 +1,9 @@
 {{-- A figure with its label; `hint` is a string or a slot. --}}
-@props(['label', 'hint' => null])
+@props(['label', 'hint' => null, 'featured' => false])
 
-<div {{ $attributes->class(['card p-4']) }}>
+<div {{ $attributes->class(['card p-4', 'metric-featured' => $featured]) }}>
     <p class="eyebrow">{{ $label }}</p>
-    <p class="mt-2 font-mono text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-50">{{ $slot }}</p>
+    <p class="metric-value">{{ $slot }}</p>
     @if ($hint)
         <p class="mt-1.5 note">{{ $hint }}</p>
     @endif

@@ -17,12 +17,12 @@
             <div><dt class="dl-label">{{ __('Last run') }}</dt>
                 <dd>{{ $h['last']?->status ?? '—' }}</dd></div>
             <div><dt class="dl-label">{{ __('Runs / failed, 24 h') }}</dt>
-                <dd>{{ $h['runs_24h'] }} / <span class="{{ $h['failed_24h'] ? 'text-red-600 dark:text-red-400' : '' }}">{{ $h['failed_24h'] }}</span></dd></div>
+                <dd>{{ $h['runs_24h'] }} / <span class="{{ $h['failed_24h'] ? 'text-loss' : '' }}">{{ $h['failed_24h'] }}</span></dd></div>
             <div><dt class="dl-label">{{ __('Items with stats') }}</dt>
                 <dd>{{ number_format($h['stats']) }}</dd></div>
         </dl>
         @if ($h['last']?->status === 'failed' && $h['last']->error)
-            <p class="mt-3 text-sm text-red-600 dark:text-red-400 break-words">{{ $h['last']->error }}</p>
+            <p class="mt-3 text-sm text-loss break-words">{{ $h['last']->error }}</p>
         @endif
     </div>
 @endforeach

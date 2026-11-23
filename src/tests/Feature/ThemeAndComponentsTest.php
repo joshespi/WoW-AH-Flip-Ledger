@@ -118,7 +118,7 @@ class ThemeAndComponentsTest extends TestCase
         $this->assertSame('+4.2%', $this->text(Blade::render('<x-pct :value="0.0415" />')));
         $this->assertSame('−2.7%', $this->text(Blade::render('<x-pct :value="-0.0274" />')));
         $this->assertSame('—', $this->text(Blade::render('<x-pct :value="null" />')));
-        $this->assertStringContainsString('text-red-600', Blade::render('<x-pct :value="-0.5" />'));
+        $this->assertStringContainsString('text-loss', Blade::render('<x-pct :value="-0.5" />'));
     }
 
     public function test_chips_say_what_they_mean_in_words(): void

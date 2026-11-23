@@ -45,7 +45,7 @@
 
             <details class="mt-4 text-sm">
                 <summary class="cursor-pointer text-gray-600 dark:text-gray-400">{{ __('Show as a table') }}</summary>
-                <div class="mt-2 max-h-80 overflow-auto">
+                <x-table-scroll class="mt-2 max-h-80" :label="__('Daily activity')">
                     <table class="data-table data-table-sticky">
                         <caption class="sr-only">{{ __('Daily counts for the last 30 days') }}</caption>
                         <thead>
@@ -67,7 +67,7 @@
                             @endforeach
                         </tbody>
                     </table>
-                </div>
+                </x-table-scroll>
             </details>
         </div>
 

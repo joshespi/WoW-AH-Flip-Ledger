@@ -40,7 +40,7 @@
             @if ($rows === [])
                 <p class="empty">{{ __('Nobody is listed here yet.') }}</p>
             @else
-                <div class="max-h-[75vh] overflow-auto" x-data="sortableTable">
+                <x-table-scroll class="max-h-[75vh]" :label="__('Scoreboard')" x-data="sortableTable">
                     <table class="data-table data-table-sticky">
                         <caption class="sr-only">{{ __('Scoreboard. Use the column buttons to sort.') }}</caption>
                         <thead>
@@ -64,7 +64,7 @@
                             @endforeach
                         </tbody>
                     </table>
-                </div>
+                </x-table-scroll>
             @endif
         </div>
 

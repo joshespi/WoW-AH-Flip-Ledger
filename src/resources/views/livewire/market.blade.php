@@ -20,13 +20,14 @@
         <x-input-error class="mt-2" :messages="$errors->get('add')" />
     </x-section>
 
-    <div class="card p-4 sm:p-6 transition-opacity" wire:loading.class="opacity-60" wire:target="move,remove,edit,save">
+    <div class="card p-4 sm:p-6">
+        <x-loading-status target="move,remove,edit,save">{{ __('Updating watchlist…') }}</x-loading-status>
         <x-input-error class="mb-3" :messages="$errors->get('list')" />
         @if ($rows === [])
-            <p class="text-sm text-gray-600 dark:text-gray-400">{{ __('Your watchlist is empty.') }}</p>
+            <p class="empty">{{ __('Your watchlist is empty.') }}</p>
         @else
             <p class="mb-3 text-sm text-gray-600 dark:text-gray-400">{{ __('Targets are per unit. A row is highlighted when the floor is at or under your buy target, or at or over your sell target.') }}</p>
-            <div class="overflow-x-auto">
+            <x-table-scroll :label="__('Watchlist')">
                 <table class="data-table">
                     <caption class="sr-only">{{ __('Your watchlist.') }}</caption>
                     <thead>
@@ -92,7 +93,7 @@
                         </tbody>
                     @endforeach
                 </table>
-            </div>
+            </x-table-scroll>
         @endif
     </div>
 </div>

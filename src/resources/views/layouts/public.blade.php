@@ -1,12 +1,12 @@
-<x-shell :title="$title" body-class="font-sans antialiased bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+<x-shell :title="$title" body-class="ledger-body font-sans antialiased">
     <div class="min-h-screen flex flex-col">
-        <header class="max-w-6xl w-full mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
+        <header class="max-w-6xl w-full mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
             <a href="/" class="flex items-center gap-2 font-semibold">
                 <x-application-logo class="h-8 w-8" />
                 <span>{{ config('app.name') }}</span>
             </a>
 
-            <nav class="flex items-center gap-3 text-sm">
+            <nav class="flex flex-wrap items-center gap-3 text-sm" aria-label="{{ __('Main') }}">
                 <x-theme-toggle />
                 @auth
                     <x-primary-button :href="route('dashboard')">{{ __('Open dashboard') }}</x-primary-button>

@@ -36,7 +36,7 @@
             </div>
             <x-input-error :messages="$errors->get('bulk')" class="mt-2" />
 
-            <div class="mt-4 overflow-x-auto" x-data="rangeSelect" @click="$event.target.matches('input[data-range]') && pick($event)">
+            <x-table-scroll class="mt-4" :label="__('Suggested buys')" x-data="rangeSelect" @click="$event.target.matches('input[data-range]') && pick($event)">
                 <table class="data-table">
                     <caption class="sr-only">{{ __('TSM buy suggestions waiting for a decision.') }}</caption>
                     <thead>
@@ -94,7 +94,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
 
             @if (count($rows) >= \App\Services\ReconcileService::LIMIT)
                 <p class="mt-3 note">{{ __('Showing the newest :n. Handle these to see more.', ['n' => \App\Services\ReconcileService::LIMIT]) }}</p>

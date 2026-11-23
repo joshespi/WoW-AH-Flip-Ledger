@@ -5,7 +5,7 @@
         <x-stat-tile :label="__('Users')" :hint="__(':v verified, :n new in 7 days', ['v' => $o['users']['verified'], 'n' => $o['users']['new_7d']])">{{ number_format($o['users']['total']) }}</x-stat-tile>
         <x-stat-tile :label="__('Have uploaded')" :hint="__('users with a successful upload')">{{ number_format($o['users']['with_upload']) }}</x-stat-tile>
         <x-stat-tile :label="__('Uploads, 24 h')">
-            <x-slot:hint><span @class(['text-red-600 dark:text-red-400' => $o['uploads']['failed_24h'] > 0])>{{ __(':n failed', ['n' => $o['uploads']['failed_24h']]) }}</span></x-slot:hint>
+            <x-slot:hint><span @class(['text-loss' => $o['uploads']['failed_24h'] > 0])>{{ __(':n failed', ['n' => $o['uploads']['failed_24h']]) }}</span></x-slot:hint>
             {{ number_format($o['uploads']['ok_24h']) }}
         </x-stat-tile>
         <x-stat-tile :label="__('Items')" :hint="__(':n without a name yet', ['n' => number_format($o['items']['unnamed'])])">{{ number_format($o['items']['total']) }}</x-stat-tile>
@@ -48,7 +48,7 @@
         @if ($o['audit'] === [])
             <p class="empty">{{ __('Nothing yet.') }}</p>
         @else
-            <div class="mt-3 overflow-x-auto">
+            <x-table-scroll class="mt-3" :label="__('Admin activity')">
                 <table class="data-table">
                     <caption class="sr-only">{{ __('Recent admin actions on accounts.') }}</caption>
                     <thead><tr><th scope="col">{{ __('When') }}</th><th scope="col">{{ __('Admin') }}</th><th scope="col">{{ __('Action') }}</th><th scope="col">{{ __('Account') }}</th><th scope="col">IP</th></tr></thead>
@@ -64,7 +64,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
         @endif
     </div>
 </x-app-layout>

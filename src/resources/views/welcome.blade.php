@@ -1,5 +1,9 @@
 <x-public-layout>
-    <p class="eyebrow text-indigo-500 dark:text-indigo-400">{{ __('Auction house flip ledger') }}</p>
+    <div class="mb-9 rounded-xl border border-gray-800 bg-gray-950 px-5 py-5 sm:px-8">
+        <img src="{{ asset('ledger-wordmark.png') }}" alt="{{ config('app.name') }}"
+             width="1086" height="362" class="mx-auto h-auto w-full max-w-[34rem]">
+    </div>
+    <p class="eyebrow text-[color:var(--accent-text)]">{{ __('Auction house flip ledger') }}</p>
     <h1 class="mt-3 max-w-3xl text-4xl font-semibold tracking-tight sm:text-5xl">
         {{ __('Know whether your auction house flips actually made gold.') }}
     </h1>
@@ -50,8 +54,8 @@
             <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{{ __('Commodity floors come from the Blizzard auction house every hour, so every position shows its break-even against the current floor.') }}</p>
         </div>
         <div class="card p-5">
-            <h2 class="font-medium">{{ __('Hands-off uploads') }}</h2>
-            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{{ __('An optional companion app sends your data after each /reload. It reads one file and touches nothing else in your WoW folder, apart from one data file for the optional in-game addon if you turn that on.') }}</p>
+            <h2 class="font-medium">{{ __('Manual uploads') }}</h2>
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{{ __('Log out or type /reload to save your latest auction activity. Upload the saved file and select the game it came from.') }}</p>
         </div>
     </div>
 </x-public-layout>
