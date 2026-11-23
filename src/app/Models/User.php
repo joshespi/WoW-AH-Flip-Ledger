@@ -244,9 +244,9 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /** A time as a `datetime-local` form value ("2026-10-12T10:51") in this user's timezone; now by default. */
-    public function inputTime(DateTimeInterface|int|string|null $time = null): string
+    public function inputTime(DateTimeInterface|int|string|null $time = null, bool $seconds = false): string
     {
-        return $this->local($time ?? time())->format('Y-m-d\TH:i');
+        return $this->local($time ?? time())->format($seconds ? 'Y-m-d\TH:i:s' : 'Y-m-d\TH:i');
     }
 
     /**
@@ -257,7 +257,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function parseInputTime(string $value): int
     {
         // PHP's own parser would also take "now" or "+1 week".
-        if (preg_match('/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}$/D', $value)) {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?$/D', $value)) {
             try {
                 return (new DateTimeImmutable($value, new DateTimeZone($this->timezone)))->getTimestamp();
             } catch (\Throwable) {

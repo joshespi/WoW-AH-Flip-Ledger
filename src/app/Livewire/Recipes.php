@@ -37,7 +37,7 @@ class Recipes extends Component
         $user = auth()->user();
 
         $saved = $this->attempt('form', function () use ($recipes, $trades, $user) {
-            $itemId = $trades->resolveItem($this->item);
+            $itemId = $trades->resolveItem($this->item, $user);
             $cost = Money::parseGold($this->cost);
             $ts = $user->parseInputTime($this->time);
 

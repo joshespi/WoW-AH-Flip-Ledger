@@ -182,6 +182,31 @@ class PositionsService
         return $ledger[$itemId]['inv'];
     }
 
+    /** Stock available for ingredient use, after buys and existing ingredient uses at that second. */
+    public function heldForCraft(User $user, int $itemId, int $ts, string $game): int
+    {
+        return $this->stockForCraft($user, $ts, $game, $itemId)[$itemId] ?? 0;
+    }
+
+    /** @return array<int, int> Item id => units available at the craft time. */
+    public function stockForCraft(User $user, int $ts, string $game, ?int $itemId = null): array
+    {
+        [$buys, $adjustments, $crafts] = $this->trades($user, $game, $itemId, through: $ts);
+        $adjustments = array_filter($adjustments, fn (array $t): bool => $t['ts'] < $ts);
+        $crafts = array_filter($crafts, fn (array $c): bool => $c['ts'] < $ts || ($c['ts'] === $ts && $c['kind'] === 'out'));
+        $first = $this->firstBuys($buys, $crafts);
+
+        if ($first === []) {
+            return [];
+        }
+
+        // Cross-item ingredient costs affect cost basis but never the number of units available.
+        $sales = $this->sales($user, $game, $first, before: $ts);
+        $ledger = $this->ledger->buildFromSales([...$buys, ...$adjustments], $sales, crafts: $crafts);
+
+        return array_filter(array_map(fn (array $row): int => $row['inv'], $ledger));
+    }
+
     /**
      * One item's count in the latest TSM inventory snapshot, by the same rule as forUser(): an
      * item missing from a snapshot that exists is 0; null when no upload carried a snapshot.
@@ -330,9 +355,9 @@ class PositionsService
      * The user's buys, and their stock corrections (units removed at average cost, as a loss for
      * a write-off, see LedgerService), from one query. All items, or just $itemId.
      *
-     * @return array{0: list<array{ts: int, item: int, qty: int, cost: int}>, 1: list<array{ts: int, item: int, qty: int, cost: int, correction: string}>}
+     * @return array{0: list<array{ts: int, item: int, qty: int, cost: int}>, 1: list<array{ts: int, item: int, qty: int, cost: int, correction: string}>, 2: list<array{ts: int, item: int, qty: int, craft: int, kind: 'in'|'out', recipe: int}>}
      */
-    private function trades(User $user, string $game, ?int $itemId = null): array
+    private function trades(User $user, string $game, ?int $itemId = null, ?int $through = null): array
     {
         $buys = [];
         $adjustments = [];
@@ -340,6 +365,7 @@ class PositionsService
 
         foreach (DB::table('trades')->ownedBy($user)->inGame($game)->whereIn('side', [Trade::SIDE_BUY, ...Trade::CORRECTIONS, ...Trade::CRAFT_SIDES])
             ->when($itemId !== null, fn ($q) => $q->where('item_id', $itemId))
+            ->when($through !== null, fn ($q) => $q->where('traded_at', '<=', Utc::sql($through)))
             ->get(['side', 'item_id', 'traded_at', 'qty', 'cost_copper', 'craft_id', 'recipe_id']) as $r) {
             // LedgerService reads a correction's cost only as its proceeds.
             $row = ['ts' => Utc::ts($r->traded_at), 'item' => (int) $r->item_id, 'qty' => (int) $r->qty, 'cost' => (int) $r->cost_copper];
@@ -386,19 +412,21 @@ class PositionsService
      * rule) in $newest, so recent activity needs no second query.
      *
      * @param  array<int, int>  $firstBuy  item id => first buy timestamp
-     * @param  SplMinHeap<array{int, int, int, int}>  $newest
+     * @param  SplMinHeap<array{int, int, int, int}>|null  $newest
      * @return \Generator<int, array{item: int, ts: int, qty: int, unit_price: int}>
      */
-    private function sales(User $user, string $game, array $firstBuy, SplMinHeap $newest): \Generator
+    private function sales(User $user, string $game, array $firstBuy, ?SplMinHeap $newest = null, ?int $before = null): \Generator
     {
-        $keep = (int) config('ledger.positions.recent_activity');
+        $keep = $newest === null ? 0 : (int) config('ledger.positions.recent_activity');
         $rows = DB::table('tsm_sales')->ownedBy($user)->inGame($game)->where('source', TsmData::SOURCE_AUCTION)
-            ->whereIn('item_id', array_keys($firstBuy))->select('item_id', 'qty', 'unit_price_copper', 'sold_at')->cursor();
+            ->whereIn('item_id', array_keys($firstBuy))
+            ->when($before !== null, fn ($query) => $query->where('sold_at', '<', Utc::sql($before)))
+            ->select('item_id', 'qty', 'unit_price_copper', 'sold_at')->cursor();
 
         foreach ($rows as $r) {
             $sale = ['item' => (int) $r->item_id, 'ts' => Utc::ts($r->sold_at), 'qty' => (int) $r->qty, 'unit_price' => (int) $r->unit_price_copper];
 
-            if ($sale['ts'] >= $firstBuy[$sale['item']]) {
+            if ($newest !== null && $sale['ts'] >= $firstBuy[$sale['item']]) {
                 $newest->insert([$sale['ts'], $sale['item'], $sale['qty'], $sale['unit_price']]);
 
                 if ($newest->count() > $keep) {

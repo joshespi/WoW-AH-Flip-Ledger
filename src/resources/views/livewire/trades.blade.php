@@ -69,43 +69,58 @@
         </form>
     </x-section>
 
-    <x-section :title="__('Record a craft')" width="max-w-none"
-               :description="__('Ingredients you hold are used up at their average cost, vendor ones are bought at the price you give, and the result costs the sum, so selling it shows the right profit.')">
+    <x-section id="record-craft" :title="__('Record a craft')" width="max-w-none"
+               :description="__('Use the date and time you crafted the batch so its cost is available when the ledger matches your sales. Add or reconcile any auction-house ingredient buys first.')">
         <form wire:submit="saveCraft" class="mt-4 space-y-4">
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div class="lg:col-span-2">
-                    <x-input-label for="product" :value="__('Makes')" />
-                    <input id="product" type="text" wire:model="product" autocomplete="off" spellcheck="false"
-                           placeholder="{{ __('Name or i:ID') }}" class="mt-1 block w-full field text-sm">
-                </div>
+                <x-craft-item-picker id="product" model="product" :label="__('Makes')"
+                                    :picker="$this->craftItemPicker($product)" class="lg:col-span-2" />
                 <div>
                     <x-input-label for="made" :value="__('Quantity made')" />
                     <input id="made" type="text" inputmode="numeric" wire:model="made" class="mt-1 block w-full field text-sm">
                 </div>
                 <div>
-                    <x-input-label for="craftTime" :value="__('When')" />
-                    <input id="craftTime" type="datetime-local" wire:model="craftTime" class="mt-1 block w-full field text-sm">
+                    <x-input-label for="craftTime" :value="__('Crafted (:tz)', ['tz' => $user->timezone])" />
+                    <input id="craftTime" type="datetime-local" step="1" wire:model.change="craftTime" class="mt-1 block w-full field text-sm">
                 </div>
             </div>
 
-            <fieldset class="space-y-2">
+            <fieldset class="space-y-3">
                 <legend class="dl-label">{{ __('Ingredients') }}</legend>
+                <p class="note">{{ __('Enter the total quantity used for the batch. Ingredients from stock use their average ledger cost.') }}</p>
                 @foreach ($ingredients as $n => $ing)
-                    <div class="grid gap-2 sm:grid-cols-12 items-end" wire:key="ing{{ $n }}">
-                        <input type="text" wire:model="ingredients.{{ $n }}.item" autocomplete="off" spellcheck="false"
-                               placeholder="{{ __('Name or i:ID') }}" aria-label="{{ __('Ingredient') }}" class="field text-sm sm:col-span-5">
-                        <input type="text" inputmode="numeric" wire:model="ingredients.{{ $n }}.qty"
-                               placeholder="{{ __('Qty used') }}" aria-label="{{ __('Quantity used') }}" class="field text-sm sm:col-span-2">
-                        <label class="flex items-center gap-2 text-sm sm:col-span-2">
-                            <input type="checkbox" wire:model.live="ingredients.{{ $n }}.vendor"> {{ __('From vendor') }}
-                        </label>
-                        @if ($ing['vendor'])
-                            <input type="text" wire:model="ingredients.{{ $n }}.price"
-                                   placeholder="{{ __('Price each (gold)') }}" aria-label="{{ __('Vendor price each') }}" class="field text-sm sm:col-span-2">
-                        @else
-                            <span class="sm:col-span-2"></span>
-                        @endif
-                        <button type="button" wire:click="removeCraftRow({{ $n }})" class="link-danger text-sm text-start sm:col-span-1">{{ __('Remove') }}</button>
+                    @php($picker = $this->craftItemPicker($ing['item'], (bool) $ing['vendor']))
+                    <div class="grid gap-3 rounded-md border border-[var(--border)] p-3 sm:grid-cols-12" wire:key="ing{{ $n }}">
+                        <x-craft-item-picker id="ingredient-{{ $n }}" model="ingredients.{{ $n }}.item"
+                                            :label="__('Ingredient')" :picker="$picker" :row="$n"
+                                            :vendor="(bool) $ing['vendor']" class="{{ $ing['vendor'] ? 'sm:col-span-4' : 'sm:col-span-6' }}" />
+                        <div class="sm:col-span-2">
+                            <x-input-label for="ingredient-qty-{{ $n }}" :value="__('Quantity used')" />
+                            <input id="ingredient-qty-{{ $n }}" type="text" inputmode="numeric"
+                                   wire:model="ingredients.{{ $n }}.qty" class="mt-1 block w-full field text-sm">
+                        </div>
+                        <div class="{{ $ing['vendor'] ? 'sm:col-span-2' : 'sm:col-span-3' }}">
+                            <x-input-label for="ingredient-source-{{ $n }}" :value="__('Source')" />
+                            <select id="ingredient-source-{{ $n }}" wire:model.live.boolean="ingredients.{{ $n }}.vendor"
+                                    class="mt-1 block w-full field text-sm">
+                                <option value="0">{{ __('From stock') }}</option>
+                                <option value="1">{{ __('From vendor') }}</option>
+                            </select>
+                        </div>
+                        <div class="sm:col-span-3" wire:key="ingredient-price-{{ $n }}" @if (! $ing['vendor']) hidden @endif>
+                            @if ($ing['vendor'])
+                                <x-input-label for="ingredient-price-{{ $n }}" :value="__('Vendor price each')" />
+                                <input id="ingredient-price-{{ $n }}" type="text" wire:model="ingredients.{{ $n }}.price"
+                                       placeholder="2g 50s" class="mt-1 block w-full field text-sm">
+                                @if (isset($picker['selected']['price']))
+                                    <button type="button" wire:click="pickCraftItem({{ $picker['id'] }}, {{ $n }})" class="mt-1 link text-start text-sm">
+                                        {{ __('Use last price') }} <x-money :copper="$picker['selected']['price']" />
+                                    </button>
+                                @endif
+                            @endif
+                        </div>
+                        <button type="button" wire:click="removeCraftRow({{ $n }})"
+                                class="link-danger self-start text-start text-sm sm:mt-8">{{ __('Remove') }}</button>
                     </div>
                 @endforeach
                 <button type="button" wire:click="addCraftRow" class="link text-sm">{{ __('Add ingredient') }}</button>

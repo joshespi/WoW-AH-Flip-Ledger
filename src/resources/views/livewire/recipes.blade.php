@@ -4,7 +4,7 @@
     @endif
 
     <x-section :title="$editing ? __('Edit recipe') : __('Add a recipe')" width="max-w-none"
-               :description="__('A recipe you paid for. Its cost counts as a loss on what it makes; link your crafts to it (Trades, Record a craft) and the profit from selling them pays it back.')">
+               :description="__('A recipe you paid for. Profit from selling its crafted items pays back the recipe cost.')">
         <form wire:submit="save" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
             <div class="lg:col-span-2">
                 <x-input-label for="name" :value="__('Recipe')" />
@@ -76,8 +76,10 @@
                                 <td class="num"><x-money :copper="$r['net']" pnl /></td>
                                 <td class="num"><x-pct :value="$r['roi']" /></td>
                                 <td>
-                                    @if ($r['sold'] === 0)
-                                        <span class="note">{{ __('Nothing sold yet') }}</span>
+                                    @if ($r['crafts'] === 0)
+                                        <span class="note">{{ __('No crafts recorded') }}</span>
+                                    @elseif ($r['sold'] === 0)
+                                        <span class="note">{{ __('No tracked sales yet') }}</span>
                                     @elseif ($r['to_go'] === 0)
                                         <x-chip type="{{ __('Paid back') }}" tone="green" />
                                     @else
@@ -85,7 +87,8 @@
                                     @endif
                                 </td>
                                 <td class="whitespace-nowrap text-end">
-                                    <button type="button" wire:click="edit({{ $r['id'] }})" class="link text-sm">{{ __('Edit') }}</button>
+                                    <a href="{{ route('trades.index', ['recipe' => $r['id']]).'#record-craft' }}" class="link text-sm">{{ __('Record craft') }}</a>
+                                    <button type="button" wire:click="edit({{ $r['id'] }})" class="ms-3 link text-sm">{{ __('Edit') }}</button>
                                     <button type="button" wire:click="delete({{ $r['id'] }})" wire:confirm="{{ __('Delete this recipe? Its cost leaves your P/L and its crafts are unlinked.') }}"
                                             class="ms-3 link-danger text-sm">{{ __('Delete') }}</button>
                                 </td>
@@ -94,7 +97,7 @@
                     </tbody>
                 </table>
             </x-table-scroll>
-            <p class="mt-3 note">{{ __('Profit counts units crafted with the recipe, sold oldest stock first, at your average cost. Crafts not linked to a recipe are not counted.') }}</p>
+            <p class="mt-3 note">{{ __('Record each craft with the date you made it. The ledger matches imported sales to stock oldest first and credits the recipe for its units sold.') }}</p>
         @endif
     </div>
 </div>

@@ -6,8 +6,10 @@ use App\Livewire\Concerns\ReportsErrors;
 use App\Models\Recipe;
 use App\Models\Trade;
 use App\Models\User;
+use App\Services\PositionsService;
 use App\Services\TradesService;
 use App\Support\Bounds;
+use App\Support\Game;
 use App\Support\ItemName;
 use App\Support\Money;
 use App\Support\Sql;
@@ -43,6 +45,8 @@ class Trades extends Component
 
     private const MAX_INGREDIENTS = 20;
 
+    private const CRAFT_SUGGESTION_LIMIT = 8;
+
     // Record-a-craft form: what is made, and each ingredient (a vendor one has a unit price in gold).
     public string $product = '';
 
@@ -63,8 +67,22 @@ class Trades extends Component
 
     public function mount(): void
     {
-        $this->time = $this->craftTime = auth()->user()->inputTime();
+        $user = auth()->user();
+        $this->time = $user->inputTime();
+        $this->craftTime = $user->inputTime(seconds: true);
         $this->ingredients = [self::blankIngredient()];
+
+        $recipeParam = request()->query('recipe');
+        $recipeId = is_string($recipeParam) ? Bounds::wholeNumber($recipeParam) : null;
+        if ($recipeId === null) {
+            return;
+        }
+
+        $recipe = Recipe::ownedBy($user)->inGame($user->activeGame())->find($recipeId);
+        if ($recipe !== null) {
+            $this->product = 'i:'.$recipe->item_id;
+            $this->craftRecipe = (string) $recipe->id;
+        }
     }
 
     public function updatingSearch(): void
@@ -110,7 +128,7 @@ class Trades extends Component
         $user = auth()->user();
 
         $saved = $this->attempt('form', function () use ($trades, $user) {
-            $itemId = $trades->resolveItem($this->item);
+            $itemId = $trades->resolveItem($this->item, $user);
             $qty = Bounds::quantityInput($this->qty);
             $cost = Money::parseGold($this->cost);
             $ts = $user->parseInputTime($this->time);
@@ -172,6 +190,156 @@ class Trades extends Component
         });
     }
 
+    #[Computed]
+    public function craftStock(): array
+    {
+        $user = auth()->user();
+
+        try {
+            $ts = $user->parseInputTime($this->craftTime);
+        } catch (InvalidArgumentException) {
+            return [];
+        }
+
+        if (! Bounds::plausibleTime($ts)) {
+            return [];
+        }
+
+        return app(PositionsService::class)->stockForCraft($user, $ts, $user->activeGame());
+    }
+
+    /** The latest unit price paid per vendor ingredient in this user's recorded crafts. */
+    #[Computed]
+    public function craftVendorPrices(): array
+    {
+        $user = auth()->user();
+        $buys = DB::table('trades')->ownedBy($user)->inGame($user->activeGame())
+            ->where('side', Trade::SIDE_BUY)->where('source', Trade::SOURCE_CRAFT)
+            ->select('item_id', 'qty', 'cost_copper', 'traded_at', 'id')
+            ->selectRaw('row_number() over (partition by item_id order by traded_at desc, id desc) as price_rank');
+
+        return DB::query()->fromSub($buys, 'vendor_buys')->where('price_rank', 1)
+            ->orderByDesc('traded_at')->orderByDesc('id')->get()
+            ->mapWithKeys(fn ($buy) => [(int) $buy->item_id => Money::unit((int) $buy->cost_copper, (int) $buy->qty)])
+            ->all();
+    }
+
+    #[Computed]
+    public function craftItemNames(): array
+    {
+        $user = auth()->user();
+        $sources = array_map('boolval', array_column($this->ingredients, 'vendor'));
+        $ids = in_array(false, $sources, true) ? array_keys($this->craftStock) : [];
+
+        if (in_array(true, $sources, true)) {
+            $ids = [...$ids, ...array_keys($this->craftVendorPrices)];
+        }
+
+        foreach ([$this->product, ...array_column($this->ingredients, 'item')] as $value) {
+            $id = ItemName::bareId(trim($value));
+            if ($id !== null && Bounds::validItemId($id)) {
+                $ids[] = $id;
+            }
+        }
+
+        return ItemName::forUser($user, $user->activeGame(), $ids);
+    }
+
+    /** Item choices and, for an entered id, its name and the applicable stock or price hint. */
+    public function craftItemPicker(string $value, ?bool $vendor = null): array
+    {
+        $user = auth()->user();
+        $game = $user->activeGame();
+        $query = trim($value);
+        $id = ItemName::bareId($query);
+        $stock = $vendor === false ? $this->craftStock : [];
+        $prices = $vendor === true ? $this->craftVendorPrices : [];
+        $choices = [];
+        $selected = null;
+
+        if ($id !== null && Bounds::validItemId($id)) {
+            $name = $this->craftItemNames[$id] ?? null;
+            $selected = ['name' => ItemName::display($name, $id), 'stock' => $stock[$id] ?? 0, 'price' => $prices[$id] ?? null];
+        } elseif ($id === null) {
+            $needle = mb_strtolower($query);
+            foreach (array_keys($stock + $prices) as $candidate) {
+                $name = ItemName::display($this->craftItemNames[$candidate] ?? null, $candidate);
+                if (str_contains(mb_strtolower($name), $needle)) {
+                    $choices[$candidate] = $name;
+                }
+                if (count($choices) === self::CRAFT_SUGGESTION_LIMIT) {
+                    break;
+                }
+            }
+
+            $remaining = self::CRAFT_SUGGESTION_LIMIT - count($choices);
+            if ($remaining > 0 && mb_strlen($query) >= 2) {
+                $pattern = Sql::like($query);
+                $excluded = array_keys($choices);
+                $personal = DB::table('user_item_names')->ownedBy($user)->inGame($game);
+                $matches = (clone $personal)->whereRaw('lower(name) like ?', [$pattern])
+                    ->whereNotIn('item_id', $excluded)->selectRaw('item_id as id, name');
+
+                if (Game::hasMarket($game)) {
+                    $matches->unionAll(DB::table('items')->whereRaw('lower(name) like ?', [$pattern])
+                        ->whereNotIn('id', $excluded)->whereNotIn('id', $personal->select('item_id'))->select('id', 'name'));
+                }
+
+                $choices += $matches->orderBy('name')->orderBy('id')->limit($remaining)->pluck('name', 'id')->all();
+            }
+        }
+
+        return compact('selected', 'choices', 'stock', 'prices', 'id');
+    }
+
+    public function pickCraftItem(int $id, ?int $row = null): void
+    {
+        if (! Bounds::validItemId($id)) {
+            return;
+        }
+
+        if ($row === null) {
+            $product = 'i:'.$id;
+            $this->clearRecipeForProductChange($product);
+            $this->product = $product;
+
+            return;
+        }
+
+        if (! isset($this->ingredients[$row])) {
+            return;
+        }
+
+        $ingredient = &$this->ingredients[$row];
+        $ingredient['item'] = 'i:'.$id;
+        $price = $ingredient['vendor'] ? ($this->craftVendorPrices[$id] ?? null) : null;
+        $ingredient['price'] = $price === null ? '' : Money::fmt($price);
+    }
+
+    public function updatingIngredients(mixed $value, ?string $key): void
+    {
+        // A price entered or picked for one item must not follow a different item.
+        if ($key !== null && preg_match('/^(\d+)\.item$/D', $key, $parts) && isset($this->ingredients[$parts[1]])) {
+            $this->ingredients[$parts[1]]['price'] = '';
+        }
+    }
+
+    public function updatingProduct(string $value): void
+    {
+        $this->clearRecipeForProductChange($value);
+    }
+
+    private function clearRecipeForProductChange(string $value): void
+    {
+        $current = trim($this->product);
+        $next = trim($value);
+
+        if (Bounds::wholeNumber($this->craftRecipe) !== null
+            && (ItemName::bareId($current) ?? $current) !== (ItemName::bareId($next) ?? $next)) {
+            $this->craftRecipe = '';
+        }
+    }
+
     public function removeCraftRow(int $i): void
     {
         $this->attempt('craft', function () use ($i) {
@@ -200,7 +368,7 @@ class Trades extends Component
 
                 try {
                     $rows[] = [
-                        'item' => $trades->resolveItem($i['item']),
+                        'item' => $trades->resolveItem($i['item'], $user),
                         'qty' => Bounds::quantityInput($i['qty']),
                         'vendor' => $i['vendor'] ? Money::parseGold($i['price']) : null,
                     ];
@@ -209,7 +377,7 @@ class Trades extends Component
                 }
             }
 
-            $productId = $trades->resolveItem($this->product);
+            $productId = $trades->resolveItem($this->product, $user);
             $recipeId = match ($this->craftRecipe) {
                 'none' => null,
                 '' => $this->onlyRecipeFor($user, $productId),
@@ -224,7 +392,7 @@ class Trades extends Component
         if ($saved) {
             $this->reset('product', 'made', 'craftNote', 'craftRecipe');
             $this->ingredients = [self::blankIngredient()];
-            $this->craftTime = $user->inputTime();
+            $this->craftTime = $user->inputTime(seconds: true);
         }
     }
 

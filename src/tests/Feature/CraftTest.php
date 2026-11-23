@@ -9,6 +9,7 @@ use App\Services\ItemDetailService;
 use App\Services\LedgerService;
 use App\Services\PositionsService;
 use App\Services\TradesService;
+use App\Support\Money;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
 use Livewire\Livewire;
@@ -110,6 +111,18 @@ class CraftTest extends TestCase
         app(TradesService::class)->addCraft($user, 400, 1, [['item' => 100, 'qty' => 81, 'vendor' => null]], self::T + 30);
     }
 
+    public function test_a_backdated_craft_cannot_use_ingredients_bought_later(): void
+    {
+        $user = User::factory()->create();
+        $trades = app(TradesService::class);
+        $trades->add($user, 100, 5, 500, self::T + 60, null);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('at the craft time');
+
+        $trades->addCraft($user, 400, 1, [['item' => 100, 'qty' => 5, 'vendor' => null]], self::T);
+    }
+
     public function test_a_failed_craft_writes_nothing(): void
     {
         $user = $this->crafted();
@@ -182,6 +195,67 @@ class CraftTest extends TestCase
 
         $potion = $this->row($user, 400);
         $this->assertSame([2, 4_000 + 10_000], [$potion->held, $potion->costBasis]);
+    }
+
+    public function test_the_craft_picker_suggests_stock_at_the_craft_time_and_reuses_vendor_purchase_prices(): void
+    {
+        $user = $this->crafted();
+        $trades = app(TradesService::class);
+        $trades->addCraft($user, 400, 1, [['item' => 300, 'qty' => 2, 'vendor' => 125]], self::T + 60);
+        $trades->addCraft(User::factory()->create(), 400, 1, [['item' => 300, 'qty' => 1, 'vendor' => 250]], self::T + 120);
+        $trades->add($user, 100, 10, 10_000, self::T + 120, null);
+
+        Livewire::actingAs($user)->test(Trades::class)
+            ->set('craftTime', $user->inputTime(self::T + 60))
+            ->set('product', 'Pot')
+            ->assertSee('Potion')
+            ->assertSee('80 available')
+            ->call('pickCraftItem', 400)
+            ->assertSet('product', 'i:400')
+            ->call('pickCraftItem', 100, 0)
+            ->assertSee('80 available at craft time')
+            ->set('craftTime', $user->inputTime(self::T + 120))
+            ->assertSee('90 available at craft time')
+            ->set('ingredients.0.vendor', true)
+            ->set('ingredients.0.item', 'Via')
+            ->assertSee('Last paid')
+            ->call('pickCraftItem', 300, 0)
+            ->assertSet('ingredients.0.price', Money::fmt(125))
+            ->assertSee('Use last price')
+            ->set('ingredients.0.item', 'i:100')
+            ->assertSet('ingredients.0.price', '')
+            ->call('pickCraftItem', 300, 0)
+            ->set('ingredients.0.qty', '3')
+            ->set('made', '1')
+            ->call('saveCraft')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('trades', [
+            'user_id' => $user->id,
+            'item_id' => 300,
+            'qty' => 3,
+            'cost_copper' => 375,
+            'side' => Trade::SIDE_BUY,
+            'source' => Trade::SOURCE_CRAFT,
+        ]);
+    }
+
+    public function test_the_form_can_use_stock_bought_earlier_in_the_same_minute(): void
+    {
+        $user = User::factory()->create();
+        $craftedAt = self::T + 30;
+        app(TradesService::class)->add($user, 100, 1, 500, self::T + 15, null);
+
+        Livewire::actingAs($user)->test(Trades::class)
+            ->set('craftTime', $user->inputTime($craftedAt, seconds: true))
+            ->set('product', 'i:400')
+            ->set('made', '1')
+            ->call('pickCraftItem', 100, 0)
+            ->assertSee('1 available at craft time')
+            ->set('ingredients.0.qty', '1')
+            ->call('saveCraft')->assertHasNoErrors();
+
+        $this->assertSame($craftedAt, Trade::where('side', Trade::SIDE_CRAFTIN)->sole()->traded_at->getTimestamp());
     }
 
     public function test_craft_rows_stay_out_of_trades_csv(): void

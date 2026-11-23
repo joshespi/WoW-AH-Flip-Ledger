@@ -11,8 +11,10 @@ use App\Services\ItemDetailService;
 use App\Services\PositionsService;
 use App\Services\RecipesService;
 use App\Services\TradesService;
+use App\Support\Game;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Livewire\Livewire;
 use Tests\Support\SeedsMarketData;
@@ -162,5 +164,47 @@ class RecipeTest extends TestCase
             ->call('saveCraft')->assertHasNoErrors();
 
         $this->assertSame(Recipe::sole()->id, (int) Trade::where('side', Trade::SIDE_CRAFTIN)->sole()->recipe_id);
+    }
+
+    public function test_a_backdated_craft_links_existing_sales_to_its_recipe_in_forever(): void
+    {
+        $game = Game::FOREVER;
+        $user = User::factory()->create(['timezone' => 'UTC', 'enabled_games' => $game, 'game_view' => $game]);
+        $recipes = app(RecipesService::class);
+        $recipe = $recipes->add($user, 'Recipe: Savory Deviate Delight', 6657, 500, self::T, game: $game);
+        DB::table('user_item_names')->insert(['user_id' => $user->id, 'game' => $game, 'item_id' => 6522, 'name' => 'Deviate Fish']);
+        $trades = app(TradesService::class);
+        $trades->add($user, 6522, 5, 350, self::T, null, game: $game);
+        $this->seedSale($user, 6657, 5, 200, self::T + 120, $game);
+        $this->seedSale($user, 6522, 5, 100, self::T + 120, $game);
+
+        $this->actingAs($user)->get(route('recipes.index'))->assertOk()
+            ->assertSee('No crafts recorded')->assertSee(route('trades.index', ['recipe' => $recipe->id]).'#record-craft');
+
+        Livewire::actingAs($user)->withQueryParams(['recipe' => (string) $recipe->id])->test(Trades::class)
+            ->assertSet('product', 'i:6657')->assertSet('craftRecipe', (string) $recipe->id)
+            ->set('craftTime', $user->inputTime(self::T + 60))->set('made', '5')
+            ->set('ingredients', [['item' => 'Deviate Fish', 'qty' => '5', 'vendor' => false, 'price' => '']])
+            ->call('saveCraft')->assertHasNoErrors();
+
+        $row = $recipes->forUser($user, $game)[0];
+        $this->assertSame([1, 5, 5, 650, 150], [$row['crafts'], $row['made'], $row['sold'], $row['profit'], $row['net']]);
+    }
+
+    public function test_changing_the_prefilled_craft_product_clears_the_recipe(): void
+    {
+        $user = User::factory()->create();
+        $recipe = app(RecipesService::class)->add($user, 'Potion Recipe', 400, 500, self::T);
+
+        Livewire::actingAs($user)->withQueryParams(['recipe' => (string) $recipe->id])->test(Trades::class)
+            ->set('product', '400')
+            ->assertSet('craftRecipe', (string) $recipe->id)
+            ->set('product', 'i:401')
+            ->assertSet('craftRecipe', '');
+
+        Livewire::actingAs($user)->withQueryParams(['recipe' => (string) $recipe->id])->test(Trades::class)
+            ->call('pickCraftItem', 401)
+            ->assertSet('product', 'i:401')
+            ->assertSet('craftRecipe', '');
     }
 }

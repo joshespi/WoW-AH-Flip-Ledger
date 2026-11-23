@@ -26,12 +26,15 @@ class TradesService
      *
      * @throws InvalidArgumentException
      */
-    public function resolveItem(string $text): int
+    public function resolveItem(string $text, ?User $user = null): int
     {
         $text = trim($text);
 
         if (($id = ItemName::bareId($text)) === null) {
-            $ids = ItemName::idsByName([$text])[mb_strtolower($text)] ?? [];
+            $name = mb_strtolower($text);
+            $ids = $user === null ? [] : DB::table('user_item_names')->ownedBy($user)->inGame($user->activeGame())
+                ->whereRaw('lower(name) = ?', [$name])->limit(2)->pluck('item_id')->all();
+            $ids = $ids ?: (ItemName::idsByName([$text])[$name] ?? []);
 
             if (count($ids) !== 1) {
                 throw new InvalidArgumentException($ids === []
@@ -146,8 +149,8 @@ class TradesService
 
             $this->attributes($i['item'], $i['qty'], ($i['vendor'] ?? 0) * $i['qty'], $ts, null);
 
-            if ($i['vendor'] === null && $this->positions->held($user, $i['item'], $game) < $i['qty']) {
-                throw new InvalidArgumentException('You hold fewer than '.number_format($i['qty']).' of item '.$i['item'].'. Buy the rest first, or mark it a vendor item.');
+            if ($i['vendor'] === null && $this->positions->heldForCraft($user, $i['item'], $ts, $game) < $i['qty']) {
+                throw new InvalidArgumentException('The ledger has fewer than '.number_format($i['qty']).' of item '.$i['item'].' at the craft time. Check when you recorded the ingredient buy, or enter the price if it came from a vendor.');
             }
         }
 

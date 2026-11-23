@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Livewire\Concerns\ReportsErrors;
+use App\Livewire\Trades;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionMethod;
@@ -16,6 +17,16 @@ class LivewireWriteGuardTest extends TestCase
 {
     /** Public methods that never write to the database. */
     private const READS_ONLY = ['mount', 'render', 'updatingSearch', 'suggestions', 'unitCopper', 'pick', 'edit', 'cancel', 'selectAll', 'clearSelection', 'sortBy', 'updatedMode'];
+
+    private const TRADE_FORM_ONLY = [
+        'craftStock',
+        'craftVendorPrices',
+        'craftItemNames',
+        'craftItemPicker',
+        'pickCraftItem',
+        'updatingIngredients',
+        'updatingProduct',
+    ];
 
     public function test_every_write_action_goes_through_attempt(): void
     {
@@ -32,7 +43,9 @@ class LivewireWriteGuardTest extends TestCase
 
             foreach ($class->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
                 // Methods that come from traits (pagination, this trait) are defined in other files.
-                if (realpath($method->getFileName()) !== realpath($file) || in_array($method->getName(), self::READS_ONLY, true)) {
+                if (realpath($method->getFileName()) !== realpath($file)
+                    || in_array($method->getName(), self::READS_ONLY, true)
+                    || ($class->getName() === Trades::class && in_array($method->getName(), self::TRADE_FORM_ONLY, true))) {
                     continue;
                 }
 
