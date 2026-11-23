@@ -75,6 +75,8 @@ The same `docker-compose.yml` serves local and production; only `.env` differs. 
 
 5. **Update.** `git pull && docker compose up -d --build`. Back up first if the release has migrations.
 
+   Set the shared web app and addon release number in [`src/VERSION`](src/VERSION). The footer, addon ZIP and packaged TOC all use it.
+
 ## Hardening
 
 - `SecurityHeaders` sets a self-only CSP (nonce for inline scripts; `unsafe-eval` stays for Alpine), `frame-ancestors 'none'`, `nosniff`, referrer and permissions policies, and HSTS over HTTPS. Nothing third-party loads.

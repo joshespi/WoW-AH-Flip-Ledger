@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0
+
+- Shares the web app's release number.
+
 ## 0.4.3
 
 - Republished so the CurseForge listing also covers the Forever client (1.60.1). No addon changes.

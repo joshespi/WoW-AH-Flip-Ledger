@@ -33,10 +33,10 @@ Not affiliated with Blizzard Entertainment or TradeSkillMaster. World of Warcraf
 
 ## Each release
 
-1. Bump `## Version:` in `WowFlipLedger.toc` and add a matching `## x.y.z` section to `CHANGELOG.md` (`scripts/build-addon.sh` refuses to build without it).
+1. Bump the shared release number in [`src/VERSION`](../src/VERSION) and add a matching `## x.y.z` section to `CHANGELOG.md`. The build writes that version into the packaged TOC.
 2. Check the `## Interface:` numbers against the live clients (`/dump (select(4, GetBuildInfo()))`).
 3. `addon/tests/run.sh`, then `scripts/build-addon.sh`. It writes `addon/dist/wowflipledger-addon-<version>.zip`.
-4. Upload it: `scripts/publish-curseforge.sh`, the Publish addon workflow, or the web form. `/setup` links to the project (`LEDGER_ADDON_URL`), so no deploy is needed.
+4. Upload it with `scripts/publish-curseforge.sh`, the Publish addon workflow, or the web form. Deploy the same release to update the web footer. `/setup` links to the project through `LEDGER_ADDON_URL`.
 
 ## Game versions
 

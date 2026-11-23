@@ -46,46 +46,46 @@ class PublicPagesTest extends TestCase
 
     public function test_footer_shows_version_and_issue_link_on_every_layout(): void
     {
-        config(['ledger.version' => '1.2.3', 'ledger.issues_url' => 'https://example.com/issues']);
+        config(['ledger.issues_url' => 'https://example.com/issues']);
+        $version = config('app.version');
+        $this->assertMatchesRegularExpression('/^\d+\.\d+\.\d+$/', $version);
+        $this->assertSame(trim(file_get_contents(base_path('VERSION'))), $version);
 
         foreach (['/', '/privacy', '/login'] as $url) {
-            $this->get($url)->assertOk()->assertSee('Version 1.2.3')->assertSee('https://example.com/issues', false);
+            $this->get($url)->assertOk()->assertSee("Version {$version}")->assertSee('https://example.com/issues', false);
         }
 
         $this->actingAs(User::factory()->create())->get('/dashboard')->assertOk()
-            ->assertSee('Version 1.2.3')
+            ->assertSee("Version {$version}")
             ->assertSee('https://example.com/issues', false)
             ->assertSee(route('privacy'), false);
     }
 
-    public function test_empty_footer_env_values_fall_back_to_the_defaults(): void
+    public function test_empty_footer_issue_url_falls_back_to_the_default(): void
     {
-        $keys = ['LEDGER_VERSION', 'LEDGER_ISSUES_URL'];
-        $saved = array_map(fn ($k) => [$_ENV[$k] ?? null, $_SERVER[$k] ?? null, getenv($k)], array_combine($keys, $keys));
+        $key = 'LEDGER_ISSUES_URL';
+        $env = $_ENV[$key] ?? null;
+        $server = $_SERVER[$key] ?? null;
+        $put = getenv($key);
 
         try {
-            foreach ($keys as $k) {
-                $_ENV[$k] = $_SERVER[$k] = '';
-                putenv("{$k}=");
-            }
+            $_ENV[$key] = $_SERVER[$key] = '';
+            putenv("{$key}=");
 
             $config = require config_path('ledger.php');
-            $this->assertSame('dev', $config['version']);
             $this->assertStringStartsWith('https://', $config['issues_url']);
         } finally {
-            foreach ($saved as $k => [$env, $server, $put]) {
-                if ($env === null) {
-                    unset($_ENV[$k]);
-                } else {
-                    $_ENV[$k] = $env;
-                }
-                if ($server === null) {
-                    unset($_SERVER[$k]);
-                } else {
-                    $_SERVER[$k] = $server;
-                }
-                putenv($put === false ? $k : "{$k}={$put}");
+            if ($env === null) {
+                unset($_ENV[$key]);
+            } else {
+                $_ENV[$key] = $env;
             }
+            if ($server === null) {
+                unset($_SERVER[$key]);
+            } else {
+                $_SERVER[$key] = $server;
+            }
+            putenv($put === false ? $key : "{$key}={$put}");
         }
     }
 

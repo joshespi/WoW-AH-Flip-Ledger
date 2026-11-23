@@ -18,8 +18,11 @@ alpine_run '
     set -eu
     apk add --no-cache zip >/dev/null
     rm -rf /tmp/addon && mkdir /tmp/addon && cp -r addon/WowFlipLedger /tmp/addon/
+    toc=/tmp/addon/WowFlipLedger/WowFlipLedger.toc
+    sed -i "s/^## Version: @VERSION@/## Version: $1/" "$toc"
+    grep -Fxq "## Version: $1" "$toc"
     find /tmp/addon -type f -exec chmod 644 {} +
     find /tmp/addon -exec touch -d "2020-01-01 00:00:00" {} +
     cd /tmp/addon && find WowFlipLedger -type f | sort | zip -X -q "/repo/$0" -@
-' "$OUT/$ADDON_ZIP"
+' "$OUT/$ADDON_ZIP" "$ADDON_VERSION"
 echo "Built $OUT/$ADDON_ZIP"
