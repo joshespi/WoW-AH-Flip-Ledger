@@ -96,7 +96,7 @@
                                 <td class="whitespace-normal">
                                     @if ($upload->failed())
                                         <x-chip type="Failed" tone="red" />
-                                        <span class="block mt-1 text-gray-600 dark:text-gray-400 break-words">{{ $upload->error }}</span>
+                                        <span class="block mt-1 max-w-xs text-gray-600 dark:text-gray-400 break-words">{{ $upload->error }}</span>
                                     @else
                                         <x-chip type="OK" tone="green" />
                                     @endif
