@@ -238,6 +238,8 @@ class IngestService
             ? $this->fillNames($data->names, array_keys($touched))
             : $this->storeUserNames($user, $game, $data->names, $addon ? null : $touched);
         $counts['skipped'] = $skipped;
+        // Dropped by the parser: the addon could not read the realm when it wrote the record.
+        $counts['no_realm'] = $data->noRealm;
 
         $user->enableGame($game);
 

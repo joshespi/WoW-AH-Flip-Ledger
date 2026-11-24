@@ -279,6 +279,7 @@ function ns.db()
     d.missed = d.missed or 0
     d.lots = d.lots or {}
     d.charRealms = d.charRealms or {}
+    d.pendingRealm = d.pendingRealm or {}
     d.depositMissed = d.depositMissed or 0
     -- Which client wrote the file (120105 retail, 16001 Forever, 11509 Classic Era): the server
     -- refuses a file uploaded as another game.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+
+- Fixes purchases, sales and expiries still going missing on Forever. The realm is now also read from your character and remembered per character. A record made while the realm is still unknown is held (and saved) until it is known, then booked under it, instead of being dropped or guessed. Records already saved without a realm are filled in only when your file names a single realm. The web app now says how many records in an upload had no realm and were skipped.
+
 ## 1.0.0
 
 - Shares the web app's release number.

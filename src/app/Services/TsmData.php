@@ -24,6 +24,7 @@ final readonly class TsmData
      * @param  string  $origin  `tsm` (TradeSkillMaster.lua) or `addon` (the companion addon's own log)
      * @param  int|null  $takenAt  when the inventory snapshot was taken (epoch), when the file says
      * @param  string|null  $game  the game whose client wrote the file, when it says (the addon's `interface`; TSM files never do)
+     * @param  int  $noRealm  addon log records dropped for having no realm
      */
     public function __construct(
         public array $names,
@@ -32,6 +33,7 @@ final readonly class TsmData
         public string $origin = self::ORIGIN_TSM,
         public ?int $takenAt = null,
         public ?string $game = null,
+        public int $noRealm = 0,
     ) {}
 
     /**

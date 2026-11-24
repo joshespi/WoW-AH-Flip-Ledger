@@ -69,10 +69,20 @@ class Upload extends Model
      */
     public static function summary(?array $counts): ?string
     {
-        return $counts ? __(':sales sales, :expired expired, :cancelled cancelled', [
+        if (! $counts) {
+            return null;
+        }
+
+        $text = __(':sales sales, :expired expired, :cancelled cancelled', [
             'sales' => number_format($counts['sales']['new'] ?? 0),
             'expired' => number_format($counts['expired']['new'] ?? 0),
             'cancelled' => number_format($counts['cancelled']['new'] ?? 0),
-        ]) : null;
+        ]);
+
+        if (($counts['no_realm'] ?? 0) > 0) {
+            $text .= ', '.__(':n records had no realm and were skipped', ['n' => number_format($counts['no_realm'])]);
+        }
+
+        return $text;
     }
 }
