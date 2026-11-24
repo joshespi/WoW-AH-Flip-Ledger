@@ -24,6 +24,8 @@ class LivewireWriteGuardTest extends TestCase
         'craftItemNames',
         'craftItemPicker',
         'pickCraftItem',
+        'editCraftTime',
+        'cancelCraftTime',
         'updatingIngredients',
         'updatingProduct',
     ];

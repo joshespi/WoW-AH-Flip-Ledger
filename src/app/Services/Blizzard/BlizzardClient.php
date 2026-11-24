@@ -55,9 +55,9 @@ class BlizzardClient
     }
 
     /**
-     * One item's English name and quality, or null when Blizzard doesn't know the id.
+     * One item's English name, quality and vendor sell/buy prices (copper each; buy is per unit, rounded down), or null when Blizzard doesn't know the id.
      *
-     * @return array{name: ?string, quality: ?string}|null
+     * @return array{name: ?string, quality: ?string, sell_price: ?int, buy_price: ?int}|null
      *
      * @throws BlizzardException
      */
@@ -79,6 +79,8 @@ class BlizzardClient
         return [
             'name' => is_string($name) ? $name : null,
             'quality' => is_string($quality) ? $quality : null,
+            'sell_price' => is_int($price = $response->json('sell_price')) ? $price : null,
+            'buy_price' => is_int($buy = $response->json('purchase_price')) ? intdiv($buy, max(1, (int) $response->json('purchase_quantity', 1))) : null,
         ];
     }
 

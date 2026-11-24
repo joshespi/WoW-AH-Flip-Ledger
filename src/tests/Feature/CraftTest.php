@@ -11,20 +11,46 @@ use App\Services\PositionsService;
 use App\Services\TradesService;
 use App\Support\Money;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use InvalidArgumentException;
 use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Tests\Support\FakesBlizzard;
 use Tests\Support\SeedsMarketData;
 use Tests\Support\SeedsUserRows;
 use Tests\TestCase;
 
 class CraftTest extends TestCase
 {
+    use FakesBlizzard;
     use RefreshDatabase;
     use SeedsMarketData;
     use SeedsUserRows;
 
     private const T = 1_791_823_860;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->blizzardUnconfigured();
+    }
+
+    public function test_a_vendor_ingredient_with_no_earlier_price_uses_the_listed_vendor_price(): void
+    {
+        $this->seedItem(300, 'Vial');
+        $user = User::factory()->create();
+        $this->blizzardConfigured();
+        Http::fake([
+            self::TOKEN_URL => Http::response(['access_token' => 'tok', 'expires_in' => 86399]),
+            self::ITEM_URL => fn () => Http::response(['id' => 300, 'name' => 'Vial', 'sell_price' => 5, 'purchase_price' => 100, 'purchase_quantity' => 5]),
+        ]);
+
+        Livewire::actingAs($user)->test(Trades::class)
+            ->set('ingredients.0.vendor', true)
+            ->call('pickCraftItem', 300, 0)
+            ->assertSet('ingredients.0.price', Money::fmt(20))
+            ->assertSee('Use vendor price');
+    }
 
     /** 100 of item 100 held at 1,000 each. At T+10: 5 of 400 from 20 of item 100 and 10 vendor 300 at 50 each. Cost 20,500. */
     private function crafted(): User
@@ -157,6 +183,41 @@ class CraftTest extends TestCase
 
         $this->assertSame(1, Trade::count());
         $this->assertSame(100, $this->row($user, 100)->held);
+    }
+
+    public function test_a_craft_can_be_moved_earlier_or_refused_before_its_ingredients_exist(): void
+    {
+        $user = $this->crafted();
+        $id = Trade::where('side', Trade::SIDE_CRAFTIN)->value('craft_id');
+        $svc = app(TradesService::class);
+        $at = fn () => Trade::where('craft_id', $id)->pluck('traded_at')->unique()->all();
+
+        $svc->updateCraftTime($user, $id, self::T + 10);
+        $this->assertCount(1, $at());
+
+        $this->expectException(InvalidArgumentException::class);
+        $svc->updateCraftTime($user, $id, self::T - 1000);
+    }
+
+    public function test_the_craft_time_can_be_edited_on_the_trades_page(): void
+    {
+        $user = $this->crafted();
+        $id = (int) Trade::where('side', Trade::SIDE_CRAFTIN)->value('craft_id');
+        $new = self::T + 20;
+
+        Livewire::actingAs($user)->test(Trades::class)
+            ->call('editCraftTime', $id)
+            ->assertSet('editingCraft', $id)
+            ->assertSet('craftEditTime', $user->inputTime(self::T + 10, seconds: true))
+            ->call('cancelCraftTime')
+            ->assertSet('editingCraft', null)
+            ->call('editCraftTime', $id)
+            ->set('craftEditTime', $user->inputTime($new, seconds: true))
+            ->call('saveCraftTime')
+            ->assertHasNoErrors()
+            ->assertSet('editingCraft', null);
+
+        $this->assertSame([$new], Trade::where('craft_id', $id)->get()->map(fn (Trade $t) => $t->traded_at->getTimestamp())->unique()->values()->all());
     }
 
     public function test_a_craft_buy_cannot_be_deleted_alone(): void

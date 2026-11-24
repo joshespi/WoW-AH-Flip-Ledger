@@ -29,7 +29,7 @@
                     @php($bulk = 'acceptSelected,ignoreSelected,vendorSelected')
                     <span class="flex gap-2 sm:ms-auto">
                         <x-primary-button type="button" wire:click="acceptSelected" wire:loading.attr="disabled" wire:target="{{ $bulk }}" wire:confirm="{{ __('Add the selected buys to your ledger?') }}">{{ __('Accept selected') }}</x-primary-button>
-                        <x-secondary-button type="button" wire:click="vendorSelected" wire:loading.attr="disabled" wire:target="{{ $bulk }}" wire:confirm="{{ __('Add the selected buys and sell them to a vendor at each item\'s last vendor price? Items never vendored before are skipped.') }}" title="{{ __('Uses each item\'s last vendor price.') }}">{{ __('Vendored selected') }}</x-secondary-button>
+                        <x-secondary-button type="button" wire:click="vendorSelected" wire:loading.attr="disabled" wire:target="{{ $bulk }}" wire:confirm="{{ __('Add the selected buys and sell them to a vendor at your last vendor price for each item, or Blizzard\'s sell price if you never vendored it? Items with neither are skipped.') }}" title="{{ __('Uses your last vendor price, else Blizzard\'s sell price.') }}">{{ __('Vendored selected') }}</x-secondary-button>
                         <x-secondary-button type="button" wire:click="ignoreSelected" wire:loading.attr="disabled" wire:target="{{ $bulk }}" wire:confirm="{{ __('Ignore the selected suggestions? They will not come back.') }}">{{ __('Ignore selected') }}</x-secondary-button>
                     </span>
                 @endif

@@ -98,7 +98,7 @@ class BlizzardClientTest extends TestCase
 
         $item = $this->client()->item(238371, 'us');
 
-        $this->assertSame(['name' => 'Arcane Wyrmfish', 'quality' => 'EPIC'], $item);
+        $this->assertSame(['name' => 'Arcane Wyrmfish', 'quality' => 'EPIC', 'sell_price' => null, 'buy_price' => null], $item);
         $this->assertSame(2, $tokens);
     }
 
@@ -155,7 +155,7 @@ class BlizzardClientTest extends TestCase
     {
         $this->fakeBlizzard();
 
-        $this->assertSame(['name' => 'Practically Pork', 'quality' => 'COMMON'], $this->client()->item(242639, 'us'));
+        $this->assertSame(['name' => 'Practically Pork', 'quality' => 'COMMON', 'sell_price' => null, 'buy_price' => null], $this->client()->item(242639, 'us'));
         $this->assertNull($this->client()->item(1, 'us'));
 
         Http::assertSent(fn (Request $r) => str_contains($r->url(), '/data/wow/item/242639')
@@ -166,7 +166,7 @@ class BlizzardClientTest extends TestCase
     {
         $this->fakeBlizzard([self::ITEM_URL => Http::response(['name' => ['en_US' => 'Void-Tempered Leather', 'de_DE' => 'Leer'], 'quality' => ['type' => 'RARE']])]);
 
-        $this->assertSame(['name' => 'Void-Tempered Leather', 'quality' => 'RARE'], $this->client()->item(238511, 'us'));
+        $this->assertSame(['name' => 'Void-Tempered Leather', 'quality' => 'RARE', 'sell_price' => null, 'buy_price' => null], $this->client()->item(238511, 'us'));
     }
 
     public function test_unsupported_regions_are_refused_before_any_request(): void

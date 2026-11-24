@@ -187,7 +187,7 @@ class ReconcileService
     }
 
     /**
-     * Vendors each candidate at its item's last vendor price. One with no earlier vendoring, an
+     * Vendors each candidate at its item's last vendor price, or Blizzard's sell price when never vendored. One with neither, an
      * implausible value or already handled is skipped without stopping the rest.
      *
      * @param  list<int>  $ids
@@ -197,10 +197,16 @@ class ReconcileService
     {
         return $this->eachSkipping(array_unique($ids), function (int $id) use ($user): bool {
             $c = $this->findPending($user, $id);
-            $unit = $c === null ? null : $this->lastVendorUnit($user, (int) $c->item_id, $c->game);
+            $unit = $c === null ? null : $this->vendorUnit($user, (int) $c->item_id, $c->game);
 
             return $unit !== null && $this->acceptVendored($user, $id, $unit);
         });
+    }
+
+    /** The user's last vendor price for the item, else Blizzard's sell price (cached), or null. */
+    public function vendorUnit(User $user, int $itemId, string $game = Game::RETAIL): ?int
+    {
+        return $this->lastVendorUnit($user, $itemId, $game) ?? app(VendorPrices::class)->sell($itemId, (string) $user->region);
     }
 
     /** What the vendor paid per unit the last time the user vendored this item, or null. */

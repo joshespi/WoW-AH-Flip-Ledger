@@ -8,6 +8,7 @@ use App\Models\Trade;
 use App\Models\User;
 use App\Services\PositionsService;
 use App\Services\TradesService;
+use App\Services\VendorPrices;
 use App\Support\Bounds;
 use App\Support\Game;
 use App\Support\ItemName;
@@ -53,6 +54,10 @@ class Trades extends Component
     public string $made = '';
 
     public string $craftTime = '';
+
+    public ?int $editingCraft = null;
+
+    public string $craftEditTime = '';
 
     public string $craftNote = '';
 
@@ -259,7 +264,8 @@ class Trades extends Component
 
         if ($id !== null && Bounds::validItemId($id)) {
             $name = $this->craftItemNames[$id] ?? null;
-            $selected = ['name' => ItemName::display($name, $id), 'stock' => $stock[$id] ?? 0, 'price' => $prices[$id] ?? null];
+            $listed = $vendor === true && ! isset($prices[$id]) ? $this->listedVendorPrice($id) : null;
+            $selected = ['name' => ItemName::display($name, $id), 'stock' => $stock[$id] ?? 0, 'price' => $prices[$id] ?? $listed, 'listed' => $listed !== null];
         } elseif ($id === null) {
             $needle = mb_strtolower($query);
             foreach (array_keys($stock + $prices) as $candidate) {
@@ -292,6 +298,12 @@ class Trades extends Component
         return compact('selected', 'choices', 'stock', 'prices', 'id');
     }
 
+    /** What Blizzard lists a vendor charging for the item, when none of the user's crafts used it. */
+    private function listedVendorPrice(int $id): ?int
+    {
+        return app(VendorPrices::class)->buy($id, (string) auth()->user()->region);
+    }
+
     public function pickCraftItem(int $id, ?int $row = null): void
     {
         if (! Bounds::validItemId($id)) {
@@ -312,7 +324,7 @@ class Trades extends Component
 
         $ingredient = &$this->ingredients[$row];
         $ingredient['item'] = 'i:'.$id;
-        $price = $ingredient['vendor'] ? ($this->craftVendorPrices[$id] ?? null) : null;
+        $price = $ingredient['vendor'] ? ($this->craftVendorPrices[$id] ?? $this->listedVendorPrice($id)) : null;
         $ingredient['price'] = $price === null ? '' : Money::fmt($price);
     }
 
@@ -393,6 +405,30 @@ class Trades extends Component
             $this->reset('product', 'made', 'craftNote', 'craftRecipe');
             $this->ingredients = [self::blankIngredient()];
             $this->craftTime = $user->inputTime(seconds: true);
+        }
+    }
+
+    public function editCraftTime(int $craftId): void
+    {
+        $user = auth()->user();
+        $t = Trade::ownedBy($user)->where('craft_id', $craftId)->firstOrFail();
+
+        $this->editingCraft = $craftId;
+        $this->craftEditTime = $user->inputTime($t->traded_at, seconds: true);
+    }
+
+    public function cancelCraftTime(): void
+    {
+        $this->reset('editingCraft', 'craftEditTime');
+    }
+
+    public function saveCraftTime(TradesService $trades): void
+    {
+        $user = auth()->user();
+
+        if ($this->editingCraft !== null && $this->attempt('form', fn () => $trades->updateCraftTime($user, $this->editingCraft, $user->parseInputTime($this->craftEditTime)))) {
+            $this->message = __('Craft time updated.');
+            $this->reset('editingCraft', 'craftEditTime');
         }
     }
 

@@ -114,7 +114,7 @@
                                        placeholder="2g 50s" class="mt-1 block w-full field text-sm">
                                 @if (isset($picker['selected']['price']))
                                     <button type="button" wire:click="pickCraftItem({{ $picker['id'] }}, {{ $n }})" class="mt-1 link text-start text-sm">
-                                        {{ __('Use last price') }} <x-money :copper="$picker['selected']['price']" />
+                                        {{ $picker['selected']['listed'] ? __('Use vendor price') : __('Use last price') }} <x-money :copper="$picker['selected']['price']" />
                                     </button>
                                 @endif
                             @endif
@@ -202,6 +202,13 @@
                                 <td class="whitespace-nowrap text-end">
                                     @if ($buy && ! $craft)
                                         <button type="button" wire:click="edit({{ $t->id }})" class="link text-sm">{{ __('Edit') }}</button>
+                                    @endif
+                                    @if ($craft && $editingCraft === (int) $t->craft_id)
+                                        <input type="datetime-local" step="1" wire:model="craftEditTime" aria-label="{{ __('Craft time') }}" class="field text-sm">
+                                        <button type="button" wire:click="saveCraftTime" class="link text-sm">{{ __('Save') }}</button>
+                                        <button type="button" wire:click="cancelCraftTime" class="link text-sm">{{ __('Cancel') }}</button>
+                                    @elseif ($craft)
+                                        <button type="button" wire:click="editCraftTime({{ $t->craft_id }})" class="link text-sm">{{ __('Edit time') }}</button>
                                     @endif
                                     <button type="button" wire:click="{{ $craft ? 'deleteCraft('.$t->craft_id.')' : 'delete('.$t->id.')' }}" wire:confirm="{{ $craft ? __('Delete this whole craft? Its ingredient use and any vendor buys it added are deleted too.') : (! $buy ? __('Undo this correction?') : ((int) $t->vendored > 0 ? __('Delete this buy? A vendor sale booked with it is deleted too.') : __('Delete this buy?'))) }}"
                                             class="ms-3 link-danger text-sm">{{ __('Delete') }}</button>

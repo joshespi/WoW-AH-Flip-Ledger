@@ -101,10 +101,13 @@ final class Bounds
         return number_format($copper / Money::COPPER_PER_GOLD);
     }
 
-    /** A whole number typed into a form (digits only, at most 9), or null. */
+    /** A whole number typed into a form (digits only, at most 9; "1,163" is fine), or null. */
     public static function wholeNumber(string $text): ?int
     {
         $text = trim($text);
+        if (preg_match('/^\d{1,3}(,\d{3})+$/', $text)) {
+            $text = str_replace(',', '', $text);
+        }
 
         return strlen($text) <= 9 ? self::count($text) : null;
     }
