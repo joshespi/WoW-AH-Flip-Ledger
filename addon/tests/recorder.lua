@@ -434,7 +434,21 @@ end
 ns.realm()
 function GetNormalizedRealmName() return "" end
 eq(ns.realm(), "Area52", "empty realm answer uses the last known realm")
+
+-- Both realm calls empty (Forever): UnitFullName answers, and the character keeps its own realm.
+do
+    local guid = UnitGUID
+    UnitFullName = function() return "Me", "Forever One" end
+    eq(ns.realm(), "Forever One", "UnitFullName answers when the realm calls are empty")
+    UnitFullName = nil
+    ns.db().realm = "Other"
+    eq(ns.realm(), "Forever One", "the character's remembered realm beats the account's last realm")
+    UnitGUID = function() return nil end
+    eq(ns.realm(), "Other", "no GUID yet: no per-character realm")
+    UnitGUID = guid
+end
 function GetNormalizedRealmName() return "Area52" end
+ns.realm()
 
 do
     local d = { events = { "buy|100||5|2|50", "sale|101|Area52|5|1|40|2" }, unresolved = { "sale|102||Foo|1|9|0" } }
@@ -445,7 +459,13 @@ do
 
     local two = { events = { "buy|1||5|2|50", "buy|2|A|5|1|40", "buy|3|B|5|1|40" }, unresolved = {} }
     ns.repairRealms(two)
-    eq(two.events[1], "buy|1||5|2|50", "several realms: not guessed")
+    eq(two.events[1], "buy|1||5|2|50", "leading gap: not guessed")
+
+    local gaps = { events = { "buy|1|A|5|2|50", "buy|2||5|1|40", "buy|3|B|5|1|40", "buy|4||5|1|40" }, unresolved = {}, lots = { "5|9|1|2|" } }
+    ns.repairRealms(gaps)
+    eq(gaps.events[2], "buy|2||5|1|40", "gap between two realms: not guessed")
+    eq(gaps.events[4], "buy|4|B|5|1|40", "trailing gap takes the realm before it")
+    eq(gaps.lots[1], "5|9|1|2|B", "lot without realm takes the latest realm")
 end
 
 T.done()

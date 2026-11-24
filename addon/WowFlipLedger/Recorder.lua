@@ -40,42 +40,96 @@ local function realmName(fn)
     end
 end
 
+-- Some clients (Forever among them) answer the realm calls with nothing for long stretches, so the
+-- realm is also asked of UnitFullName and remembered per character; the last good one is kept.
+local function unitRealm()
+    return (select(2, UnitFullName("player")))
+end
+
 function ns.realm()
     local d = ns.db()
     local r = realmName(GetNormalizedRealmName) or realmName(GetRealmName)
+        or realmName(UnitFullName and unitRealm)
+    -- No GUID yet (before login) would give every character the same key.
+    local key = UnitGUID and UnitGUID("player") and ns.charKey and ns.charKey()
+
     if r then
-        if d.realm ~= r then
-            d.realm = r
+        d.realm = r
+        if key then
+            d.charRealms[key] = r
         end
         return r
     end
 
-    return d.realm or ""
+    return (key and d.charRealms[key]) or d.realm or ""
 end
 
--- Records written without a realm get the one realm the other records name (none if there are
--- several: not guessed). Runs once per load.
-function ns.repairRealms(d)
-    local found, n = nil, 0
-    for _, list in ipairs({ d.events, d.unresolved }) do
-        for _, s in ipairs(list) do
-            local realm = s:match("^[^|]*|[^|]*|([^|]+)|")
-            if realm and realm ~= found then
-                found, n = realm, n + 1
+local function realmOf(s)
+    return s:match("^[^|]*|[^|]*|([^|]+)|")
+end
+
+local function parseLot(s)
+    local id, t, qty, deposit, realm = s:match("^(%d+)|(%d+)|(%d+)|(%d+)|([^|]*)$")
+    return tonumber(id), tonumber(t), tonumber(qty), tonumber(deposit), realm
+end
+
+-- Fills empty realms in one chronological list: a gap takes the realm before it, unless the next
+-- record names a different one (then it is not guessed). Leading gaps stay empty.
+local function repairList(list, only)
+    local after, nxt = {}, nil
+    for i = #list, 1, -1 do
+        nxt = realmOf(list[i]) or nxt
+        after[i] = nxt
+    end
+
+    local prev = only
+    for i, s in ipairs(list) do
+        local realm = realmOf(s)
+        if realm then
+            prev = realm
+        elseif prev and (after[i] == nil or after[i] == prev) then
+            local kind, t, rest = s:match("^([^|]*)|([^|]*)||(.*)$")
+            if kind then
+                list[i] = kind .. "|" .. t .. "|" .. prev .. "|" .. rest
             end
         end
     end
+end
 
-    found = n == 1 and found or (n == 0 and d.realm) or nil
-    if not found or found == "" then
-        return
-    end
-
+-- Records written without a realm get the one realm the other records name, or (with several
+-- realms) the neighbouring records' realm when it is unambiguous. Runs once per load.
+function ns.repairRealms(d)
+    local seen, n, gaps, last = nil, 0, false, nil
     for _, list in ipairs({ d.events, d.unresolved }) do
-        for i, s in ipairs(list) do
-            local kind, t, rest = s:match("^([^|]*)|([^|]*)||(.*)$")
-            if kind then
-                list[i] = kind .. "|" .. t .. "|" .. found .. "|" .. rest
+        for _, s in ipairs(list) do
+            local r = realmOf(s)
+            if not r then
+                gaps = true
+            else
+                if r ~= seen then
+                    seen, n = r, n + 1
+                end
+                if list == d.events then
+                    last = r
+                end
+            end
+        end
+    end
+    -- One realm in the whole file (or none, and one remembered): every gap is that realm.
+    local only = (n == 1 and seen) or (n == 0 and d.realm ~= "" and d.realm) or nil
+
+    if gaps then
+        for _, list in ipairs({ d.events, d.unresolved }) do
+            repairList(list, only)
+        end
+    end
+    d.realm = (d.realm ~= "" and d.realm) or last or only
+
+    -- A lot saved without a realm belongs to the latest known one.
+    if d.realm and d.realm ~= "" then
+        for i, s in ipairs(d.lots or {}) do
+            if select(5, parseLot(s)) == "" then
+                d.lots[i] = s .. d.realm
             end
         end
     end
@@ -294,11 +348,6 @@ end
 -- Posts waiting for the game to confirm them: { id, qty, deposit, at }.
 local pending = {}
 local PENDING_SECONDS = 300
-
-local function parseLot(s)
-    local id, t, qty, deposit, realm = s:match("^(%d+)|(%d+)|(%d+)|(%d+)|([^|]*)$")
-    return tonumber(id), tonumber(t), tonumber(qty), tonumber(deposit), realm
-end
 
 function ns.addLot(id, t, qty, deposit, realm)
     local d = ns.db()
