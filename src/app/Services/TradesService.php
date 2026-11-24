@@ -180,6 +180,45 @@ class TradesService
         $rows->delete();
     }
 
+    /**
+     * Moves a whole craft (product, ingredient use, vendor buys) to $ts. Held ingredients must
+     * still be in stock just before the new time; all or nothing. Later crafts and sales are not
+     * re-checked, so moving a craft earlier can leave one of them short.
+     *
+     * @throws InvalidArgumentException
+     */
+    public function updateCraftTime(User $user, int $craftId, int $ts): void
+    {
+        if (! Bounds::plausibleTime($ts)) {
+            throw new InvalidArgumentException('Time is outside the plausible range.');
+        }
+
+        DB::transaction(function () use ($user, $craftId, $ts) {
+            $rows = Trade::ownedBy($user)->where('craft_id', $craftId)->get();
+
+            abort_if($rows->isEmpty(), 404);
+
+            Trade::ownedBy($user)->where('craft_id', $craftId)->update(['traded_at' => Utc::sql($ts)]);
+
+            $game = $rows->first()->game;
+            $vendored = $rows->where('side', Trade::SIDE_BUY)->map(fn (Trade $t): int => (int) $t->item_id)->all();
+
+            foreach ($rows->where('side', Trade::SIDE_CRAFTOUT) as $out) {
+                $item = (int) $out->item_id;
+
+                if (in_array($item, $vendored, true)) {
+                    continue;
+                }
+
+                if ($this->positions->heldForCraft($user, $item, $ts - 1, $game) < $out->qty) {
+                    $name = ItemName::display(DB::table('items')->where('id', $item)->value('name'), $item);
+
+                    throw new InvalidArgumentException('The ledger has fewer than '.number_format($out->qty).' of '.$name.' before that time. Check when you recorded the ingredient buy.');
+                }
+            }
+        });
+    }
+
     public function deleteCorrection(User $user, int $id): void
     {
         Trade::ownedBy($user)->whereIn('side', Trade::CORRECTIONS)->findOrFail($id)->delete();

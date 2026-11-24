@@ -77,6 +77,7 @@ class AddonParser
         $depth = 0;
         $rows = 0;
         $priceRows = 0;
+        $noRealm = 0;
         foreach (LuaLines::of($contents, $this->maxLines, 'WoW Flip Ledger') as $line) {
             $line = trim($line);
 
@@ -110,7 +111,7 @@ class AddonParser
                         if (preg_match(self::INV, $m[1], $i)) {
                             $inventory['i:'.$i[1]] = ($inventory['i:'.$i[1]] ?? 0) + (int) $i[2];
                         }
-                    } elseif (($row = $this->event($m[1], byName: $mode === 'unresolved')) !== null) {
+                    } elseif (($row = $this->event($m[1], byName: $mode === 'unresolved', noRealm: $noRealm)) !== null) {
                         if (++$rows > $this->maxRows) {
                             throw new TsmParseException('That file has too many log entries to be a WoW Flip Ledger data file.');
                         }
@@ -151,6 +152,7 @@ class AddonParser
             origin: TsmData::ORIGIN_ADDON,
             takenAt: $last !== null && Bounds::plausibleTime($last) ? $last : null,
             game: $interface === null ? null : Game::fromInterface($interface),
+            noRealm: $noRealm,
         );
     }
 
@@ -163,7 +165,7 @@ class AddonParser
      *
      * @return array{0: string, 1: array<string, string>}|null
      */
-    private function event(string $record, bool $byName = false): ?array
+    private function event(string $record, bool $byName, int &$noRealm): ?array
     {
         $f = explode('|', $record);
         $kind = $f[0];
@@ -179,7 +181,16 @@ class AddonParser
             default => null,
         };
 
-        if ($want === null || count($f) !== $want || ! preg_match(self::REALM, $f[2])) {
+        if ($want === null || count($f) !== $want) {
+            return null;
+        }
+
+        if ($f[2] === '') {
+            $noRealm++;
+
+            return null;
+        }
+        if (! preg_match(self::REALM, $f[2])) {
             return null;
         }
 

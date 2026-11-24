@@ -387,12 +387,14 @@ check(status:find("auction house API present", 1, true) ~= nil, "status reports 
 -- Missing APIs must not break loading (another client flavour).
 do
     local saved = { C_AuctionHouse = C_AuctionHouse, C_Container = C_Container, TakeInboxMoney = TakeInboxMoney }
+    local onEvent = frame.OnEvent
     C_AuctionHouse, C_Container, TakeInboxMoney = nil, nil, nil
     local ns2 = T.load(ADDON_DIR, FILES)
     fire("PLAYER_LOGIN")
     fire("PLAYER_LOGOUT")
     check(ns2.recorderStatus():find("missing", 1, true) ~= nil, "no auction API is reported, not an error")
     C_AuctionHouse, C_Container, TakeInboxMoney = saved.C_AuctionHouse, saved.C_Container, saved.TakeInboxMoney
+    frame.OnEvent = onEvent
 end
 
 -- Fixture: the saved variables as WoW writes them, for the server's parser tests ----------------
@@ -434,18 +436,80 @@ end
 ns.realm()
 function GetNormalizedRealmName() return "" end
 eq(ns.realm(), "Area52", "empty realm answer uses the last known realm")
-function GetNormalizedRealmName() return "Area52" end
 
+-- Both realm calls empty (Forever): UnitFullName answers, and the character keeps its own realm.
 do
-    local d = { events = { "buy|100||5|2|50", "sale|101|Area52|5|1|40|2" }, unresolved = { "sale|102||Foo|1|9|0" } }
-    ns.repairRealms(d)
-    eq(d.events[1], "buy|100|Area52|5|2|50", "empty realm filled from the other records")
-    eq(d.events[2], "sale|101|Area52|5|1|40|2", "records with a realm are untouched")
-    eq(d.unresolved[1], "sale|102|Area52|Foo|1|9|0", "unresolved sales are repaired too")
+    local guid = UnitGUID
+    UnitFullName = function() return "Me", "Forever One" end
+    eq(ns.realm(), "Forever One", "UnitFullName answers when the realm calls are empty")
+    UnitFullName = nil
+    ns.db().realm = "Other"
+    eq(ns.realm(), "Forever One", "the character's remembered realm beats the account's last realm")
+    UnitGUID = function() return nil end
+    eq(ns.realm(), "Other", "no GUID yet: no per-character realm")
+    UnitGUID = guid
+end
+function GetNormalizedRealmName() return "Area52" end
+ns.realm()
 
-    local two = { events = { "buy|1||5|2|50", "buy|2|A|5|1|40", "buy|3|B|5|1|40" }, unresolved = {} }
+-- Migration for files saved before records were held: one realm in the file fills the gaps; with
+-- several realms nothing is guessed.
+do
+    local m = { events = { "buy|100||5|2|50", "sale|101|Area52|5|1|40|2" }, unresolved = { "sale|102||Foo|1|9|0" }, lots = { "5|9|1|2|" }, realm = "" }
+    ns.repairRealms(m)
+    eq(m.events[1], "buy|100|Area52|5|2|50", "one realm in the file: gap filled")
+    eq(m.events[2], "sale|101|Area52|5|1|40|2", "records with a realm are untouched")
+    eq(m.unresolved[1], "sale|102|Area52|Foo|1|9|0", "unresolved sales are repaired too")
+    eq(m.lots[1], "5|9|1|2|Area52", "lot without realm takes the known realm")
+
+    local two = { events = { "buy|1||5|2|50", "buy|2|A|5|1|40", "buy|3||5|1|40", "buy|4|B|5|1|40" }, unresolved = {}, realm = "" }
     ns.repairRealms(two)
-    eq(two.events[1], "buy|1||5|2|50", "several realms: not guessed")
+    eq(two.events[1], "buy|1||5|2|50", "several realms: leading gap not guessed")
+    eq(two.events[3], "buy|3||5|1|40", "several realms: middle gap not guessed")
+
+    local again = { events = { "buy|1||5|2|50" }, unresolved = {}, realm = "X", realmRepaired = true }
+    ns.repairRealms(again)
+    eq(again.events[1], "buy|1||5|2|50", "runs once")
+end
+
+-- A record with no realm is held, not guessed, and booked once the character's realm is known.
+do
+    local db = ns.db()
+    local before = #db.events
+    db.charRealms = {}
+    function GetNormalizedRealmName() return "" end
+    eq(ns.realm(), "", "no realm known for this character: empty, not another character's realm")
+
+    buy(238371, 5, 100, 500)
+    eq(#db.events, before, "a buy with no realm is not written")
+    eq(#db.pendingRealm, 1, "it is held instead")
+
+    sellerMail("Wyrmfish", { bid = 900, cut = 45, count = 3 })
+    takeItems("Auction expired: Held", 238371, 2)
+    eq(#db.pendingRealm, 3, "sales and expiries are held too")
+
+    db.pendingRealm[#db.pendingRealm + 1] = { op = "buy", key = "someone-else", t = NOW, id = 1, qty = 1, a = 1 }
+    fire("PLAYER_ENTERING_WORLD")
+    eq(#db.events, before, "still no realm: nothing flushed")
+
+    function GetNormalizedRealmName() return "Area52" end
+    fire("PLAYER_ENTERING_WORLD")
+    eq(db.events[before + 1], rec("buy", NOW, 238371, 5, 500), "held buy is booked with the realm")
+    check(db.events[before + 2] and db.events[before + 2]:find("^sale|%d+|Area52|238371|3|900|45$"), "held sale is booked")
+    check(db.events[before + 3] and db.events[before + 3]:find("^expired|%d+|Area52|238371|2$"), "held expiry is booked")
+    eq(#db.pendingRealm, 1, "another character's held records stay for that character")
+    db.pendingRealm = {}
+
+    ns.MAX_PENDING = 2
+    function GetNormalizedRealmName() return "" end
+    db.charRealms = {}
+    for i = 1, 4 do buy(238371, i, 100, 100 * i) end
+    eq(#db.pendingRealm, 2, "held records are capped")
+    eq(db.pendingRealm[1].qty, 3, "the oldest are dropped")
+    ns.MAX_PENDING = 500
+    db.pendingRealm = {}
+    function GetNormalizedRealmName() return "Area52" end
+    ns.realm()
 end
 
 T.done()

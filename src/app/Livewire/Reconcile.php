@@ -54,8 +54,8 @@ class Reconcile extends Component
         $this->vendoring = $vendor;
         $this->vendorEach = '';
 
-        // Start from what the vendor paid last time for this item.
-        if ($vendor && ($last = $reconcile->lastVendorUnit($user, (int) $c->item_id, $c->game)) !== null) {
+        // Start from what the vendor paid last time for this item, else Blizzard's sell price.
+        if ($vendor && ($last = $reconcile->vendorUnit($user, (int) $c->item_id, $c->game)) !== null) {
             $this->vendorEach = Money::fmt($last);
         }
     }
@@ -122,7 +122,7 @@ class Reconcile extends Component
             $n = $reconcile->acceptVendoredMany(auth()->user(), $ids);
         })) {
             $this->bulkDone(count($ids), $n, ':n buy added and vendored.|:n buys added and vendored.',
-                ':n skipped (no earlier vendor price for the item, or already handled). Use Vendored on a row to set one.');
+                ':n skipped (no vendor price known for the item, or already handled). Use Vendored on a row to set one.');
         }
     }
 

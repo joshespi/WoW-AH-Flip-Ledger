@@ -13,12 +13,15 @@ use App\Support\Money;
 use App\Support\Utc;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
+use Tests\Support\FakesBlizzard;
 use Tests\Support\SeedsMarketData;
 use Tests\TestCase;
 
 class ReconcileTest extends TestCase
 {
+    use FakesBlizzard;
     use RefreshDatabase;
     use SeedsMarketData;
 
@@ -179,9 +182,26 @@ class ReconcileTest extends TestCase
         Livewire::actingAs($user)->test(Reconcile::class)->call('edit', $next, true)->assertSet('vendorEach', Money::fmt(200));
     }
 
+    public function test_vendored_selected_falls_back_to_the_blizzard_sell_price(): void
+    {
+        $user = $this->user();
+        $this->blizzardConfigured();
+        Http::fake([
+            self::TOKEN_URL => Http::response(['access_token' => 'tok', 'expires_in' => 86399]),
+            self::ITEM_URL => fn () => Http::response(['id' => 100, 'name' => 'Practically Pork', 'sell_price' => 30]),
+        ]);
+        $id = $this->candidate($user, 'a', 10, 1000);
+
+        Livewire::actingAs($user)->test(Reconcile::class)
+            ->set('selected', [$id])->call('vendorSelected')->assertSee('1 buy added and vendored.');
+
+        $this->assertSame(300, Trade::where('side', 'vendor')->value('cost_copper'));
+    }
+
     public function test_vendored_selected_uses_each_items_last_price_and_skips_unknown_ones(): void
     {
         $user = $this->user();
+        $this->blizzardUnconfigured();
         $this->seedItem(200, 'Other');
         $first = $this->candidate($user, 'a', 10, 1000);
         Livewire::actingAs($user)->test(Reconcile::class)->call('edit', $first, true)->set('vendorEach', '2s')->call('saveEdited');

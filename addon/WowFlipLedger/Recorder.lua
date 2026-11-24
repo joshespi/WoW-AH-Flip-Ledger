@@ -40,42 +40,89 @@ local function realmName(fn)
     end
 end
 
+-- Some clients (Forever among them) answer the realm calls with nothing for long stretches, so the
+-- realm is also asked of UnitFullName and remembered per character. "" means not known yet: the
+-- caller holds the record (ns.record) rather than guess, since a wrong realm books P/L wrongly.
+local function unitRealm()
+    return (select(2, UnitFullName("player")))
+end
+
+-- The character's key, "" before the GUID is known (it would give every character the same key).
+local function who()
+    return (UnitGUID and UnitGUID("player") and ns.charKey and ns.charKey()) or ""
+end
+
 function ns.realm()
     local d = ns.db()
     local r = realmName(GetNormalizedRealmName) or realmName(GetRealmName)
+        or realmName(UnitFullName and unitRealm)
+    local key = who()
+
     if r then
-        if d.realm ~= r then
-            d.realm = r
+        d.realm = r
+        if key ~= "" then
+            d.charRealms[key] = r
         end
         return r
     end
 
+    -- Another character's realm (d.realm) is not this one's; only before login is it all there is.
+    if key ~= "" then
+        return d.charRealms[key] or ""
+    end
     return d.realm or ""
 end
 
--- Records written without a realm get the one realm the other records name (none if there are
--- several: not guessed). Runs once per load.
+local function realmOf(s)
+    return s:match("^[^|]*|[^|]*|([^|]+)|")
+end
+
+local function parseLot(s)
+    local id, t, qty, deposit, realm = s:match("^(%d+)|(%d+)|(%d+)|(%d+)|([^|]*)$")
+    return tonumber(id), tonumber(t), tonumber(qty), tonumber(deposit), realm
+end
+
+-- One-time migration for files saved before records were held: with a single realm in the file
+-- (or a remembered one), records without a realm take it. No neighbour guessing across realms.
 function ns.repairRealms(d)
-    local found, n = nil, 0
+    if d.realmRepaired then
+        return
+    end
+    d.realmRepaired = true
+
+    local seen, n, last = nil, 0, nil
     for _, list in ipairs({ d.events, d.unresolved }) do
         for _, s in ipairs(list) do
-            local realm = s:match("^[^|]*|[^|]*|([^|]+)|")
-            if realm and realm ~= found then
-                found, n = realm, n + 1
+            local r = realmOf(s)
+            if r then
+                if r ~= seen then
+                    seen, n = r, n + 1
+                end
+                if list == d.events then
+                    last = r
+                end
             end
         end
     end
+    local only = (n == 1 and seen) or (n == 0 and d.realm ~= "" and d.realm) or nil
 
-    found = n == 1 and found or (n == 0 and d.realm) or nil
-    if not found or found == "" then
-        return
+    if only then
+        for _, list in ipairs({ d.events, d.unresolved }) do
+            for i, s in ipairs(list) do
+                local kind, t, rest = s:match("^([^|]*)|([^|]*)||(.*)$")
+                if kind then
+                    list[i] = kind .. "|" .. t .. "|" .. only .. "|" .. rest
+                end
+            end
+        end
     end
+    d.realm = (d.realm ~= "" and d.realm) or last or only
 
-    for _, list in ipairs({ d.events, d.unresolved }) do
-        for i, s in ipairs(list) do
-            local kind, t, rest = s:match("^([^|]*)|([^|]*)||(.*)$")
-            if kind then
-                list[i] = kind .. "|" .. t .. "|" .. found .. "|" .. rest
+    -- A lot saved without a realm belongs to the latest known one.
+    if d.realm and d.realm ~= "" then
+        for i, s in ipairs(d.lots or {}) do
+            if select(5, parseLot(s)) == "" then
+                d.lots[i] = s .. d.realm
             end
         end
     end
@@ -219,6 +266,71 @@ function ns.resolveWaiting()
     d.unresolved = still
 end
 
+-- Records waiting for a realm ----------------------------------------------------------------
+
+ns.MAX_PENDING = 500
+
+local function dispatch(o, realm)
+    if o.op == "buy" then
+        ns.addEvent("buy", o.t, realm, o.id, o.qty, o.a)
+    elseif o.op == "sale" then
+        ns.addEvent("sale", o.t, realm, o.id, o.qty, o.a, o.b)
+        ns.takeLots(o.id, o.qty, realm)
+    elseif o.op == "unresolved" then
+        ns.addUnresolved("sale", o.t, realm, o.name, o.qty, o.a, o.b)
+    elseif o.op == "expiry" then
+        ns.addEvent(o.kind, o.t, realm, o.id, o.qty)
+        local matched, lost = ns.takeLots(o.id, o.qty, realm)
+        if lost > 0 then
+            ns.addEvent("deposit", o.t, realm, o.id, matched, lost)
+        end
+        if matched < o.qty then
+            local d = ns.db()
+            d.depositMissed = d.depositMissed + 1
+        end
+    elseif o.op == "lot" then
+        ns.addLot(o.id, o.t, o.qty, o.a, realm)
+    end
+end
+
+-- Books o under the character's realm, or keeps it (saved, so it survives /reload) until one is known.
+function ns.record(o)
+    local realm = ns.realm()
+    if realm ~= "" then
+        dispatch(o, realm)
+        return
+    end
+
+    local d = ns.db()
+    o.key = who()
+    d.pendingRealm[#d.pendingRealm + 1] = o
+    if #d.pendingRealm > ns.MAX_PENDING then
+        table.remove(d.pendingRealm, 1)
+    end
+end
+
+-- Books held records once this character's realm is known. A character flushes only its own.
+function ns.flushRealm()
+    local d = ns.db()
+    if #d.pendingRealm == 0 then
+        return
+    end
+    local realm = ns.realm()
+    if realm == "" then
+        return
+    end
+
+    local me, keep, held = who(), {}, d.pendingRealm
+    d.pendingRealm = keep
+    for _, o in ipairs(held) do
+        if o.key == me then
+            dispatch(o, realm)
+        else
+            keep[#keep + 1] = o
+        end
+    end
+end
+
 -- Buys ----------------------------------------------------------------------------------------
 
 -- The price quote for the purchase in progress.
@@ -268,6 +380,7 @@ function ns.onPurchaseConfirm(id, qty)
 end
 
 function ns.onPurchaseSucceeded()
+    ns.flushRealm()
     local p = purchase
     purchase = nil
 
@@ -282,7 +395,7 @@ function ns.onPurchaseSucceeded()
     end
 
     ns.learn(p.id)
-    ns.addEvent("buy", time(), ns.realm(), p.id, p.qty, total)
+    ns.record({ op = "buy", t = time(), id = p.id, qty = p.qty, a = total })
 end
 
 function ns.onPurchaseFailed()
@@ -295,14 +408,14 @@ end
 local pending = {}
 local PENDING_SECONDS = 300
 
-local function parseLot(s)
-    local id, t, qty, deposit, realm = s:match("^(%d+)|(%d+)|(%d+)|(%d+)|([^|]*)$")
-    return tonumber(id), tonumber(t), tonumber(qty), tonumber(deposit), realm
-end
-
 function ns.addLot(id, t, qty, deposit, realm)
     local d = ns.db()
-    d.lots[#d.lots + 1] = join(id, t, qty, deposit, realm or ns.realm())
+    realm = realm or ns.realm()
+    if realm == "" then
+        ns.record({ op = "lot", id = id, t = t, qty = qty, a = deposit })
+        return
+    end
+    d.lots[#d.lots + 1] = join(id, t, qty, deposit, realm)
 
     local cutoff = t - LOT_DAYS * DAY
     while #d.lots > ns.MAX_LOTS or (d.lots[1] and (select(2, parseLot(d.lots[1])) or 0) < cutoff) do
@@ -453,6 +566,7 @@ function ns.onMailTaken(index)
         return
     end
 
+    ns.flushRealm()
     local d = ns.db()
     local _, _, _, subject, money, _, daysLeft, hasItem = GetInboxHeaderInfo(index)
     local now = time()
@@ -480,12 +594,11 @@ function ns.onMailTaken(index)
             return
         end
 
-        local id, realm = ns.resolve(name), ns.realm()
+        local id = ns.resolve(name)
         if id then
-            ns.addEvent("sale", t, realm, id, count, gross, cut or 0)
-            ns.takeLots(id, count, realm)
+            ns.record({ op = "sale", t = t, id = id, qty = count, a = gross, b = cut or 0 })
         else
-            ns.addUnresolved("sale", t, realm, name, count, gross, cut or 0)
+            ns.record({ op = "unresolved", t = t, name = clean(name), qty = count, a = gross, b = cut or 0 })
         end
         return
     end
@@ -505,17 +618,8 @@ function ns.onMailTaken(index)
         return
     end
 
-    local realm = ns.realm()
     for _, it in ipairs(ns.attachments(index)) do
-        ns.addEvent(kind, t, realm, it.id, it.qty)
-
-        local matched, lost = ns.takeLots(it.id, it.qty, realm)
-        if lost > 0 then
-            ns.addEvent("deposit", t, realm, it.id, matched, lost)
-        end
-        if matched < it.qty then
-            d.depositMissed = d.depositMissed + 1
-        end
+        ns.record({ op = "expiry", kind = kind, t = t, id = it.id, qty = it.qty })
     end
 end
 
@@ -542,14 +646,16 @@ function ns.recorderStatus()
     end
 
     return string.format(
-        "Recording: %d buys, %d sales, %d expired, %d cancelled; %d deposits lost recorded (%d expired/cancelled had no or only a partly matching post); %d sales waiting on an item name; %d buys missed. Client %s (%s), interface %s, project %s, auction house API %s.",
-        counts.buy, counts.sale, counts.expired, counts.cancelled, counts.deposit, d.depositMissed, #d.unresolved, d.missed,
+        "Recording: %d buys, %d sales, %d expired, %d cancelled; %d deposits lost recorded (%d expired/cancelled had no or only a partly matching post); %d sales waiting on an item name; %d records waiting on a realm; %d buys missed. Client %s (%s), interface %s, project %s, auction house API %s.",
+        counts.buy, counts.sale, counts.expired, counts.cancelled, counts.deposit, d.depositMissed, #d.unresolved, #d.pendingRealm, d.missed,
         tostring(c.version), tostring(c.build), tostring(c.toc), tostring(c.project), c.ah and "present" or "missing"
     )
 end
 
 -- Wiring -------------------------------------------------------------------------------------
 
+ns.on("PLAYER_LOGIN", ns.flushRealm)
+ns.on("PLAYER_ENTERING_WORLD", ns.flushRealm)
 ns.on("PLAYER_LOGIN", ns.resolveWaiting)
 ns.on("COMMODITY_PRICE_UPDATED", function(_, _, total)
     ns.onPriceQuote(total)

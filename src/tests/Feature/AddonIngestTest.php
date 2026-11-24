@@ -299,6 +299,20 @@ class AddonIngestTest extends TestCase
         $this->assertSame([777 => 4, self::ITEM => 5], $held, '888 sold out; 777 was only ever counted by TSM');
     }
 
+    public function test_records_without_a_realm_are_counted_and_reported(): void
+    {
+        $upload = $this->addon([
+            'sale|'.self::T.'|Area52|'.self::ITEM.'|1|45000|2250',
+            'sale|'.(self::T + 1).'||'.self::ITEM.'|1|45000|2250',
+            'expired|'.(self::T + 2).'||'.self::ITEM.'|1',
+        ]);
+
+        $this->assertSame(1, $upload->counts['sales']['new']);
+        $this->assertSame(2, $upload->counts['no_realm']);
+        $this->assertStringContainsString('2 records had no realm', Upload::summary($upload->counts));
+        $this->assertStringNotContainsString('no realm', Upload::summary($this->addon(['sale|'.(self::T + 5).'|Area52|'.self::ITEM.'|1|45000|2250'])->counts));
+    }
+
     public function test_a_waiting_sale_gets_its_id_from_a_unique_catalog_name(): void
     {
         $this->seedItem(111, 'Void-Tempered Hide', 'blizzard');
