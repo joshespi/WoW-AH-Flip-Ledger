@@ -63,6 +63,44 @@ class CorrectHoldings extends Component
         }
     }
 
+    /** The correction being edited in its row, null when none. */
+    public ?int $editing = null;
+
+    public string $editQty = '';
+
+    public string $editReason = '';
+
+    public string $editNote = '';
+
+    public function edit(int $id): void
+    {
+        $c = Trade::ownedBy(auth()->user())->whereIn('side', Trade::HOLDING_CORRECTIONS)->findOrFail($id);
+
+        $this->editing = $c->id;
+        $this->editQty = (string) $c->qty;
+        $this->editReason = $c->side;
+        $this->editNote = (string) $c->note;
+        $this->resetErrorBag('corrections');
+    }
+
+    public function cancel(): void
+    {
+        $this->editing = null;
+        $this->resetErrorBag('corrections');
+    }
+
+    public function saveEdit(TradesService $trades): void
+    {
+        $saved = $this->attempt('corrections', function () use ($trades) {
+            $qty = Bounds::wholeNumber($this->editQty) ?? throw new InvalidArgumentException('Removed must be a whole number.');
+            $trades->updateCorrection(auth()->user(), (int) $this->editing, $qty, $this->editReason, $this->editNote);
+        });
+
+        if ($saved) {
+            $this->reload(__('Correction updated.'));
+        }
+    }
+
     public function undo(int $id, TradesService $trades): void
     {
         if ($this->attempt('corrections', fn () => $trades->deleteCorrection(auth()->user(), $id))) {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3
+
+- Web app changes only. No addon changes.
+
 ## 1.0.2
 
 - Web app changes only. No addon changes.

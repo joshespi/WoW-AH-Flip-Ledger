@@ -74,8 +74,27 @@
                             </thead>
                             <tbody>
                                 @foreach ($corrections as $c)
-                                    <tr wire:key="c{{ $c->id }}">
+                                    <tr wire:key="c{{ $c->id }}{{ $editing === $c->id ? '-edit' : '' }}">
                                         <td><x-time :at="$c->traded_at" /></td>
+                                    @if ($editing === $c->id)
+                                        <td>
+                                            <select wire:model="editReason" aria-label="{{ __('Kind') }}" class="field text-sm">
+                                                @foreach (\App\Models\Trade::HOLDING_CORRECTIONS as $side)
+                                                    <option value="{{ $side }}">{{ \App\Models\Trade::correctionLabel($side) }}</option>
+                                                @endforeach
+                                            </select>
+                                        </td>
+                                        <td class="num">
+                                            <input type="text" inputmode="numeric" wire:model="editQty" wire:keydown.enter="saveEdit" aria-label="{{ __('Removed') }}" class="w-24 field text-sm num text-end">
+                                        </td>
+                                        <td>
+                                            <input type="text" maxlength="{{ \App\Support\Bounds::MAX_NOTE }}" wire:model="editNote" wire:keydown.enter="saveEdit" aria-label="{{ __('Note') }}" class="w-full min-w-40 field text-sm">
+                                        </td>
+                                        <td class="text-end space-x-3">
+                                            <button type="button" wire:click="saveEdit" wire:loading.attr="disabled" wire:target="saveEdit" class="link text-sm">{{ __('Save') }}</button>
+                                            <button type="button" wire:click="cancel" class="link text-sm">{{ __('Cancel') }}</button>
+                                        </td>
+                                    @else
                                         <td>
                                             {{ \App\Models\Trade::correctionLabel($c->side) }}
                                             @if (($proceeds = \App\Models\Trade::proceeds($c->side, (int) $c->cost_copper)) !== null)
@@ -84,11 +103,15 @@
                                         </td>
                                         <td class="num">{{ number_format($c->qty) }}</td>
                                         <td class="text-gray-600 dark:text-gray-400">{{ $c->note }}</td>
-                                        <td class="text-end">
+                                        <td class="text-end space-x-3">
+                                            @if (\App\Models\Trade::isHoldingCorrection($c->side))
+                                                <button type="button" wire:click="edit({{ $c->id }})" class="link text-sm">{{ __('Edit') }}</button>
+                                            @endif
                                             <button type="button" wire:click="undo({{ $c->id }})" wire:confirm="{{ __('Undo this correction?') }}"
                                                     wire:loading.attr="disabled" wire:target="undo"
                                                     class="link-danger text-sm">{{ __('Undo') }}</button>
                                         </td>
+                                    @endif
                                     </tr>
                                 @endforeach
                             </tbody>

@@ -93,9 +93,7 @@ class TradesService
      */
     public function correctHeld(User $user, int $itemId, int $held, string $side, ?string $note = null, string $game = Game::RETAIL): Trade
     {
-        if (! in_array($side, Trade::HOLDING_CORRECTIONS, true)) {
-            throw new InvalidArgumentException('Pick what happened to the rest.');
-        }
+        $this->holdingSide($side);
 
         $current = $this->positions->held($user, $itemId, $game);
 
@@ -222,6 +220,51 @@ class TradesService
     public function deleteCorrection(User $user, int $id): void
     {
         Trade::ownedBy($user)->whereIn('side', Trade::CORRECTIONS)->findOrFail($id)->delete();
+    }
+
+    /**
+     * Changes a holding correction's units removed, kind and note; its time stays. It can remove
+     * at most what the ledger would hold now without it. Vendor sales follow their buy instead.
+     *
+     * @throws InvalidArgumentException
+     */
+    public function updateCorrection(User $user, int $id, int $qty, string $side, ?string $note): Trade
+    {
+        $this->holdingSide($side);
+
+        return DB::transaction(function () use ($user, $id, $qty, $side, $note) {
+            $trade = Trade::ownedBy($user)->whereIn('side', Trade::HOLDING_CORRECTIONS)->lockForUpdate()->findOrFail($id);
+
+            if ($qty < 1) {
+                throw new InvalidArgumentException('Removed must be at least 1. To remove none, undo the correction.');
+            }
+
+            $item = (int) $trade->item_id;
+            $ts = Utc::ts($trade->getRawOriginal('traded_at'));
+
+            // Removing no more than before always fits. More must have been held at its time (the
+            // replay removes only what is there) and must not take the holding below zero now.
+            if ($qty > (int) $trade->qty) {
+                $max = min($this->positions->heldForCraft($user, $item, $ts, $trade->game),
+                    $this->positions->held($user, $item, $trade->game) + (int) $trade->qty);
+
+                if ($qty > $max) {
+                    throw new InvalidArgumentException('Removed must be at most '.number_format($max).'.');
+                }
+            }
+
+            $trade->update($this->attributes($item, $qty, 0, $ts, $note) + ['side' => $side]);
+
+            return $trade;
+        });
+    }
+
+    /** @throws InvalidArgumentException */
+    private function holdingSide(string $side): void
+    {
+        if (! Trade::isHoldingCorrection($side)) {
+            throw new InvalidArgumentException('Pick what happened to the rest.');
+        }
     }
 
     /**

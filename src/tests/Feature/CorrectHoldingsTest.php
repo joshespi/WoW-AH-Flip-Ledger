@@ -8,6 +8,7 @@ use App\Models\Trade;
 use App\Models\User;
 use App\Services\PositionsService;
 use App\Services\TradesService;
+use App\Support\Utc;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
@@ -108,6 +109,64 @@ class CorrectHoldingsTest extends TestCase
             ->assertSee('Written off')->call('undo', $id)->assertRedirect();
 
         $this->assertSame(60, $this->position($user)->held);
+    }
+
+    public function test_a_correction_can_be_edited_in_place(): void
+    {
+        $user = $this->user();
+        $c = app(TradesService::class)->correctHeld($user, 100, 10, 'writeoff'); // removes 50
+        $at = $c->getRawOriginal('traded_at');
+
+        Livewire::actingAs($user)->test(CorrectHoldings::class, ['itemId' => 100, 'ledgerHeld' => 10])
+            ->call('edit', $c->id)->assertSet('editQty', '50')->assertSet('editReason', 'writeoff')
+            ->set('editQty', '61')->call('saveEdit')->assertSee('at most 60') // 10 held + 50
+            ->set('editQty', '30')->set('editReason', 'adjust')->set('editNote', 'miscounted')->call('saveEdit')
+            ->assertHasNoErrors()->assertRedirect(route('items.show', 100).'#correct');
+
+        $c->refresh();
+        $this->assertSame([30, 'adjust', 'miscounted', $at], [(int) $c->qty, $c->side, $c->note, $c->getRawOriginal('traded_at')]);
+        $p = $this->position($user);
+        $this->assertSame(30, $p->held);
+        $this->assertSame(40_000, $p->realized);
+    }
+
+    public function test_an_edit_cannot_remove_more_than_was_held_at_its_time(): void
+    {
+        $user = $this->user();
+        $trades = app(TradesService::class);
+        $c = $trades->correctHeld($user, 100, 10, 'adjust'); // removes 50 of 60
+        $c->update(['traded_at' => Utc::sql(self::T + 200)]);
+        $trades->add($user, 100, 50, 50_000, self::T + 300, null); // 60 held now
+
+        try {
+            $trades->updateCorrection($user, $c->id, 61, 'adjust', null);
+            $this->fail('removed more than was held at its time');
+        } catch (InvalidArgumentException $e) {
+            $this->assertStringContainsString('at most 60', $e->getMessage()); // not 60 + 50
+        }
+
+        $trades->updateCorrection($user, $c->id, 60, 'adjust', null);
+        $this->assertSame(50, app(PositionsService::class)->held($user, 100));
+    }
+
+    public function test_vendor_sales_and_other_users_corrections_cannot_be_edited(): void
+    {
+        $user = $this->user();
+        $vendor = Trade::create(['user_id' => $user->id, 'game' => 'retail', 'side' => 'vendor', 'source' => 'manual', 'item_id' => 100,
+            'qty' => 5, 'cost_copper' => 500, 'traded_at' => '2026-10-12 17:00:00']);
+        $other = User::factory()->create();
+        app(TradesService::class)->add($other, 100, 10, 10_000, self::T, null);
+        $theirs = app(TradesService::class)->correctHeld($other, 100, 0, 'adjust');
+
+        foreach ([$vendor->id, $theirs->id] as $id) {
+            try {
+                app(TradesService::class)->updateCorrection($user, $id, 1, 'adjust', null);
+                $this->fail("correction {$id} was edited");
+            } catch (ModelNotFoundException) {
+            }
+        }
+
+        $this->assertSame(5, (int) $vendor->fresh()->qty);
     }
 
     public function test_less_tsm_stock_warns_about_uncollected_mail_but_is_not_the_default(): void

@@ -56,6 +56,12 @@ class Trade extends Model
         return (int) array_search($side, self::CORRECTIONS, true);
     }
 
+    /** Whether Correct holdings may book (and edit) this side. */
+    public static function isHoldingCorrection(string $side): bool
+    {
+        return in_array($side, self::HOLDING_CORRECTIONS, true);
+    }
+
     /** Whether a correction books realized P/L (proceeds, if any, minus the removed cost); an adjust does not. */
     public static function booksPnl(string $side): bool
     {
