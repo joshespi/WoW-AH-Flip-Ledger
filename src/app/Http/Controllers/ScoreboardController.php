@@ -13,10 +13,10 @@ class ScoreboardController extends Controller
     public function __invoke(Request $request, ScoreboardService $scoreboard): View
     {
         // Query values come from links, but anyone can type them: anything unknown falls back.
-        $pick = fn (string $key, array $allowed) => in_array($request->query($key), $allowed, true) ? $request->query($key) : $allowed[0];
+        $pick = fn (string $key, array $allowed, ?string $default = null) => in_array($request->query($key), $allowed, true) ? $request->query($key) : ($default ?? $allowed[0]);
 
         $game = $pick('game', Game::GAMES);
-        $period = $pick('period', array_keys(ScoreboardService::PERIODS));
+        $period = $pick('period', array_keys(ScoreboardService::PERIODS), ScoreboardService::DEFAULT_PERIOD);
         $metric = $pick('metric', array_keys(ScoreboardService::METRICS));
 
         $rows = $scoreboard->board($game, $period, $metric);

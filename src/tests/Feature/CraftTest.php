@@ -220,6 +220,72 @@ class CraftTest extends TestCase
         $this->assertSame([$new], Trade::where('craft_id', $id)->get()->map(fn (Trade $t) => $t->traded_at->getTimestamp())->unique()->values()->all());
     }
 
+    public function test_repeating_a_batch_scales_stock_and_vendor_buys_and_checks_the_remaining_stock(): void
+    {
+        $user = $this->crafted();
+        $source = Trade::where('side', Trade::SIDE_CRAFTIN)->sole();
+        $page = Livewire::actingAs($user)->test(Trades::class)
+            ->assertSee('Repeat craft')
+            ->call('startRepeatCraft', $source->id)
+            ->assertSet('repeatQty', '5')
+            ->set('repeatQty', '20')
+            ->set('repeatTime', $user->inputTime(self::T + 20, seconds: true))
+            ->call('saveRepeatCraft')
+            ->assertHasNoErrors()
+            ->assertSet('repeatingCraft', null);
+
+        $product = $this->row($user, 400);
+        $this->assertSame([25, 102_500], [$product->held, $product->costBasis]);
+        $this->assertSame(0, $this->row($user, 100)->held);
+        $this->assertDatabaseHas('trades', ['side' => Trade::SIDE_BUY, 'item_id' => 300, 'qty' => 40, 'cost_copper' => 2000]);
+
+        $before = Trade::count();
+        $page->call('startRepeatCraft', $source->id)->call('saveRepeatCraft')->assertHasErrors('repeat');
+        $this->assertSame($before, Trade::count());
+    }
+
+    public function test_repeat_rejects_fractional_ingredient_use(): void
+    {
+        $user = User::factory()->create();
+        $trades = app(TradesService::class);
+        $source = $trades->addCraft($user, 400, 2, [['item' => 300, 'qty' => 3, 'vendor' => 50]], self::T);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('whole units');
+        $trades->repeatCraft($user, $source->id, 1, self::T + 10);
+    }
+
+    public function test_repeat_refuses_a_deleted_or_foreign_craft_and_writes_nothing(): void
+    {
+        $user = $this->crafted();
+        $id = Trade::where('side', Trade::SIDE_CRAFTIN)->sole()->id;
+        $trades = app(TradesService::class);
+        $before = Trade::count();
+
+        foreach ([[User::factory()->create(), $id], [$user, $id + 1000]] as [$who, $craft]) {
+            try {
+                $trades->repeatCraft($who, $craft, 5, self::T + 20);
+                $this->fail('expected a refusal');
+            } catch (InvalidArgumentException $e) {
+                $this->assertStringContainsString('no longer exists', $e->getMessage());
+            }
+        }
+
+        $this->assertSame($before, Trade::count());
+    }
+
+    public function test_the_stock_check_names_the_short_ingredient_among_several(): void
+    {
+        $user = User::factory()->create();
+        $trades = app(TradesService::class);
+        $trades->add($user, 100, 10, 1_000, self::T, null);
+        $trades->add($user, 300, 2, 200, self::T, null);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('fewer than 3 of item 300');
+        $trades->addCraft($user, 400, 1, [['item' => 100, 'qty' => 10, 'vendor' => null], ['item' => 300, 'qty' => 3, 'vendor' => null]], self::T + 10);
+    }
+
     public function test_a_craft_buy_cannot_be_deleted_alone(): void
     {
         $user = $this->crafted();

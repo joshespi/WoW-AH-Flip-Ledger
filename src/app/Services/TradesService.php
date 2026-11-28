@@ -146,13 +146,19 @@ class TradesService
             }
 
             $this->attributes($i['item'], $i['qty'], ($i['vendor'] ?? 0) * $i['qty'], $ts, null);
-
-            if ($i['vendor'] === null && $this->positions->heldForCraft($user, $i['item'], $ts, $game) < $i['qty']) {
-                throw new InvalidArgumentException('The ledger has fewer than '.number_format($i['qty']).' of item '.$i['item'].' at the craft time. Check when you recorded the ingredient buy, or enter the price if it came from a vendor.');
-            }
         }
 
         return DB::transaction(function () use ($user, $productId, $qtyMade, $ingredients, $ts, $note, $game, $recipeId) {
+            // Two simultaneous batches must not both claim the same remaining stock.
+            User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $fromStock = array_column(array_filter($ingredients, fn (array $i): bool => $i['vendor'] === null), 'item');
+            $stock = $fromStock === [] ? [] : $this->positions->stockForCraft($user, $ts, $game, $fromStock);
+            foreach ($ingredients as $i) {
+                if ($i['vendor'] === null && ($stock[$i['item']] ?? 0) < $i['qty']) {
+                    throw new InvalidArgumentException('The ledger has fewer than '.number_format($i['qty']).' of item '.$i['item'].' at the craft time. Check when you recorded the ingredient buy, or enter the price if it came from a vendor.');
+                }
+            }
+
             $made = $this->create($user, Trade::SIDE_CRAFTIN, $productId, $qtyMade, 0, $ts, $note, Trade::SOURCE_MANUAL, null, $game);
             $made->update(['craft_id' => $made->id, 'recipe_id' => $recipeId]);
 
@@ -166,6 +172,30 @@ class TradesService
 
             return $made;
         });
+    }
+
+    public function repeatCraft(User $user, int $craftId, int $qtyMade, int $ts): Trade
+    {
+        $game = $user->activeGame();
+        $rows = Trade::ownedBy($user)->inGame($game)->where('craft_id', $craftId)->get();
+        $product = $rows->firstWhere('side', Trade::SIDE_CRAFTIN);
+        if ($product === null) {
+            throw new InvalidArgumentException('That craft no longer exists.');
+        }
+
+        $buys = $rows->where('side', Trade::SIDE_BUY)->keyBy('item_id');
+        $ingredients = [];
+        foreach ($rows->where('side', Trade::SIDE_CRAFTOUT) as $used) {
+            $scaled = $used->qty * $qtyMade;
+            if ($scaled % $product->qty !== 0) {
+                throw new InvalidArgumentException('Choose an output quantity that uses whole units of every ingredient.');
+            }
+
+            $buy = $buys->get($used->item_id);
+            $ingredients[] = ['item' => (int) $used->item_id, 'qty' => intdiv($scaled, $product->qty), 'vendor' => $buy ? Money::unit($buy->cost_copper, $buy->qty) : null];
+        }
+
+        return $this->addCraft($user, $product->item_id, $qtyMade, $ingredients, $ts, $product->note, $game, $product->recipe_id);
     }
 
     /** Takes the whole craft: what it made, what it used and the vendor buys it brought in. */

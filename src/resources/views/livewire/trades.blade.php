@@ -200,6 +200,9 @@
                                 @endif
                                 <td class="text-gray-600 dark:text-gray-400">{{ $t->note }}</td>
                                 <td class="whitespace-nowrap text-end">
+                                    @if ($t->side === \App\Models\Trade::SIDE_CRAFTIN)
+                                        <button type="button" wire:click="startRepeatCraft({{ $t->craft_id }})" class="me-3 link text-sm">{{ __('Repeat craft') }}</button>
+                                    @endif
                                     @if ($buy && ! $craft)
                                         <button type="button" wire:click="edit({{ $t->id }})" class="link text-sm">{{ __('Edit') }}</button>
                                     @endif
@@ -214,6 +217,23 @@
                                             class="ms-3 link-danger text-sm">{{ __('Delete') }}</button>
                                 </td>
                             </tr>
+                            @if ($repeatingCraft === (int) $t->craft_id)
+                                <tr wire:key="repeat-{{ $t->craft_id }}">
+                                    <td colspan="7">
+                                        <form wire:submit="saveRepeatCraft" class="flex flex-wrap items-end gap-3">
+                                            <label>{{ __('Additional units') }}
+                                                <input type="number" min="1" max="{{ \App\Support\Bounds::MAX_QTY }}" required wire:model="repeatQty" class="mt-1 block w-28 field text-sm">
+                                            </label>
+                                            <label>{{ __('Crafted (:tz)', ['tz' => $user->timezone]) }}
+                                                <input type="datetime-local" step="1" required wire:model="repeatTime" class="mt-1 block field text-sm">
+                                            </label>
+                                            <x-secondary-button type="submit" wire:loading.attr="disabled" wire:target="saveRepeatCraft">{{ __('Record craft') }}</x-secondary-button>
+                                            <button type="button" wire:click="cancelRepeatCraft" class="link text-sm">{{ __('Cancel') }}</button>
+                                        </form>
+                                        <x-input-error :messages="$errors->get('repeat')" />
+                                    </td>
+                                </tr>
+                            @endif
                         @endforeach
                     </tbody>
                 </table>

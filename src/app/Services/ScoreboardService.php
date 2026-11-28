@@ -17,8 +17,10 @@ use Illuminate\Support\Facades\Log;
  */
 class ScoreboardService
 {
-    /** period => window in days (null: all time). The first is the default. */
+    /** period => window in days (null: all time). */
     public const PERIODS = ['7d' => 7, '30d' => 30, 'all' => null];
+
+    public const DEFAULT_PERIOD = 'all';
 
     /** metric => entries column. The first is the default. */
     public const METRICS = ['pnl' => 'pnl_copper', 'sales' => 'sales_copper', 'units' => 'units'];

@@ -54,6 +54,17 @@ class RecipeTest extends TestCase
         return [$user, $recipe];
     }
 
+    public function test_repeating_a_craft_keeps_its_recipe_and_note(): void
+    {
+        [$user, $recipe] = $this->setUpRecipe();
+        $source = Trade::where('side', Trade::SIDE_CRAFTIN)->sole();
+        $source->update(['note' => 'batch A']);
+
+        $made = app(TradesService::class)->repeatCraft($user, $source->id, 5, self::T + 30);
+
+        $this->assertSame([$recipe->id, 'batch A'], [(int) $made->fresh()->recipe_id, $made->note]);
+    }
+
     public function test_the_recipe_cost_is_a_realized_loss_on_its_product(): void
     {
         [$user] = $this->setUpRecipe();

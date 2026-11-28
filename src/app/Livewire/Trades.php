@@ -59,6 +59,12 @@ class Trades extends Component
 
     public string $craftEditTime = '';
 
+    public ?int $repeatingCraft = null;
+
+    public string $repeatQty = '';
+
+    public string $repeatTime = '';
+
     public string $craftNote = '';
 
     /** '' picks the one recipe for the product, if any; 'none', or a recipe id. */
@@ -405,6 +411,35 @@ class Trades extends Component
             $this->reset('product', 'made', 'craftNote', 'craftRecipe');
             $this->ingredients = [self::blankIngredient()];
             $this->craftTime = $user->inputTime(seconds: true);
+        }
+    }
+
+    public function startRepeatCraft(int $craftId): void
+    {
+        $user = auth()->user();
+        $qty = Trade::ownedBy($user)->inGame($user->activeGame())->where('side', Trade::SIDE_CRAFTIN)->whereKey($craftId)->valueOrFail('qty');
+        $this->resetErrorBag('repeat');
+        $this->repeatingCraft = $craftId;
+        $this->repeatQty = (string) $qty;
+        $this->repeatTime = $user->inputTime(seconds: true);
+    }
+
+    public function cancelRepeatCraft(): void
+    {
+        $this->reset('repeatingCraft', 'repeatQty', 'repeatTime');
+        $this->resetErrorBag('repeat');
+    }
+
+    public function saveRepeatCraft(TradesService $trades): void
+    {
+        $user = auth()->user();
+        $this->resetErrorBag('repeat');
+        if ($this->repeatingCraft !== null && $this->attempt('repeat', fn () => $trades->repeatCraft(
+            $user, $this->repeatingCraft, Bounds::quantityInput($this->repeatQty), $user->parseInputTime($this->repeatTime)
+        ))) {
+            $this->message = __('Craft recorded.');
+            $this->cancelRepeatCraft();
+            $this->resetPage();
         }
     }
 

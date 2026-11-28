@@ -188,10 +188,13 @@ class PositionsService
         return $this->stockForCraft($user, $ts, $game, $itemId)[$itemId] ?? 0;
     }
 
-    /** @return array<int, int> Item id => units available at the craft time. */
-    public function stockForCraft(User $user, int $ts, string $game, ?int $itemId = null): array
+    /**
+     * @param  int|list<int>|null  $items  null for every item
+     * @return array<int, int> Item id => units available at the craft time.
+     */
+    public function stockForCraft(User $user, int $ts, string $game, int|array|null $items = null): array
     {
-        [$buys, $adjustments, $crafts] = $this->trades($user, $game, $itemId, through: $ts);
+        [$buys, $adjustments, $crafts] = $this->trades($user, $game, $items, through: $ts);
         $adjustments = array_filter($adjustments, fn (array $t): bool => $t['ts'] < $ts);
         $crafts = array_filter($crafts, fn (array $c): bool => $c['ts'] < $ts || ($c['ts'] === $ts && $c['kind'] === 'out'));
         $first = $this->firstBuys($buys, $crafts);
@@ -357,14 +360,14 @@ class PositionsService
      *
      * @return array{0: list<array{ts: int, item: int, qty: int, cost: int}>, 1: list<array{ts: int, item: int, qty: int, cost: int, correction: string}>, 2: list<array{ts: int, item: int, qty: int, craft: int, kind: 'in'|'out', recipe: int}>}
      */
-    private function trades(User $user, string $game, ?int $itemId = null, ?int $through = null): array
+    private function trades(User $user, string $game, int|array|null $items = null, ?int $through = null): array
     {
         $buys = [];
         $adjustments = [];
         $crafts = [];
 
         foreach (DB::table('trades')->ownedBy($user)->inGame($game)->whereIn('side', [Trade::SIDE_BUY, ...Trade::CORRECTIONS, ...Trade::CRAFT_SIDES])
-            ->when($itemId !== null, fn ($q) => $q->where('item_id', $itemId))
+            ->when($items !== null, fn ($q) => $q->whereIn('item_id', (array) $items))
             ->when($through !== null, fn ($q) => $q->where('traded_at', '<=', Utc::sql($through)))
             ->get(['side', 'item_id', 'traded_at', 'qty', 'cost_copper', 'craft_id', 'recipe_id']) as $r) {
             // LedgerService reads a correction's cost only as its proceeds.
