@@ -217,7 +217,7 @@
                                             class="ms-3 link-danger text-sm">{{ __('Delete') }}</button>
                                 </td>
                             </tr>
-                            @if ($repeatingCraft === (int) $t->craft_id)
+                            @if ($t->side === \App\Models\Trade::SIDE_CRAFTIN && $repeatingCraft === (int) $t->craft_id)
                                 <tr wire:key="repeat-{{ $t->craft_id }}">
                                     <td colspan="7">
                                         <form wire:submit="saveRepeatCraft" class="flex flex-wrap items-end gap-3">
